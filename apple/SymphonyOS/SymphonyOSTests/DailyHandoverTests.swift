@@ -61,6 +61,15 @@ struct DailyHandoverTests {
         #expect(DailyHandover.light(at: 0.6, from: from, to: to).opacity == 1)
     }
 
+    /// The microphone fades in over the last quarter of the travel, so the landing is one light.
+    @Test func theMicFadesInOverTheLastQuarter() {
+        let mic = { (p: Double) in DailyHandover.light(at: p, from: from, to: to).micOpacity }
+        #expect(mic(0) == 0)
+        #expect(mic(0.75) == 0)
+        #expect(abs(mic(0.875) - 0.5) < 0.0001)
+        #expect(mic(1) == 1)
+    }
+
     /// The bar's light: its diameter, at the field's right end, `lightInset` in.
     @Test func theBarsLightIsAtTheFieldsRightEnd() {
         let end = DailyHandover.end(bar: bar)
@@ -138,6 +147,34 @@ struct DailyHandoverTests {
             #expect(DailyHandover.play(lowered: true, sheetOver: false, reduceMotion: reduceMotion) == .skip)
             #expect(DailyHandover.play(lowered: false, sheetOver: true, reduceMotion: reduceMotion) == .skip)
         }
+    }
+
+    /// A slot already taken as the handover starts (a waiting Tell answered as Today appears)
+    /// interrupts it before it begins: no travel, the light is home at once.
+    @Test func aSlotAlreadyTakenMeansNoTravel() {
+        #expect(DailyHandover.play(lowered: false, sheetOver: false, reduceMotion: false, slotTaken: true) == .still)
+        #expect(DailyHandover.play(lowered: true, sheetOver: false, reduceMotion: false, slotTaken: true) == .skip)
+    }
+
+    // MARK: What ends the travel
+
+    /// A tap on the light or the field: the travel ends and the light is home, then the tap does its work.
+    @Test func aTouchOnTheBarEndsTheTravelAndArrives() {
+        #expect(DailyHandover.interrupt(.touch) == (ends: true, arrives: true))
+    }
+
+    /// Listening, a note or Undo taking the slot ends the travel; the slot going back to empty does not.
+    @Test func theSlotTakenEndsTheTravelAndArrives() {
+        for slot in [DailyBar.Slot.listening, .say(note: "It’s on Friday the 20th.", undo: false), .say(note: nil, undo: true)] {
+            #expect(DailyHandover.interrupt(.slot(slot)) == (ends: true, arrives: true))
+        }
+        #expect(DailyHandover.interrupt(.slot(.empty)) == (ends: false, arrives: false))
+    }
+
+    /// The handle lowers the sheet over the whole plan, taking the bar away: the travel ends with no
+    /// arrival, so neither the halo nor the line plays and the line is not spent.
+    @Test func theHandleEndsTheTravelWithNoArrival() {
+        #expect(DailyHandover.interrupt(.handle) == (ends: true, arrives: false))
     }
 
     // MARK: The line in the bar's one slot
@@ -256,6 +293,19 @@ struct DailyHandoverModelTests {
         m.handoverArrived()
         #expect(m.bar.slot == .listening)
         #expect(handoverMemory.seen(for: me) == false)
+    }
+
+    /// The bar gone from the screen by the time the light lands (a sheet opened, the phone half
+    /// open): no halo, no line, and the line is not spent.
+    @Test func noBarAtTheLandingSpendsNothing() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.handoverArrived(barShown: false)
+        #expect(m.handoverHalo == false)
+        #expect(m.bar.slot == .empty)
+        #expect(handoverMemory.seen(for: me) == false)
+        m.handoverArrived()
+        #expect(m.bar.slot == .handover)
     }
 
     /// A Tell that waited for the walk is answered once as the handover starts: the bar listens,

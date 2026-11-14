@@ -355,7 +355,8 @@ final class LightEditionUITests: XCTestCase {
     }
 
     /// Finishing the walk in a light household lands on light Today with the handover's line; a
-    /// second launch that finishes again as the same person lands there with no line.
+    /// second launch that finishes again as the same person lands there with no line. Both times the
+    /// handover ran: the bar's light wears its halo (`daily.bar.halo`, a Debug demo marker).
     @MainActor func testFinishingTheWalkHandsTheLightToTheBarOnce() throws {
         let line = "daily.handover"
         let first = finishTheWalk(light: true)
@@ -364,6 +365,7 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(any[line].waitForExistence(timeout: 10), "no handover line the first time")
         XCTAssertEqual(any[line].label, "The light lives here now. Type, or tap it to speak.")
         XCTAssertTrue(any["daily.bar.light"].exists, "no light on the bar")
+        XCTAssertTrue(any["daily.bar.halo"].exists, "the light wears no halo")
         XCTAssertTrue(any[line].waitForNonExistence(timeout: 15), "the line never went")
         first.terminate()
 
@@ -371,6 +373,7 @@ final class LightEditionUITests: XCTestCase {
         let anyAgain = again.descendants(matching: .any)
         XCTAssertTrue(anyAgain["daily.today"].waitForExistence(timeout: 30), "not on light Today the second time")
         XCTAssertTrue(anyAgain["daily.bar.light"].waitForExistence(timeout: 10), "no light on the bar")
+        XCTAssertTrue(anyAgain["daily.bar.halo"].waitForExistence(timeout: 10), "the handover did not run the second time")
         XCTAssertFalse(anyAgain[line].waitForExistence(timeout: 5), "the line showed a second time")
     }
 
@@ -382,5 +385,6 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertFalse(any["daily.today"].exists, "a light page in a full household")
         XCTAssertFalse(any["daily.bar.light"].exists, "a light on a full household's Today")
         XCTAssertFalse(any["daily.handover"].waitForExistence(timeout: 3), "the handover's line in a full household")
+        XCTAssertFalse(any["daily.bar.halo"].exists, "a handover in a full household")
     }
 }

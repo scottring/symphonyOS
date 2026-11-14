@@ -215,8 +215,11 @@ import Observation
 
     /// The walk's light has arrived on the bar (or snapped home at a touch): the light wears the
     /// halo for `DailyHandover.lineMs`, and the first time for this person on this phone the line
-    /// asks for the slot. It is remembered as seen only if it actually showed.
-    func handoverArrived() {
+    /// asks for the slot. It is remembered as seen only if it actually showed. With the bar no
+    /// longer on screen (`barShown` false: a sheet opened, the phone set down half open) nothing
+    /// arrives, and the line is not spent.
+    func handoverArrived(barShown: Bool = true) {
+        guard barShown else { return }
         handoverHalo = true
         scheduler.after(DailyHandover.lineMs, key: Self.haloKey) { [weak self] in self?.handoverHalo = false }
         guard !handoverMemory.seen(for: userId) else { return }

@@ -78,7 +78,7 @@ struct LightTodayView: View {
                 if low == nil {
                     DailyPaperFade(fade: m.bar.fade, size: size)
                     DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
-                                 listening: DailyCopy.listening(.today), lightShown: travel == nil, touched: { endTravel() })
+                                 listening: DailyCopy.listening(.today), lightShown: travel == nil, touched: { interrupt(.touch) })
                 }
                 if let travel {
                     HandoverLight(progress: travel, from: DailyHandover.start(window: size), to: DailyHandover.end(bar: m.bar))
@@ -106,7 +106,7 @@ struct LightTodayView: View {
         // An ordinary walk just finished onto this page (`DailyHandover.plays`): the light comes down to the bar.
         .onChange(of: appState.handover) { _, _ in startHandover() }
         // Listening, a note or Undo taking the line slot ends the travel at once.
-        .onChange(of: model.bar.slot) { _, slot in if slot != .empty { endTravel() } }
+        .onChange(of: model.bar.slot) { _, slot in interrupt(.slot(slot)) }
         // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet;
         // asked for while the walk shows, it is answered as the walk closes.
         .onChange(of: appState.tellRequested) { _, _ in answerTell() }
@@ -278,7 +278,7 @@ struct LightTodayView: View {
 
     /// The handle lowers the sheet over the whole plan, reading the ridge as it goes, or raises it.
     private func handleTapped() {
-        endTravel(arriving: false)
+        interrupt(.handle)
         let ridge = DailyLookBack.ridge(goalAreas, me: userId, saved: walkPosition)
         for event in lookBack.handleTapped(areas: ridge.areas, kept: ridge.kept) { model.send(event) }
     }
@@ -292,8 +292,8 @@ struct LightTodayView: View {
     private func startHandover() {
         guard appState.handover else { return }
         appState.handover = false
-        switch DailyHandover.play(lowered: lookBack.lowered, sheetOver: opened != nil || appState.dailyPanel != nil,
-                                  reduceMotion: reduceMotion) {
+        switch DailyHandover.play(lowered: lookBack.lowered, sheetOver: sheetOver, reduceMotion: reduceMotion,
+                                  slotTaken: model.bar.slot != .empty) {
         case .skip:
             return
         case .still:
@@ -321,27 +321,36 @@ struct LightTodayView: View {
         }
     }
 
+    /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.
+    private var sheetOver: Bool { opened != nil || appState.dailyPanel != nil || appState.posture.isHalfOpen }
+
+    /// Whether the bar is still on screen as the light lands (asked again: a sheet may have opened).
+    private var barShown: Bool {
+        DailyHandover.play(lowered: lookBack.lowered, sheetOver: sheetOver, reduceMotion: reduceMotion) != .skip
+    }
+
     /// The travelling light reaches the bar: it is the bar's light from here on.
     private func arrive(_ run: Int) {
         guard travelRun == run, travel != nil else { return }
         travel = nil
-        withAnimation(.easeIn(duration: 0.25)) { model.handoverArrived() }
+        withAnimation(.easeIn(duration: 0.25)) { model.handoverArrived(barShown: barShown) }
     }
 
-    /// A touch on the bar, or the slot taken, during the travel: the light snaps home at once, and
-    /// a sheet that had not begun to rise rises. The handle lowering the sheet takes the bar away,
-    /// so nothing arrives (`arriving` false) and the line is not spent.
-    private func endTravel(arriving: Bool = true) {
-        guard travel != nil else { return }
+    /// Something happened during the travel, as `DailyHandover.interrupt` reads it: a touch on the
+    /// bar or the slot taken snaps the light home and it arrives; the handle (taking the bar away)
+    /// ends it with no arrival. A sheet that had not begun to rise rises.
+    private func interrupt(_ interruption: DailyHandover.Interruption) {
+        let cut = DailyHandover.interrupt(interruption)
+        guard cut.ends, travel != nil else { return }
         travelRun += 1
         var still = Transaction()
         still.disablesAnimations = true
         withTransaction(still) { travel = nil }
         if sheetDrop != 0 { withAnimation(reduceMotion ? nil : WalkEndingView.move) { sheetDrop = 0 } }
-        guard arriving else { return }
+        guard cut.arrives else { return }
         // After the touch has done what it asks: a tap on the light listening first takes the
         // slot, so the line is not shown, and not spent.
-        DispatchQueue.main.async { model.handoverArrived() }
+        DispatchQueue.main.async { model.handoverArrived(barShown: barShown) }
     }
 
     /// Tell asked for from outside, as the model answers it (`DailyGate.tell`); once taken, a

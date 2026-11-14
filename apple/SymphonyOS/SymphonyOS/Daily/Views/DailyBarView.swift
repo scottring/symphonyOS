@@ -138,15 +138,29 @@ struct DailyBarView: View {
             touched()
             model.send(.micTapped)
         } label: {
+            // Shown at once as the travelling light lands (never faded in), so one light changes size.
             DailyLight(diameter: metrics.light, listening: bar.isListening, halo: model.handoverHalo)
                 .opacity(lightShown ? 1 : 0)
-                .animation(.easeInOut(duration: 0.25), value: model.handoverHalo)
                 .frame(width: metrics.lightTouch.width, height: metrics.lightTouch.height, alignment: .trailing)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(bar.lightLabel)
         .accessibilityIdentifier("daily.bar.light")
+        .background { haloMarker }
+    }
+
+    /// Debug demo only: a marker a UI test can find while the light wears the handover's halo, so
+    /// "no line" can be told apart from "no handover at all".
+    @ViewBuilder private var haloMarker: some View {
+        #if DEBUG
+        if DemoMode.isOn && model.handoverHalo {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier("daily.bar.halo")
+        }
+        #endif
     }
 
     // MARK: The line above the bar
@@ -244,13 +258,14 @@ struct DailyBarView: View {
 /// glow and highlight (`WalkOrbView`'s body at 96 across) scaled to `diameter`, with the board's
 /// thin warm ring and a microphone in plank ink. Listening, it turns rust with a white
 /// microphone and a soft rust ring. It does not breathe: on the bar it is a button, at rest.
-/// Just handed over from the walk it wears the board's halo (`halo`); travelling down it is
-/// drawn without its microphone (`mic` false), as the walk's light has none.
+/// Just handed over from the walk it wears the board's halo (`halo`, which fades in and out on
+/// its own); travelling down its microphone fades in over the last quarter (`micOpacity`), as the
+/// walk's light has none.
 struct DailyLight: View {
     let diameter: CGFloat
     let listening: Bool
     var halo = false
-    var mic = true
+    var micOpacity: Double = 1
 
     /// The walk's light is 96 across; everything below is its number times this.
     private var k: CGFloat { diameter / 96 }
@@ -265,13 +280,16 @@ struct DailyLight: View {
                     .fill(DailyPalette.rust)
                     .frame(width: diameter, height: diameter)
             } else {
-                if halo { handoverHalo }
+                // Only the halo animates: the light itself never fades as it arrives.
+                ZStack { if halo { handoverHalo } }
+                    .animation(.easeInOut(duration: 0.25), value: halo)
                 orb(at: k)
             }
-            if mic {
+            if micOpacity > 0 {
                 Image(systemName: "mic")
                     .font(.system(size: 20 * diameter / 38, weight: .regular))
                     .foregroundStyle(listening ? Color.white : DailyPalette.plankInk)
+                    .opacity(micOpacity)
             }
         }
         .frame(width: diameter, height: diameter)
