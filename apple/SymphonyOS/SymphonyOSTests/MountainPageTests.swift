@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import SwiftData
 @testable import Symphony
 
 private func day(_ y: Int, _ m: Int, _ d: Int) -> Date {
@@ -49,28 +50,35 @@ struct MountainPageTests {
 
     // MARK: The period on screen
 
-    @Test func theOwnLevelFollowsTheDateAndTheLevelsAboveFollowTheWalk() {
+    @Test func thePagesPeriodsHoldTheDateItWasOpenedOn() {
+        // 28 November: the walk plans December and winter; the November page is November and fall.
         let opened = day(2026, 11, 28)
         let walk = WalkPeriods.pick(now: opened)
         let page = MountainPage.periods(level: .month, selected: opened, today: opened, seasons: nil)
-        #expect(walk.monthStart == day(2026, 12, 1))
+        #expect(walk.monthStart == day(2026, 12, 1) && walk.season.name == "Winter" && walk.year == 2027)
         #expect(page.monthStart == day(2026, 11, 1))
-        #expect(page.year == walk.year)
-        #expect(page.season == walk.season)
+        #expect(page.season.name == "Fall")
+        #expect(page.year == 2026)
         #expect(page.weekStart == walk.weekStart)
         #expect(page.today == walk.today)
+        // "Current" keeps the walk's meaning: the one in force today.
+        #expect(page.monthIsCurrent && page.seasonIsCurrent)
 
         // On a day when the two agree, the page is the walk's.
         let mid = day(2026, 10, 14)
         #expect(MountainPage.periods(level: .month, selected: mid, today: mid, seasons: nil).monthStart
             == WalkPeriods.pick(now: mid).monthStart)
 
-        // A Season page opened on 14 November shows fall while the walk plans winter.
+        // A Season page opened on 14 November is fall, and its month (what its line names) November.
         let fourteenth = day(2026, 11, 14)
         let season = MountainPage.periods(level: .season, selected: fourteenth, today: fourteenth, seasons: nil)
         #expect(WalkPeriods.pick(now: fourteenth).season.name == "Winter")
         #expect(season.season.name == "Fall")
-        #expect(season.monthStart == WalkPeriods.pick(now: fourteenth).monthStart)
+        #expect(season.monthName == "November")
+
+        // A page opened ahead of today: the season that holds that day, not in force yet.
+        let ahead = MountainPage.periods(level: .season, selected: day(2027, 1, 10), today: fourteenth, seasons: nil)
+        #expect(ahead.season.name == "Winter" && !ahead.seasonIsCurrent && !ahead.monthIsCurrent)
     }
 
     @Test func aYearPageShowsTheYearItWasOpenedOn() {
@@ -284,14 +292,23 @@ struct MountainPageTests {
 
         let effects = page.apply(.moveTo(area("Money").id))
         #expect(effects == [.setArea(y.id, .year, to: area("Money").id, from: area("Health").id)])
-        #expect(page.kept == [area("Health").id, area("Money").id])
+        // Health was kept only because the flag stood there; nothing saved keeps it.
+        #expect(page.kept == [area("Money").id])
         #expect(page.items.first?.areaId == area("Money").id)
         #expect(page.selected == nil && !page.moving)
 
-        // Moving into an area already kept keeps nothing new.
-        _ = page.apply(.flag(y.id))
-        #expect(page.apply(.moveTo(area("Health").id)) == [.setArea(y.id, .year, to: area("Health").id, from: area("Money").id)])
-        #expect(page.kept == [area("Health").id, area("Money").id])
+        // A saved area stays kept with nothing in it.
+        var saved = MountainPage(level: .year, items: [y], areas: ridge, saved: [area("Health").id])
+        _ = saved.apply(.flag(y.id))
+        #expect(saved.apply(.moveTo(area("Fun").id)) == [.setArea(y.id, .year, to: area("Fun").id, from: area("Health").id)])
+        #expect(saved.kept == [area("Health").id, area("Fun").id])
+
+        // With nowhere else to go, Move to does not open.
+        var lone = MountainPage(level: .year, items: [y], areas: [area("Health")], saved: [])
+        _ = lone.apply(.flag(y.id))
+        #expect(lone.apply(.moveTapped) == [])
+        #expect(!lone.moving)
+        #expect(lone.panel?.moveTo == [])
     }
 
     @Test func pullUpLetsGo() {
@@ -305,6 +322,18 @@ struct MountainPageTests {
         #expect(page.panel == nil)
         #expect(!page.items.contains { $0.id == m.id })
         #expect(page.apply(.pullUp) == [])
+
+        // What depended on it is worked out again: its area's column (kept only by it), and the
+        // week task under it, which stays, unlinked, as the writer leaves it.
+        let other = flag(.month, "Stretch every morning", in: "Health")
+        let lonely = flag(.month, "Fix the bike", in: "Fun")
+        let w = flag(.week, "Pump the tyres", in: "Fun", parent: lonely.id)
+        var page2 = MountainPage(level: .month, items: [s, other, lonely, w], areas: ridge, saved: [])
+        #expect(page2.kept == [area("Health").id, area("Fun").id])
+        _ = page2.apply(.flag(lonely.id))
+        _ = page2.apply(.pullUp)
+        #expect(page2.kept == [area("Health").id])
+        #expect(page2.below.map(\.parentId) == [nil])
     }
 
     // MARK: Walk it down
@@ -381,6 +410,14 @@ struct MountainPageTests {
         #expect(kept == [area("Health").id, area("People").id, area("Money").id])
         #expect(MountainPage.kept(items: [], areas: ridge, saved: []) == [])
 
+        // A saved id whose area's row came with another id is found by its name first.
+        let homeRow = WalkArea(id: uid(7001), name: "Home")
+        let ridgeWithRow = ridge.map { $0.name == "Home" ? homeRow : $0 }
+        #expect(MountainPage.kept(items: [], areas: ridgeWithRow, saved: [area("Home").id, UUID()],
+                                  savedAreas: ridge) == [homeRow.id])
+        let page0 = MountainPage(level: .year, items: [], areas: ridgeWithRow, saved: [area("Home").id], savedAreas: ridge)
+        #expect(page0.kept == [homeRow.id])
+
         // A week task's area is not a column on a Month page.
         let page = MountainPage(level: .month, items: [flag(.week, "Ring the plumber", in: "Home")], areas: ridge, saved: [])
         #expect(page.kept == [])
@@ -408,6 +445,11 @@ struct MountainPageTests {
         let unsaved = MountainPage.areas([homeRow], me: me, saved: [])
         #expect(unsaved.map(\.name) == WalkClassifier.defaults)
         #expect(unsaved.first { $0.name == "Home" }?.id == homeRow.id)
+
+        // With no rows and nothing saved, the six defaults.
+        let bare = MountainPage.areas([], me: me, saved: [])
+        #expect(bare.map(\.name) == WalkClassifier.defaults)
+        #expect(Set(bare.map(\.id)).count == 6)
 
         // Never more than the ridge holds.
         let many = (0..<8).map { WalkArea(id: uid(9100 + $0), name: "Extra \($0)") }
@@ -462,5 +504,153 @@ struct MountainPageTests {
         #expect(page.perform(.moveTo(area("Fun").id), on: other.id)
             == [.setArea(other.id, .season, to: area("Fun").id, from: area("Home").id)])
         #expect(page.perform(.pullUp, on: y.id) == [])     // not a flag of this page's level
+    }
+
+    // MARK: Built from the rows, by their links
+
+    private func goal(_ name: String, year: Int, in areaName: String? = nil, user: UUID? = nil,
+                      context: String? = "personal") -> Goal {
+        let g = Goal(id: UUID(), userId: user ?? me, name: name, year: year)
+        g.context = context
+        g.areaId = areaName.map { area($0).id }
+        return g
+    }
+
+    private func row(_ title: String, _ level: WalkLevel, start: Date? = nil, in areaName: String? = nil,
+                     goal: UUID? = nil, source: UUID? = nil, user: UUID? = nil, context: String? = "personal") -> SymphonyTask {
+        let t = SymphonyTask(id: UUID(), userId: user ?? me, title: title, context: context)
+        switch level {
+        case .season: t.bucket = "quarter"; t.seasonStart = start
+        case .month: t.bucket = "month"; t.monthStart = start
+        default: t.bucket = "week"; t.weekStart = start
+        }
+        t.areaId = areaName.map { area($0).id }
+        t.goalId = goal
+        t.sourceId = source
+        return t
+    }
+
+    @Test func aFallPageOnTheFourteenthHangsEachFlagUnderItsRealParent() {
+        let today = day(2026, 11, 14)
+        let fall = day(2026, 9, 1), winter = day(2026, 12, 1)
+        let y2026 = goal("Feel strong", year: 2026, in: "Health")
+        let y2027 = goal("Finish the house", year: 2027, in: "Home")
+        let family = goal("Family trip", year: 2027, in: "Fun", context: "family")
+        let fullOfNovember = row("Get running again", .season, start: fall, in: "Health", goal: y2026.id)
+        let bare = row("Sort the attic", .season, start: fall, in: "Home", goal: y2027.id)
+        let underFamily = row("Book the cabin", .season, start: fall, in: "Fun", goal: family.id)
+        let november = row("Three runs a week", .month, start: day(2026, 11, 1), in: "Health", source: fullOfNovember.id)
+        let winterGoal = row("Paint the hall", .season, start: winter, in: "Home", goal: y2027.id)
+        let theirs = row("Their fall goal", .season, start: fall, in: "Home", user: UUID())
+        let work = row("Ship the report", .season, start: fall, in: "Work", context: "work")
+
+        let flags = MountainPage.flags(level: .season, goals: [y2026, y2027, family],
+                                       tasks: [fullOfNovember, bare, underFamily, november, winterGoal, theirs, work],
+                                       selected: today, today: today, seasons: nil, me: me, areas: ridge)
+        #expect(flags.periods.season.name == "Fall")
+        #expect(flags.own.map(\.id) == [fullOfNovember.id, bare.id, underFamily.id])
+        // Its year flag is its real parent: 2026 for one, 2027 for the other; none of the family's.
+        #expect(flags.own.map(\.parentId) == [y2026.id, y2027.id, nil])
+        #expect(Set(flags.above.map(\.id)) == [y2026.id, y2027.id])
+        #expect(flags.above.allSatisfy { $0.level == .year })
+        // The walk's winter goal is not on the Fall page; another person's and a Work row never are.
+        let shown = Set(flags.items.map(\.id))
+        for hidden in [winterGoal.id, theirs.id, work.id, family.id] { #expect(!shown.contains(hidden)) }
+        #expect(flags.below.map(\.id) == [november.id])
+        #expect(flags.walk.contains { $0.id == winterGoal.id })
+
+        var page = MountainPage(level: .season, flags: flags, areas: ridge, saved: [])
+        #expect(page.periods == flags.periods)
+        _ = page.apply(.flag(fullOfNovember.id))
+        #expect(page.panel?.line == nil)                   // it has November's goal under it
+        _ = page.apply(.flag(bare.id))
+        #expect(page.panel?.line == DailyCopy.nothingUnder(.season, periods: flags.periods))
+        #expect(flags.periods.monthName == "November")
+        // Fall is not the walk's season: nothing on it is walked down.
+        #expect(page.panel?.canWalkDown == false)
+        #expect(page.walkState.items.count == 5)
+    }
+
+    @Test func theNovemberPageOnTheTwentyEighthKeepsItsFallParents() throws {
+        let today = day(2026, 11, 28)
+        let fall = day(2026, 9, 1), winter = day(2026, 12, 1)
+        let year = goal("Finish the house", year: 2027, in: "Home")
+        let fallGoal = row("Sort the attic", .season, start: fall, in: "Home", goal: year.id)
+        let winterGoal = row("Paint the hall", .season, start: winter, in: "Home", goal: year.id)
+        let gutters = row("Clear the gutters", .month, start: day(2026, 11, 1), in: "Home", source: fallGoal.id)
+        let december = row("Buy the paint", .month, start: winter, in: "Home", source: winterGoal.id)
+
+        let flags = MountainPage.flags(level: .month, goals: [year], tasks: [fallGoal, winterGoal, gutters, december],
+                                       selected: today, today: today, seasons: nil, me: me, areas: ridge)
+        #expect(flags.own.map(\.id) == [gutters.id])
+        #expect(flags.own.first?.parentId == fallGoal.id)      // a Fall parent stays a Fall parent
+        // Above: the year, then the walk's winter goal and the real Fall parent, each once.
+        #expect(flags.above.map(\.id) == [year.id, winterGoal.id, fallGoal.id])
+        #expect(flags.above.map(\.parentId) == [nil, year.id, year.id])
+        #expect(!flags.items.contains { $0.id == december.id })
+
+        // A goal added with the winter flag focused files into November, under that flag.
+        var page = MountainPage(level: .month, flags: flags, areas: ridge, saved: [])
+        _ = page.apply(.flag(winterGoal.id))
+        let hanging = try #require(page.hanging)
+        #expect(hanging.parent?.id == winterGoal.id)
+        #expect(hanging.periods.monthStart == day(2026, 11, 1))
+        // The season handed over is one the writer accepts: it holds the month it files into.
+        #expect(hanging.periods.season.start <= hanging.periods.monthStart
+                && hanging.periods.monthStart < hanging.periods.season.end)
+
+        let container = try ModelContainer(
+            for: SymphonyTask.self, Goal.self, GoalArea.self, TaskCommitment.self, TaskFocus.self,
+            PendingChange.self, Routine.self, ActionableInstance.self, FamilyMember.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let ctx = ModelContext(container)
+        for g in [year] { ctx.insert(g) }
+        for t in [fallGoal, winterGoal] { ctx.insert(t) }
+        try ctx.save()
+        let added = WalkItem(id: UUID(), level: .month, title: "Pick the colours", areaId: hanging.parent?.areaId,
+                             parentId: hanging.parent?.id, day: nil)
+        WalkWriter(context: ctx, userId: me, periods: hanging.periods).create(added, parent: hanging.parent)
+        let written = try #require(try ctx.fetch(FetchDescriptor<SymphonyTask>()).first { $0.id == added.id })
+        #expect(written.bucket == "month")
+        #expect(PlanCalendar.sameDay(written.monthStart, day(2026, 11, 1)))
+        #expect(written.sourceId == winterGoal.id)
+        #expect(written.goalId == year.id)
+    }
+
+    @Test func theYearPageOnTheTwentyNinthReadsTwentyTwentySix() {
+        let today = day(2026, 12, 29)
+        let held = goal("Feel strong", year: 2026, in: "Health")
+        let bare = goal("Learn to sail", year: 2026, in: "Fun")
+        let next = goal("Finish the house", year: 2027, in: "Home")
+        let winterUnder = row("Swim twice a week", .season, start: day(2026, 12, 1), in: "Health", goal: held.id)
+        let winterNext = row("Paint the hall", .season, start: day(2026, 12, 1), in: "Home", goal: next.id)
+
+        let flags = MountainPage.flags(level: .year, goals: [held, bare, next], tasks: [winterUnder, winterNext],
+                                       selected: today, today: today, seasons: nil, me: me, areas: ridge)
+        #expect(flags.periods.year == 2026)
+        #expect(flags.own.map(\.id) == [held.id, bare.id])
+        #expect(flags.above.isEmpty)
+        #expect(flags.below.map(\.id) == [winterUnder.id])        // by link, not by the walk's 2027
+        #expect(flags.periods.season.name == "Winter")
+
+        var page = MountainPage(level: .year, flags: flags, areas: ridge, saved: [])
+        _ = page.apply(.flag(held.id))
+        #expect(page.panel?.line == nil)
+        _ = page.apply(.flag(bare.id))
+        #expect(page.panel?.line == DailyCopy.nothingUnder(.year, periods: flags.periods))
+    }
+
+    @Test func aFlagWhoseParentIsGoneStandsOnItsAreasPost() {
+        let today = day(2026, 11, 14)
+        let orphan = row("Three runs a week", .month, start: day(2026, 11, 1), in: "Health", source: UUID())
+        let selfLinked = row("Stretch", .month, start: day(2026, 11, 1), in: "Health")
+        selfLinked.sourceId = selfLinked.id
+        let flags = MountainPage.flags(level: .month, goals: [], tasks: [orphan, selfLinked],
+                                       selected: today, today: today, seasons: nil, me: me, areas: ridge)
+        #expect(flags.own.map(\.parentId) == [nil, nil])
+        #expect(flags.above.isEmpty)
+        let page = MountainPage(level: .month, flags: flags, areas: ridge, saved: [])
+        let layout = WalkLayout.make(page.walkState, today: today, footing: .natural)
+        #expect(layout.posts.contains { $0.key == WalkPostKey(level: .month, column: area("Health").id) })
     }
 }
