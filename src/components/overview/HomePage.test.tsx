@@ -125,5 +125,7 @@ describe('Home is mounted', () => {
     const { appRegistry } = await import('@/shell/appRegistry')
     const app = appRegistry.find((a) => a.route === '/overview')
     expect(app?.Component).toBe(HomePage)
-  })
+    // Importing the registry loads the whole app: about 4s on its own, and
+    // past the default 5s when the full suite runs on a busy machine.
+  }, 30_000)
 })
