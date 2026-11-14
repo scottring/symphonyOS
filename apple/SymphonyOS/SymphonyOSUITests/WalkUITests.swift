@@ -29,7 +29,7 @@ final class WalkUITests: XCTestCase {
     @MainActor func testAQuickStartPlantsAFlag() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]
-        app.launch()
+        app.launchDemo()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
 
         // Welcome: the light itself is the quick start.
@@ -56,7 +56,7 @@ final class WalkUITests: XCTestCase {
     @MainActor func testAFullHouseholdSeesNoWalkUntilItAsks() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo"]
-        app.launch()
+        app.launchDemo()
         let today = app.buttons["Today. Switch horizon"]
         XCTAssertTrue(today.waitForExistence(timeout: 60), "never reached Today")
         XCTAssertFalse(app.staticTexts[welcome].waitForExistence(timeout: 5), "the walk started by itself in a full household")
@@ -77,7 +77,7 @@ final class WalkUITests: XCTestCase {
     @MainActor func testLeavingForNowAndPickingItBackUp() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]
-        app.launch()
+        app.launchDemo()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
         let orb = app.buttons["walk.orb"]
         tap(orb, "the light (Quick start)")

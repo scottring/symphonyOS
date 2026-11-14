@@ -12,7 +12,7 @@ final class LightSpreadUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
                                "-TodaySize", "890x626"] + extra
-        app.launch()
+        app.launchDemo()
         let any = app.descendants(matching: .any)
         XCTAssertTrue(any[page].waitForExistence(timeout: 60), "never reached \(page)")
         return (app, any)
@@ -48,7 +48,7 @@ final class LightSpreadUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-14",
                                "-SymphonyDailySeed", "done", "-TodaySize", "890x626"]
-        app.launch()
+        app.launchDemo()
         let any = app.descendants(matching: .any)
         XCTAssertTrue(any["daily.spread"].waitForExistence(timeout: 60), "never reached the spread")
         XCTAssertTrue(app.staticTexts["8–14 November"].exists, "not this week on the left")

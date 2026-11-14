@@ -18,6 +18,8 @@ struct LightTodayView: View {
     let layout: TodayLayout
     /// Where the walk's light stood, in this page's points, for the handover (`DailyHandover.start`).
     let handoverFrom: (centre: CGPoint, diameter: CGFloat)
+    /// The light half-open display covers this page (the Planner's `DailyGate.coversPage`, its one source).
+    let covered: Bool
     /// A word in the row of words.
     let go: (Horizon) -> Void
     /// A page on a date: where a sign leads.
@@ -218,11 +220,6 @@ struct LightTodayView: View {
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.
     private var sheetOver: Bool { DailyTodayHooks.sheetOver(detailsOpen: opened != nil, appState) }
-
-    /// The light half-open display covers this page (`DailyGate.coversPage`).
-    private var covered: Bool {
-        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: DailyDevice.phone)
-    }
 
     /// Whether the bar is still on screen as the light lands (asked again: a sheet may have opened).
     private var barShown: Bool {

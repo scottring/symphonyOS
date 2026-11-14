@@ -23,6 +23,8 @@ struct LightSpreadView: View {
     let safeTop: CGFloat
     let safeBottom: CGFloat
     let layout: TodayLayout
+    /// The light half-open display covers this page (the Planner's `DailyGate.coversPage`, its one source).
+    let covered: Bool
     /// A word in the row of words, and a band flag (Month).
     let go: (Horizon) -> Void
     /// A page on a date: where a sign leads.
@@ -233,11 +235,6 @@ struct LightSpreadView: View {
         case .still, .travel:
             withAnimation(.easeIn(duration: 0.25)) { model.handoverArrived() }
         }
-    }
-
-    /// The light half-open display covers this page (`DailyGate.coversPage`).
-    private var covered: Bool {
-        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: DailyDevice.phone)
     }
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.

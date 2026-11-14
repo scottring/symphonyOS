@@ -122,11 +122,15 @@ struct LightPlannerView<Full: View>: View {
             model?.close()
             model = nil
         }
-        // The day turned (the minute tick, the app coming back, opening flat: `refreshDay`): the selected
-        // date follows it when it was today (`DailyClock.selected`), so Week and the spread's left page do.
-        .onChange(of: model?.today) { old, new in
-            guard let old, let new else { return }
-            appState.selectedDate = DailyClock.selected(appState.selectedDate, turnedFrom: old, to: new)
+        // The day turned (the minute tick, the app coming back, opening flat: `refreshDay`), or the model
+        // was made again after the Planner was away: the selected date is mended (`DailyGate.dayTurn`,
+        // ruling D18), only where light pages live for this device, so Week and the spread's left page follow.
+        .onChange(of: model?.today) { _, today in
+            guard let today else { return }
+            let turn = DailyGate.dayTurn(selected: appState.selectedDate, lastDay: appState.dailyLastDay, today: today,
+                                         edition: appState.edition, phone: phone)
+            if turn.selected != appState.selectedDate { appState.selectedDate = turn.selected }
+            appState.dailyLastDay = turn.lastDay
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
@@ -149,13 +153,13 @@ struct LightPlannerView<Full: View>: View {
                     // Opened flat (Task 18): Today and Week are one spread, the rest of the week beside today.
                     LightSpreadView(model: model, userId: userId, seasons: seasons, size: size,
                                     safeTop: pageInsets.top, safeBottom: pageInsets.bottom, layout: layout,
-                                    go: go, open: open)
+                                    covered: covered, go: go, open: open)
                         .frame(width: size.width, height: size.height)
                 case .today:
                     LightTodayView(model: model, userId: userId, seasons: seasons, size: size,
                                    safeTop: pageInsets.top, safeBottom: pageInsets.bottom, layout: layout,
                                    handoverFrom: DailyHandover.start(page: size, left: insets.left, right: insets.right),
-                                   go: go, open: open)
+                                   covered: covered, go: go, open: open)
                         .frame(width: size.width, height: size.height)
                 case .week:
                     LightWeekView(model: model, userId: userId, seasons: seasons, size: size,

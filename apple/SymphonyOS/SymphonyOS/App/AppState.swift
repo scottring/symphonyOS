@@ -105,6 +105,10 @@ final class AppState {
     var dailyHidesDock = false
     /// Inbox or More, opened from beside the light bar, as a sheet over the page.
     var dailyPanel: DailyPanel?
+    /// The last day the light Planner saw (`DailyModel.today`; `DailyGate.dayTurn`). Kept here, beside the
+    /// selected date it mends, so a day that turns while the Planner is away (its model let go) is
+    /// still applied to `selectedDate` when the Planner and its model come back.
+    var dailyLastDay: Date?
     /// The walk is showing over everything (set by the main view as it opens and closes it):
     /// a Tell asked for meanwhile waits until it closes (`DailyGate.tell`).
     var walkShowing = false

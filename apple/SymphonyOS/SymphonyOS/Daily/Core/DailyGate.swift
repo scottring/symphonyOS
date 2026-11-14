@@ -150,6 +150,19 @@ enum DailyGate {
         }
     }
 
+    /// The Planner's step as the day turns (`DailyModel.today` changing, or the model made again after
+    /// the Planner was away): it runs only where light pages live for this device, a light household
+    /// on a phone, on any of its windows (held sideways too, so turning it upright later shows the
+    /// right date); on an iPad (ruling D17) or in a full household nothing is touched. It mends the
+    /// selected date by ruling D18 (`DailyClock.selected`) from the last day it saw, and records the
+    /// new one; the first day seen is only recorded.
+    static func dayTurn(selected: Date, lastDay: Date?, today: Date, edition: Edition,
+                        phone: Bool) -> (selected: Date, lastDay: Date?) {
+        guard phone, edition == .light else { return (selected, lastDay) }
+        guard let lastDay else { return (selected, today) }
+        return (DailyClock.selected(selected, turnedFrom: lastDay, to: today), today)
+    }
+
     /// The mountain pages: Month, Season and Year are the walk's own mountain at that level
     /// (`MountainPageView`); Week and Today are not.
     static func mountain(_ horizon: Horizon) -> WalkLevel? {

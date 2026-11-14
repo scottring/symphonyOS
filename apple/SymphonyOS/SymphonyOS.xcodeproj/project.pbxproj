@@ -241,6 +241,7 @@
 		E54556A265B7BAD27E15FEC7 /* WalkState+Orb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 298482E97F5E1153139815AC /* WalkState+Orb.swift */; };
 		E57C504F359B868F330F8AD7 /* PageIngestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */; };
 		E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F45CDE5093407A022589D06 /* ListsView.swift */; };
+		E72C310BA42CB9659F4A1B2E /* DemoLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930161C7A23CA025DB6279D3 /* DemoLaunch.swift */; };
 		E7C7EB89D64D38D5E4C1844A /* WalkTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A62F7A67123AF40218075F3 /* WalkTypes.swift */; };
 		E8B5EA11D41BBF3272A9E57F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99D77B01B73C4E9753A3494 /* ContentView.swift */; };
 		E9931F907BB03878B9C2E2D4 /* SyncOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F10C1B10246EDA085A4AAEB /* SyncOrderTests.swift */; };
@@ -462,6 +463,7 @@
 		91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSerializationTests.swift; sourceTree = "<group>"; };
 		91E7DB757E79521EF9D28609 /* DailyWeekList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeekList.swift; sourceTree = "<group>"; };
 		929BC589EEE02B0452BF408A /* walk-bag.PLACEHOLDER.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "walk-bag.PLACEHOLDER.wav"; sourceTree = "<group>"; };
+		930161C7A23CA025DB6279D3 /* DemoLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoLaunch.swift; sourceTree = "<group>"; };
 		936EBEFDA2D82A91BDC6877A /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		93D83DAC938B3E5C5B0328E6 /* StillToDo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StillToDo.swift; sourceTree = "<group>"; };
 		96334CB8EF20C74A0CFEF840 /* TimelineItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineItemCard.swift; sourceTree = "<group>"; };
@@ -1165,6 +1167,7 @@
 			isa = PBXGroup;
 			children = (
 				0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */,
+				930161C7A23CA025DB6279D3 /* DemoLaunch.swift */,
 				E8E81530D37318E5E8C758EA /* LightEditionUITests.swift */,
 				CD94E09AB9B75AC2DC251E35 /* LightSpreadUITests.swift */,
 				3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */,
@@ -1631,6 +1634,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */,
+				E72C310BA42CB9659F4A1B2E /* DemoLaunch.swift in Sources */,
 				4368E0DCEC662C3E25FA39DE /* LightEditionUITests.swift in Sources */,
 				36468B278B817405B2CC24EF /* LightSpreadUITests.swift in Sources */,
 				4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */,

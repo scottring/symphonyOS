@@ -11,17 +11,14 @@ enum DailyClock {
     }
 
     /// The selected date (`AppState.selectedDate`, which Week and the spread's left page follow) once
-    /// the day has turned from `old` to `new`: if it was today it moves to the new today; if the person
-    /// had gone to another date on purpose (a sign's "tomorrow", a mountain page's period) it stays,
-    /// except that a "tomorrow" the day has now passed becomes today's. Unchanged if the day has not turned.
+    /// the day has turned from `old` to `new`, by ruling D18: a selected date that was today or later
+    /// when the day turned, and is now before today, becomes today (today itself, the sign's
+    /// "tomorrow" with the app reopened days later, a coming period once its date has passed). A
+    /// selected date already before the old today (a past week or period the person went to) stays,
+    /// and so does any date that is still today or later. Unchanged if the day has not turned.
     static func selected(_ selected: Date, turnedFrom old: Date, to new: Date) -> Date {
-        guard !PlanCalendar.sameDay(old, new) else { return selected }
-        if PlanCalendar.sameDay(selected, old) { return PlanCalendar.day(new) }
-        let tomorrow = PlanCalendar.addDays(PlanCalendar.day(old), 1)
-        if PlanCalendar.sameDay(selected, tomorrow) && PlanCalendar.day(selected) < PlanCalendar.day(new) {
-            return PlanCalendar.day(new)
-        }
-        return selected
+        let day = PlanCalendar.day(selected), old = PlanCalendar.day(old), new = PlanCalendar.day(new)
+        return day >= old && day < new ? new : selected
     }
 
     #if DEBUG

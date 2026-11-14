@@ -10,7 +10,7 @@ final class LightEditionUITests: XCTestCase {
     private func launch(light: Bool) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight", "-SymphonyDaily"] : [])
-        app.launch()
+        app.launchDemo()
         // A light household lands on light Today (`daily.today`); a full one on the Today it always had.
         let today = light ? app.descendants(matching: .any)["daily.today"] : app.buttons["Today. Switch horizon"]
         XCTAssertTrue(today.waitForExistence(timeout: 60), "never reached Today")
@@ -66,7 +66,7 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-28",
                                "-SymphonyDailySeed", "quiet"]
-        app.launch()
+        app.launchDemo()
         let sign = app.descendants(matching: .any)["daily.signpost"]
         XCTAssertTrue(sign.waitForExistence(timeout: 60), "no sign on the 28th")
         XCTAssertTrue(sign.label.contains("November"), "not the month's sign: \(sign.label)")
@@ -81,7 +81,7 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
                                "-SymphonyDailyPage", "year", "-SymphonyDailyState", "select"]
-        app.launch()
+        app.launchDemo()
         let any = app.descendants(matching: .any)
         let year = any["daily.mountain.year"]
         XCTAssertTrue(year.waitForExistence(timeout: 60), "never reached Year")
@@ -145,7 +145,7 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
                                "-SymphonyDailyPage", "week", "-SymphonyDailyState", "select"]
-        app.launch()
+        app.launchDemo()
         let any = app.descendants(matching: .any)
         let week = any["daily.week"]
         XCTAssertTrue(week.waitForExistence(timeout: 60), "never reached Week")
@@ -219,7 +219,7 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
                                "-SymphonyDailySeed", "nopiece"]
-        app.launch()
+        app.launchDemo()
         let any = app.descendants(matching: .any)
         let sign = any["daily.signpost"]
         XCTAssertTrue(sign.waitForExistence(timeout: 60), "no sign")
@@ -263,11 +263,11 @@ final class LightEditionUITests: XCTestCase {
 
     // MARK: Set down half open (Task 19)
 
-    private func launchHalfOpen(_ extra: [String]) -> XCUIApplication {
+    private func launchHalfOpen(_ extra: [String], posture: String = "laptop", size: String = "626x890") -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-HalfOpen", "laptop",
-                               "-TodaySize", "626x890"] + extra
-        app.launch()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-HalfOpen", posture,
+                               "-TodaySize", size] + extra
+        app.launchDemo()
         XCTAssertTrue(app.descendants(matching: .any)["daily.halfOpen"].waitForExistence(timeout: 60),
                       "no light half-open display")
         return app
@@ -383,12 +383,8 @@ final class LightEditionUITests: XCTestCase {
     /// underneath, kept but out of reach (ruling D14), with no dock: its bar's light, Inbox, More and its
     /// last word are there and inert, and the display's light is the one that takes a touch.
     @MainActor func testTheSpreadStaysUnderTheBookDisplay() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
-                               "-HalfOpen", "book", "-TodaySize", "890x626"]
-        app.launch()
+        let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-10"], posture: "book", size: "890x626")
         let any = app.descendants(matching: .any)
-        XCTAssertTrue(any["daily.halfOpen"].waitForExistence(timeout: 60), "no light half-open display")
         let kept = any["daily.coveredPage"]
         XCTAssertTrue(kept.waitForExistence(timeout: 15), "no light page kept under the display")
         XCTAssertEqual(kept.value as? String, "today")
@@ -400,13 +396,14 @@ final class LightEditionUITests: XCTestCase {
             assertThereButInert(page[id], id)
         }
         XCTAssertFalse(app.buttons["Planner"].exists, "the dock under the display")
+        XCTAssertFalse(app.buttons["Routines"].exists)
     }
 
     /// A full household set down half open keeps the old display, dinner and all.
     @MainActor func testAFullHouseholdKeepsTheOldHalfOpenDisplay() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-HalfOpen", "laptop", "-TodaySize", "626x890"]
-        app.launch()
+        app.launchDemo()
         let tonight = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Tonight")).firstMatch
         XCTAssertTrue(tonight.waitForExistence(timeout: 60), "the old display's dinner is not there")
         XCTAssertFalse(app.descendants(matching: .any)["daily.halfOpen"].exists)
@@ -421,7 +418,7 @@ final class LightEditionUITests: XCTestCase {
         app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
             + ["-SymphonyWalk", "-SymphonyWalkStep", "6", "-SymphonyWalkSheet", "up"]
             + (remembers ? ["-SymphonyHandoverRemembers"] : [])
-        app.launch()
+        app.launchDemo()
         // The ending's last control (`WalkCopy.goToToday`).
         let openToday = app.descendants(matching: .any)["Open Today"]
         XCTAssertTrue(openToday.waitForExistence(timeout: 60), "the walk's ending never showed")

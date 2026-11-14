@@ -346,8 +346,9 @@ extension DailyGateTests {
 }
 
 /// When the day turns (`DailyModel.refreshDay` finds a new today), the selected date the light pages
-/// follow moves with it if it was today; a date the person went to on purpose stays, except that the
-/// sign's "tomorrow", once the day has turned past it, becomes today.
+/// follow is mended by ruling D18: a selected date that was today or later when the day turned, and
+/// is now before today, becomes today; one already before the old today (a past week or period the
+/// person went to) stays, and so does any date that is still today or later.
 struct DailyDayTurnTests {
     private func day(_ m: Int, _ d: Int) -> Date {
         PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: m, day: d))!
@@ -359,36 +360,88 @@ struct DailyDayTurnTests {
         return DailySpread.left(week, today: today)
     }
 
-    @Test func theSelectedDateFollowsTheDayWhenItWasToday() {
+    /// Selected = the old today: the new today. The left page becomes the week of the 15th.
+    @Test func todayFollowsTheDay() {
         let saturday = day(11, 14), sunday = day(11, 15)
         let moved = DailyClock.selected(saturday, turnedFrom: saturday, to: sunday)
         #expect(PlanCalendar.sameDay(moved, sunday))
-        // The left page becomes the week of the 15th, read as this week.
         #expect(DailySpread.weekStart(selected: moved) == PlanCalendar.weekStart(sunday))
         #expect(left(selected: moved, today: sunday).eyebrow == DailyCopy.restOfWeek)
     }
 
-    @Test func aDateGoneToOnPurposeStays() {
+    /// A date that was today or later when the day turned and is now before today becomes today: the
+    /// sign's "tomorrow" with the app reopened days later, and a mountain page's coming period once
+    /// that date itself has passed.
+    @Test func aDateThatWasAheadAndIsNowPastBecomesToday() {
+        let saturday = day(11, 14), sunday = day(11, 15), wednesday = day(11, 18)
+        #expect(PlanCalendar.sameDay(DailyClock.selected(sunday, turnedFrom: saturday, to: wednesday), wednesday))
+        let monday = day(11, 16)
+        #expect(PlanCalendar.sameDay(DailyClock.selected(monday, turnedFrom: saturday, to: wednesday), wednesday))
+    }
+
+    /// A date already before the old today (a past week or period gone to on purpose) stays, however
+    /// far the day turns: last week, and a month page's date on the 1st.
+    @Test func aDateAlreadyPastStays() {
+        let saturday = day(11, 14), sunday = day(11, 15), wednesday = day(11, 18)
+        let lastWeek = day(11, 4)
+        #expect(DailyClock.selected(lastWeek, turnedFrom: saturday, to: sunday) == lastWeek)
+        #expect(DailyClock.selected(lastWeek, turnedFrom: saturday, to: wednesday) == lastWeek)
+        let month = day(11, 1)
+        #expect(DailyClock.selected(month, turnedFrom: saturday, to: sunday) == month)
+    }
+
+    /// A date that is still today or later stays: the sign's "tomorrow" (now today, read as this
+    /// week), and a mountain page's coming period until that date itself passes.
+    @Test func aDateStillTodayOrLaterStays() {
         let saturday = day(11, 14), sunday = day(11, 15)
-        // The sign's "tomorrow" (the 15th): unchanged, and now it reads as this week.
         let fromTheSign = DailyClock.selected(sunday, turnedFrom: saturday, to: sunday)
         #expect(fromTheSign == sunday)
         #expect(left(selected: fromTheSign, today: sunday).eyebrow == DailyCopy.restOfWeek)
-        // A month page's date: unchanged.
-        let month = day(11, 1)
-        #expect(DailyClock.selected(month, turnedFrom: saturday, to: sunday) == month)
+        let december = day(12, 1)
+        #expect(DailyClock.selected(december, turnedFrom: saturday, to: sunday) == december)
         // The day not turning changes nothing.
-        #expect(DailyClock.selected(month, turnedFrom: saturday, to: saturday) == month)
         #expect(DailyClock.selected(saturday, turnedFrom: saturday, to: saturday) == saturday)
     }
 
-    @Test func aTomorrowTheDayHasPassedBecomesToday() {
+    /// The Planner's step (`DailyGate.dayTurn`): it runs only where light pages live for this device,
+    /// a light household on a phone, on any of its windows (a phone held sideways too, so turning it
+    /// upright later shows the right date); on an iPad, or in a full household, the date is untouched.
+    /// It keeps the last day it saw, so a day that turned while the Planner was away is mended when
+    /// it comes back; the first day seen only records it.
+    @Test func theDayTurnsOnlyWhereLightPagesLive() {
         let saturday = day(11, 14), sunday = day(11, 15), wednesday = day(11, 18)
-        // Reopened days later: the sign's "tomorrow" is now in the past, so it is today's.
-        #expect(PlanCalendar.sameDay(DailyClock.selected(sunday, turnedFrom: saturday, to: wednesday), wednesday))
-        // A date further ahead than tomorrow is left alone.
-        let friday = day(11, 20)
-        #expect(DailyClock.selected(friday, turnedFrom: saturday, to: wednesday) == friday)
+        // A phone, held any way (the step takes no window): follows, and records the new day.
+        let phone = DailyGate.dayTurn(selected: saturday, lastDay: saturday, today: sunday, edition: .light, phone: true)
+        #expect(PlanCalendar.sameDay(phone.selected, sunday) && phone.lastDay == sunday)
+        // An iPad: the old pages' date is untouched, and nothing is recorded.
+        let iPad = DailyGate.dayTurn(selected: saturday, lastDay: saturday, today: sunday, edition: .light, phone: false)
+        #expect(iPad.selected == saturday && iPad.lastDay == saturday)
+        // A full household: untouched.
+        let full = DailyGate.dayTurn(selected: saturday, lastDay: saturday, today: sunday, edition: .full, phone: true)
+        #expect(full.selected == saturday)
+        // The first day seen: recorded, nothing moves.
+        let first = DailyGate.dayTurn(selected: saturday, lastDay: nil, today: saturday, edition: .light, phone: true)
+        #expect(first.selected == saturday && first.lastDay == saturday)
+        // Away from Saturday to Wednesday (the model made again): mended on return.
+        let back = DailyGate.dayTurn(selected: saturday, lastDay: saturday, today: wednesday, edition: .light, phone: true)
+        #expect(PlanCalendar.sameDay(back.selected, wednesday) && back.lastDay == wednesday)
+    }
+}
+
+extension DailyMetricsTests {
+    /// The spread's bar shows its placeholder whole: its words' room, at the board and for folds a
+    /// little off centre, is at least the phone board's (195, where "Add to today" is seen whole), and
+    /// `DailyCopy.fitting` picks the full form there even at a generous 10 points a letter.
+    @Test func theSpreadsPlaceholderFitsItsField() {
+        let periods = WalkPeriods.pick(now: PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!)
+        let full = DailyCopy.placeholder(.today, periods: periods)
+        let forms = [full, DailyCopy.shortPlaceholder(.today)]
+        let phoneRoom = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34).bar.wordsRoom
+        for fold in stride(from: CGFloat(435), through: 455, by: 5) {
+            let room = spread(fold: fold).bar.wordsRoom
+            #expect(room >= phoneRoom, "fold \(fold): \(room)")
+            #expect(DailyCopy.fitting(forms, room: room, width: { CGFloat($0.count) * 10 }) == full, "fold \(fold)")
+        }
     }
 }
 
