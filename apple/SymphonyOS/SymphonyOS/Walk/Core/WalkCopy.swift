@@ -198,6 +198,10 @@ enum WalkCopy {
     static func forGoal(_ name: String) -> String { "for \(name)" }
     static func nextEvent(_ time: String) -> String { "Next · \(time)" }
     static func ringLabel(done: Int, total: Int) -> String { "\(done) of \(total) done" }
+    /// The sheet's date under "Today": "Friday, 13 November", as the Today step's eyebrow reads it.
+    static func endingDate(_ p: WalkPeriods) -> String { format(p.today, "EEEE, d MMMM") }
+    /// A next event's time for `nextEvent`: "2:30 pm", in the walk's own calendar and time zone.
+    static func nextEventTime(_ start: Date) -> String { format(start, "h:mm a").lowercased() }
 
     // MARK: Settings
 

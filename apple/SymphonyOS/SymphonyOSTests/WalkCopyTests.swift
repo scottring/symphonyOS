@@ -227,4 +227,15 @@ struct WalkCopyTests {
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: "Feel strong again") == "Lift, 30 minutes, for Feel strong again")
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: nil) == "Lift, 30 minutes")
     }
+
+    /// The ending's date and the next event's time, in the walk's own calendar and words.
+    @Test func theEndingsDateAndTimeReadAsTheWalksOwn() {
+        #expect(WalkCopy.endingDate(nov13) == "Friday, 13 November")
+        let cal = PlanCalendar.calendar
+        let afternoon = cal.date(bySettingHour: 14, minute: 30, second: 0, of: day(2026, 11, 13))!
+        let morning = cal.date(bySettingHour: 9, minute: 5, second: 0, of: day(2026, 11, 13))!
+        #expect(WalkCopy.nextEventTime(afternoon) == "2:30 pm")
+        #expect(WalkCopy.nextEventTime(morning) == "9:05 am")
+        #expect(WalkCopy.nextEvent(WalkCopy.nextEventTime(afternoon)) == "Next · 2:30 pm")
+    }
 }

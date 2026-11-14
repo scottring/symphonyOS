@@ -22,6 +22,9 @@ final class WalkFlowTests {
     let scheduler = ManualWalkScheduler()
     let listener = FakeWalkListener()
     let calendar = FakeWalkCalendar()
+    /// What the calendar feed holds for a day, and the time it is, as the model reads them.
+    var events: [TimelineItem]? = nil
+    var clockNow = now
     let suite = "WalkFlowTests.\(UUID())"
     let store: WalkPositionStore
 
@@ -36,7 +39,8 @@ final class WalkFlowTests {
     private func model(_ ctx: ModelContext, entry: WalkEntry = .start, edition: Edition = .light) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: entry == .resume ? store.load(for: me) : nil,
                   edition: edition, now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound(),
-                  calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() })
+                  calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() },
+                  calendarEvents: { [unowned self] _ in self.events }, clock: { [unowned self] in self.clockNow })
     }
 
     private func fetch<T: PersistentModel>(_ ctx: ModelContext, _ type: T.Type) -> [T] {
@@ -509,35 +513,67 @@ final class WalkFlowTests {
         #expect(m.dayLine == WalkCopy.thatsTheDay)
     }
 
-    @Test func closingTheSheetFinishesTheWalk() throws {
+    @Test func closingTheSheetFinishesTheWalk() async throws {
         let m = model(try walkTestContext())
         var ended: [WalkStatus] = []
         m.onEnd = { ended.append($0) }
-        m.choose(.quick)
-        for _ in 0..<6 { m.choose(.next) }
+        quickStart(m, keeping: ["Health"])
+        await say(m, "feel strong again")                     // a plan to look back at, so the handle moves the sheet
+        for _ in 0..<5 { m.choose(.next) }
         #expect(m.state.step == 6)
-        #expect(m.endingRows.isEmpty && m.dayLine == WalkCopy.nothingToday && m.nextToWalk == nil)
+        #expect(m.endingRows.isEmpty && m.dayLine == WalkCopy.nothingToday)
         m.send(.sheetHandle)
+        #expect(m.state.sheetOpen)
         m.send(.sheetHandle)
+        #expect(!m.state.sheetOpen)
         #expect(ended.isEmpty)                                 // the handle only raises and lowers
         m.send(.goToToday)
         #expect(ended == [.finished])
         #expect(store.load(for: me)?.status == .finished)
     }
 
-    @Test func theNextEventIsTodaysNextTimedOne() {
+    @Test func theNextEventIsTheFirstOneStartingAfterNow() throws {
         func at(_ hour: Int) -> Date { PlanCalendar.calendar.date(bySettingHour: hour, minute: 0, second: 0, of: now)! }
         func item(_ title: String, _ start: Date?, type: TimelineItem.ItemType = .event, allDay: Bool = false) -> TimelineItem {
             TimelineItem(id: title, type: type, title: title, startTime: start, isAllDay: allDay, completed: false,
-                         context: nil, entityId: UUID())
+                         context: nil, entityId: UUID(), eventKey: "key-\(title)")
         }
-        let items = [item("School drop-off", at(8)), item("Picture day", nil, allDay: true),
-                     item("Dentist", at(15)), item("Boxing", at(11)), item("Lunch task", at(12), type: .task)]
-        let next = WalkModel.nextEvent(in: items, after: at(10))
-        #expect(next?.title == "Boxing")
-        #expect(next?.start == at(11))
-        #expect(WalkModel.nextEvent(in: items, after: at(16)) == nil)
-        #expect(WalkModel.nextEvent(in: nil, after: at(10)) == nil)
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        #expect(m.nextUp == nil)                               // nothing in the feed: no line
+        events = [item("School drop-off", at(8)), item("Picture day", nil, allDay: true),
+                  item("Dentist", at(15)), item("Boxing", at(11)), item("Lunch task", at(12), type: .task)]
+        clockNow = at(10)
+        #expect(m.nextUp?.title == "Boxing")
+        #expect(m.nextUp?.start == at(11))
+        // Ticked off on Today: Today would not lead with it, so neither does the sheet.
+        let ticked = ActionableInstance(userId: me, entityType: "calendar_event", entityId: "key-Boxing", date: now)
+        ticked.status = "completed"
+        ctx.insert(ticked)
+        try ctx.save()
+        #expect(m.nextUp?.title == "Dentist")
+        clockNow = at(16)
+        #expect(m.nextUp == nil)                               // none left today
+    }
+
+    @Test func aTickIsHonouredOnlyForTodaysRows() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        // The person's own Work task for today: not one of the sheet's rows.
+        let work = SymphonyTask(userId: me, title: "Send the report", scheduledFor: now, context: "work", syncStatus: .synced)
+        ctx.insert(work)
+        try ctx.save()
+        m.send(.rowToggled(work.id))                           // before the ending
+        quickStart(m, keeping: ["Health"])
+        for _ in 0..<4 { m.choose(.next) }
+        await say(m, "stretch for ten minutes")
+        m.choose(.next)
+        #expect(m.state.step == 6)
+        #expect(!m.endingRows.contains { $0.id == work.id })
+        m.send(.rowToggled(work.id))
+        m.send(.rowToggled(UUID()))
+        #expect(!work.completed)
+        #expect(!fetch(ctx, PendingChange.self).contains { $0.recordId == work.id })
     }
 }
 #endif

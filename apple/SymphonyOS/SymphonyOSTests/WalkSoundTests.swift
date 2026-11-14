@@ -23,10 +23,12 @@ struct WalkSoundTests {
     let me = UUID()
     let scheduler = ManualWalkScheduler()
     let sound = FakeWalkSound()
+    let calendar = FakeWalkCalendar()
 
     private func model() throws -> WalkModel {
         WalkModel(context: try walkTestContext(), userId: me, entry: .start, position: nil, edition: .light,
-                  now: now, store: nil, scheduler: scheduler, listener: FakeWalkListener(), sound: sound)
+                  now: now, store: nil, scheduler: scheduler, listener: FakeWalkListener(), sound: sound,
+                  calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() })
     }
 
     // MARK: Files
@@ -127,7 +129,8 @@ struct WalkSoundTests {
     @Test func afterListeningEndsTheNextSoundPlays() async throws {
         let listener = FakeWalkListener()
         let m = WalkModel(context: try walkTestContext(), userId: me, entry: .start, position: nil, edition: .light,
-                          now: now, store: nil, scheduler: scheduler, listener: listener, sound: sound)
+                          now: now, store: nil, scheduler: scheduler, listener: listener, sound: sound,
+                          calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() })
         m.choose(.quick)
         m.choose(.next)
         m.send(.orbDown)

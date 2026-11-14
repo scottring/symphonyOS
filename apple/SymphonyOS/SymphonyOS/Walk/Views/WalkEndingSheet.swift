@@ -6,9 +6,12 @@ import SwiftUI
 /// rises to y 130; it is not a system sheet. What it shows comes from the model
 /// (`endingRows`, `ring`, `nextUp`, `dayLine`, `nextToWalk`) and the state
 /// (`endingTitle`, `sheetRaised`, `sheetHandleLabel`); taps go back as events.
+/// The paper runs on past the stage into the device's letterbox, so it meets the
+/// screen's edges; its content stays where the stage puts it.
 struct WalkEndingView: View {
     let model: WalkModel
-    /// The sheet rises from below the stage the first time it appears.
+    @Environment(\.walkStage) private var device
+    /// The sheet rises from below the screen the first time it appears.
     @State private var risen = false
 
     static let peekTop: CGFloat = 716
@@ -21,6 +24,8 @@ struct WalkEndingView: View {
         let s = model.state
         let stage = model.art.stage
         let top = s.sheetRaised ? Self.raisedTop : Self.peekTop
+        // The letterbox around the centred stage, in stage points.
+        let bleed = CGSize(width: device.origin.x / device.scale, height: device.origin.y / device.scale)
         ZStack(alignment: .topLeading) {
             Text(s.endingTitle)
                 .font(.custom("CrimsonPro-Regular", size: 24))
@@ -33,14 +38,13 @@ struct WalkEndingView: View {
                 .offset(y: 54)
                 .allowsHitTesting(false)
                 .accessibilityAddTraits(.isHeader)
-            WalkEndingSheet(model: model, raised: s.sheetRaised)
+            WalkEndingSheet(model: model, raised: s.sheetRaised, bleed: bleed)
                 .frame(width: stage.width, height: stage.height - top, alignment: .top)
                 .offset(y: top)
-                .offset(y: risen ? 0 : stage.height - top)
+                .offset(y: risen ? 0 : stage.height - top + bleed.height)
                 .animation(Self.move, value: top)
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
-        .clipped()
         .onAppear { withAnimation(Self.rise) { risen = true } }
     }
 }
@@ -50,30 +54,39 @@ struct WalkEndingView: View {
 struct WalkEndingSheet: View {
     let model: WalkModel
     let raised: Bool
+    /// How far the paper runs past the stage's sides and bottom, in stage points.
+    var bleed: CGSize = .zero
 
     var body: some View {
         VStack(spacing: 0) {
             handle
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 12) {
-                    head
-                    if let next = model.nextUp { nextCard(next) }
-                    if !model.endingRows.isEmpty { rows }
-                    if let name = model.nextToWalk { walkAnother(name) }
-                    if let line = model.dayLine {
-                        Text(line)
-                            .font(.custom("CrimsonPro-Regular", size: 22))
-                            .foregroundStyle(EndingPaper.deepGreen)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 4)
+            ScrollViewReader { scroller in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        head.id(Self.top)
+                        if let next = model.nextUp { nextCard(next) }
+                        if !model.endingRows.isEmpty { rows }
+                        if let name = model.nextToWalk { walkAnother(name) }
+                        if let line = model.dayLine {
+                            Text(line)
+                                .font(.custom("CrimsonPro-Regular", size: 22))
+                                .foregroundStyle(EndingPaper.deepGreen)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 4)
+                        }
+                        goToToday
                     }
-                    goToToday
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 28)
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 28)
+                .scrollDisabled(!raised)
+                .onChange(of: raised) { _, up in
+                    // Lowered, the peek shows the date and the ring again, not the middle of the list.
+                    guard !up else { return }
+                    withAnimation(WalkEndingView.move) { scroller.scrollTo(Self.top, anchor: .top) }
+                }
             }
-            .scrollDisabled(!raised)
         }
         .padding(.top, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -81,11 +94,16 @@ struct WalkEndingSheet: View {
             UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
                 .fill(EndingPaper.sheet)
                 .shadow(color: Color(red: 30 / 255, green: 38 / 255, blue: 40 / 255).opacity(0.18), radius: 20, x: 0, y: -10)
+                .padding(EdgeInsets(top: 0, leading: -bleed.width, bottom: -bleed.height, trailing: -bleed.width))
         )
         .task(id: CalendarFeed.shared.readKey(for: model.periods.today)) {
             await CalendarFeed.shared.refresh(model.periods.today, maxAge: 60)
         }
     }
+
+    private static let top = "walk.ending.top"
+    /// The handle and "Go to Today" stay tall enough to tap on the smallest phone the stage shrinks to.
+    static let tapHeight: CGFloat = 56
 
     // MARK: Handle
 
@@ -98,7 +116,7 @@ struct WalkEndingSheet: View {
                     .font(.custom("DMSans-SemiBold", size: 13))
                     .foregroundStyle(EndingPaper.muted)
             }
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
             .contentShape(Rectangle())
             .onTapGesture { model.send(.sheetHandle) }
             .accessibilityElement(children: .combine)
@@ -119,7 +137,7 @@ struct WalkEndingSheet: View {
                     .font(.custom("DMSans-SemiBold", size: 12))
                     .tracking(0.96)
                     .foregroundStyle(EndingPaper.eyebrow)
-                Text(Self.date(model.periods.today))
+                Text(WalkCopy.endingDate(model.periods))
                     .font(.custom("CrimsonPro-Regular", size: 28))
                     .foregroundStyle(EndingPaper.ink)
                     .lineLimit(1)
@@ -131,20 +149,11 @@ struct WalkEndingSheet: View {
         }
     }
 
-    private static func date(_ day: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        f.calendar = PlanCalendar.calendar
-        f.timeZone = PlanCalendar.calendar.timeZone
-        f.dateFormat = "EEEE, d MMMM"
-        return f.string(from: day)
-    }
-
     // MARK: Next on the calendar
 
     private func nextCard(_ next: (title: String, start: Date)) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(WalkCopy.nextEvent(next.start.formatted(date: .omitted, time: .shortened)).uppercased())
+            Text(WalkCopy.nextEvent(WalkCopy.nextEventTime(next.start)).uppercased())
                 .font(.custom("DMSans-SemiBold", size: 12))
                 .tracking(0.6)
                 .foregroundStyle(EndingPaper.rust)
@@ -212,7 +221,7 @@ struct WalkEndingSheet: View {
         Text(WalkCopy.goToToday)
             .font(.custom("DMSans-SemiBold", size: 15))
             .foregroundStyle(EndingPaper.green)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
             .contentShape(Rectangle())
             .onTapGesture { model.send(.goToToday) }
             .accessibilityAddTraits(.isButton)

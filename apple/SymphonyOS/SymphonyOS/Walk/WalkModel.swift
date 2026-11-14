@@ -52,12 +52,15 @@ extension Dictation: WalkListening {}
     @ObservationIgnored private var closed = false
 
     // The calendar ask and the ending (Task 20).
-    /// Today's tasks for the ending sheet, each with what it is for: read from the store
-    /// after every event and point while the walk is on Look back up.
+    /// Today's tasks while on Look back up, each with what it is for: re-read after every
+    /// send there; empty elsewhere.
     private(set) var endingRows: [WalkEnding.Row] = []
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private let calendarAccess: @MainActor () -> AppleCalendarAccess
     @ObservationIgnored private let requestCalendar: @MainActor () async -> Void
+    /// A day's calendar items as Today reads them (the calendar feed), and the time it is now.
+    @ObservationIgnored private let calendarEvents: @MainActor (Date) -> [TimelineItem]?
+    @ObservationIgnored private let clock: @MainActor () -> Date
     /// The Calendar point was chosen in this walk: it is never offered again, whatever the answer.
     @ObservationIgnored private var calendarAsked = false
 
@@ -76,7 +79,9 @@ extension Dictation: WalkListening {}
          now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
          scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil,
          calendarAccess: @escaping @MainActor () -> AppleCalendarAccess = { AppleCalendarService.shared.access },
-         requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() }) {
+         requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() },
+         calendarEvents: @escaping @MainActor (Date) -> [TimelineItem]? = { CalendarFeed.shared.items(for: $0) },
+         clock: @escaping @MainActor () -> Date = { .now }) {
         let periods = WalkPeriods.pick(now: now, seasons: seasons)
         let resuming = entry == .resume ? position : nil
         let planted = Set(resuming?.planted ?? [])
@@ -113,6 +118,8 @@ extension Dictation: WalkListening {}
         self.context = context
         self.calendarAccess = calendarAccess
         self.requestCalendar = requestCalendar
+        self.calendarEvents = calendarEvents
+        self.clock = clock
         readEnding()
     }
 
@@ -120,6 +127,8 @@ extension Dictation: WalkListening {}
 
     func send(_ event: WalkEvent) {
         guard !closed else { return }
+        // A tick counts only for one of the sheet's rows: never a stale or stray id.
+        if case .rowToggled(let id) = event, !endingRows.contains(where: { $0.id == id }) { return }
         carryOut(state.apply(event, env))
         readEnding()
     }
@@ -317,11 +326,10 @@ extension Dictation: WalkListening {}
 
     /// The calendar may be offered on Today: the light edition only, never once the Calendar
     /// point was chosen in this walk, and only while the system has never asked this person
-    /// (any answer, here or elsewhere, ends the offer for good). It is read only from Week and
-    /// from Look back up, the steps a point can bring the walk onto Today from, so no other
-    /// step reads the system's permission.
+    /// (any answer, here or elsewhere, ends the offer for good). Read before every reducer
+    /// call; reading the system's status never prompts.
     private var canAskCalendar: Bool {
-        guard edition == .light, !calendarAsked, state.step == 4 || state.step == 6 else { return false }
+        guard edition == .light, !calendarAsked else { return false }
         return calendarAccess() == .notAsked
     }
 
@@ -338,17 +346,21 @@ extension Dictation: WalkListening {}
     /// Done and total of today's rows, for the ring.
     var ring: (done: Int, total: Int) { (endingRows.filter(\.done).count, endingRows.count) }
 
-    /// Today's next calendar event after this moment, if the calendar feed has one: none
+    /// Today's next calendar event after now, as Today would show it: the same feed, with no
+    /// domain filter (Today's events bypass it), less any event ticked off on Today. None
     /// without calendar access, in a full household with no connected calendar, or in a demo.
     var nextUp: (title: String, start: Date)? {
-        Self.nextEvent(in: CalendarFeed.shared.items(for: periods.today), after: .now)
-    }
-
-    /// The first timed event that starts after `moment`.
-    static func nextEvent(in items: [TimelineItem]?, after moment: Date) -> (title: String, start: Date)? {
-        (items ?? [])
+        let today = periods.today
+        let moment = clock()
+        let instances = (try? context.fetch(FetchDescriptor<ActionableInstance>())) ?? []
+        let ticked = Set(instances.filter {
+            $0.entityType == "calendar_event" && ($0.status == "completed" || $0.status == "skipped")
+                && PlanCalendar.sameDay($0.date, today)
+        }.map(\.entityId))
+        return (calendarEvents(today) ?? [])
             .compactMap { item -> (title: String, start: Date)? in
-                guard item.type == .event, !item.isAllDay, let start = item.startTime, start > moment else { return nil }
+                guard item.type == .event, !item.isAllDay, let start = item.startTime, start > moment,
+                      !(item.eventKey.map(ticked.contains) ?? false) else { return nil }
                 return (item.title, start)
             }
             .min { $0.start < $1.start }

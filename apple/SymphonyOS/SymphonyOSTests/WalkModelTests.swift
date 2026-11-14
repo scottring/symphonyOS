@@ -21,6 +21,7 @@ struct WalkModelTests {
     let me = UUID()
     let scheduler = ManualWalkScheduler()
     let listener = FakeWalkListener()
+    let calendar = FakeWalkCalendar()
 
     private func store() -> WalkPositionStore {
         WalkPositionStore(defaults: UserDefaults(suiteName: "WalkModelTests.\(UUID())")!)
@@ -29,7 +30,8 @@ struct WalkModelTests {
     private func model(_ ctx: ModelContext, entry: WalkEntry = .start, position: WalkPosition? = nil,
                        store: WalkPositionStore? = nil) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: position, edition: .light,
-                  now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound())
+                  now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound(),
+                  calendarAccess: { [calendar] in calendar.access }, requestCalendar: { [calendar] in await calendar.request() })
     }
 
     private func fetch<T: PersistentModel>(_ ctx: ModelContext, _ type: T.Type) -> [T] {

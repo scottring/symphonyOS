@@ -785,4 +785,12 @@ struct WalkPlantTests {
         _ = s.apply(.rowToggled(m.deposit.id), m.env)
         #expect(!s.items[0].done)
     }
+
+    @Test func aRowIsTickedOnlyAtTheEnding() {
+        for step in 0...5 {
+            var s = m.on(step, items: [m.deposit])
+            #expect(s.apply(.rowToggled(m.deposit.id), m.env) == [])
+            #expect(!s.items[0].done)
+        }
+    }
 }

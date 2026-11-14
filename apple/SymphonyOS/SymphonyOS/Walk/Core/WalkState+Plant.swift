@@ -357,8 +357,10 @@ extension WalkState {
 
     // MARK: The ending's rows
 
-    /// Ticks any of today's tasks, planted by the walk or not; the writer decides whose rows it may touch.
+    /// Ticks any of today's tasks, planted by the walk or not, on the ending only. The model
+    /// passes on only ids among the sheet's rows; the writer touches only the person's own.
     mutating func toggleRow(_ taskId: UUID) -> [WalkEffect] {
+        guard step == 6 else { return [] }
         if let index = items.firstIndex(where: { $0.id == taskId }) { items[index].done.toggle() }
         return [.write(.toggleDone(taskId))]
     }
