@@ -153,7 +153,8 @@ struct WalkCopyTests {
         #expect(WalkCopy.hint(taught) == "")
         let wg = item(.week, "Gym induction")
         var t = state(step: 5); t.items = [wg]; t.focus[.today] = wg.id
-        #expect(WalkCopy.hint(t) == "Tap Next to start here, or hold to speak.")
+        #expect(WalkCopy.hint(t) == WalkCopy.hintStartHere)          // the Next line reads "Start with this one" there
+        #expect(WalkCopy.nextLine(t, WalkPeriods.pick(now: Date()))?.text == WalkCopy.startWithThis)
         t.firstThing = wg.id
         #expect(WalkCopy.hint(t) == "Tap Finish to keep it, or hold to say another.")
         // Speech off for this walk: a tap types, a hold opens the other choices.
@@ -339,7 +340,7 @@ struct WalkCopyTests {
                  WalkCopy.nextFlag("Run a 5K"), WalkCopy.forGoal("Run a 5K"), WalkCopy.nextEvent("2:30 pm"),
                  WalkCopy.ringLabel(done: 1, total: 3), WalkCopy.ring(done: 1, total: 3), WalkCopy.endingDate(p),
                  WalkCopy.replayButton, WalkCopy.replayFooter, WalkCopy.resumeButton, WalkCopy.walkWaiting,
-                 WalkCopy.orbLabelWelcome, WalkCopy.orbLabel, WalkCopy.orbLabelSpeechOff, WalkCopy.orbLabelGround, WalkCopy.rowDone, WalkCopy.rowOpen,
+                 WalkCopy.orbLabelWelcome, WalkCopy.orbLabel, WalkCopy.orbLabelTask, WalkCopy.orbLabelSpeechOff, WalkCopy.orbLabelGround, WalkCopy.rowDone, WalkCopy.rowOpen,
                  WalkCopy.typeFieldLabel, WalkCopy.hintChoose, WalkCopy.hintOpen, WalkCopy.hintFirst, WalkCopy.hintAnother,
                  WalkCopy.hintGround, WalkCopy.hintGroundNone, WalkCopy.hintStartHere, WalkCopy.hintFirstThing,
                  WalkCopy.hintSpeaking, WalkCopy.hintSpeechOff, WalkCopy.teachHold, WalkCopy.teachLetGo,
@@ -448,6 +449,12 @@ struct WalkCopyTests {
         #expect(WalkCopy.walkWaiting == "Your walk is waiting. Pick it back up.")
         #expect(WalkCopy.orbLabelWelcome == "Quick start. One goal, down to today. About 3 minutes.")
         #expect(WalkCopy.orbLabel == "Hold and speak to add a goal. Double tap for other choices.")
+        #expect(WalkCopy.orbLabelTask == "Hold and speak to add a task. Double tap for other choices.")
+        // Week and Today hold tasks: the light says so there (final review 2, minor).
+        for step in 1...5 {
+            var s = WalkState(); s.step = step
+            #expect(WalkCopy.orbAccessibilityLabel(s) == (step >= 4 ? WalkCopy.orbLabelTask : WalkCopy.orbLabel))
+        }
         #expect(WalkCopy.groundWhy == "Tap the ones that matter to you.")
         #expect(WalkCopy.leaveForNow == "Leave for now"); #expect(WalkCopy.leaveDetail == "Your place is kept.")
         #expect(WalkCopy.orbLabelSpeechOff == "Double tap to type it. The other choices are in the actions.")
@@ -459,7 +466,9 @@ struct WalkCopyTests {
         #expect(WalkCopy.hintAnother == "Hold to add another, or tap Next.")
         #expect(WalkCopy.hintGround == "Tap the ones that matter, then Next.")
         #expect(WalkCopy.hintGroundNone == "Tap the ones that matter.")
-        #expect(WalkCopy.hintStartHere == "Tap Next to start here, or hold to speak.")
+        // It names the Next line's own words there (final review 2, minor).
+        #expect(WalkCopy.hintStartHere == "Tap “\(WalkCopy.startWithThis)”, or hold to speak.")
+        #expect(WalkCopy.hintStartHere.count <= WalkCopy.hintMaxLength)
         #expect(WalkCopy.hintFirstThing == "Tap Finish to keep it, or hold to say another.")
         #expect(WalkCopy.hintSpeaking == "Let go when you’ve said it")
         #expect(WalkCopy.hintOpen == "Tap one, or tap the light to close")
@@ -544,7 +553,8 @@ struct WalkCopyTests {
     @Test func theLightSaysWhatItDoes() {
         #expect(WalkCopy.orbAccessibilityLabel(state(step: 0)) == "Quick start. One goal, down to today. About 3 minutes.")
         for step in 1...5 {
-            #expect(WalkCopy.orbAccessibilityLabel(state(step: step)) == "Hold and speak to add a goal. Double tap for other choices.")
+            // A goal on Year, Season and Month; a task on Week and Today, which hold tasks.
+            #expect(WalkCopy.orbAccessibilityLabel(state(step: step)) == (step >= 4 ? WalkCopy.orbLabelTask : WalkCopy.orbLabel))
             var off = state(step: step); off.speechIsOff = true
             #expect(WalkCopy.orbAccessibilityLabel(off) == "Double tap to type it. The other choices are in the actions.")
         }

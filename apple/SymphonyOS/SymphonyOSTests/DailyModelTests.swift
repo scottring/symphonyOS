@@ -939,6 +939,19 @@ struct DailyModelTests {
         #expect(m.today == day(2026, 11, 11))
     }
 
+    /// Final review 2 I3: a phone that cannot recognise speech on the device types from the start: the
+    /// light asks for the field and the listener is never started, so nothing is ever asked.
+    @Test func aPhoneThatCannotListenTypesFromTheStart() async throws {
+        let ctx = try walkTestContext()
+        listener.cannotListenHere = true
+        let m = model(ctx)
+        #expect(m.bar.speechOff)
+        m.send(.micTapped)
+        await scheduler.settle()
+        #expect(m.bar.fieldAsked == 1)
+        #expect(listener.starts == 0)
+    }
+
     /// Final review (minor): Control Centre, the app switcher or a call makes the scene inactive; the
     /// bar lets go then, as for the background, and nothing it heard is added.
     @Test func anInactiveSceneLetsTheBarGo() async throws {

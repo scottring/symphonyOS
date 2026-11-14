@@ -169,6 +169,12 @@ struct WalkPositionStore {
         load(for: userId)?.status == .paused
     }
 
+    /// This person has a walk waiting to be picked up in this household (`WalkEntry.isWaiting`):
+    /// one left with Leave for now, or, in a household that is not light only, one left in progress.
+    func hasWaitingWalk(for userId: UUID?, householdEditions: [String?]) -> Bool {
+        WalkEntry.isWaiting(load(for: userId), householdEditions: householdEditions)
+    }
+
     func forget(for userId: UUID?) {
         guard let userId else { return }
         defaults.removeObject(forKey: Self.key(userId))
@@ -192,7 +198,7 @@ enum WalkEntry: Equatable {
     static func decide(replay: Bool, resume: Bool = false, demoWalk: Bool, position: WalkPosition?,
                        householdEditions: [String?], initialSyncFinished: Bool, goalCount: Int) -> WalkEntry {
         if replay || demoWalk { return .start }
-        if resume { return position?.status == .paused ? .resume : .none }
+        if resume { return isWaiting(position, householdEditions: householdEditions) ? .resume : .none }
         let onlyLight = lightOnly(householdEditions)
         if let position { return position.status == .inProgress && onlyLight ? .resume : .none }
         return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
@@ -208,14 +214,30 @@ enum WalkEntry: Equatable {
                           replay: Bool, resume: Bool = false, householdEditions: [String?]) -> Bool {
         guard !walkUp, signedIn else { return false }
         if initialSyncFinished || (position?.status == .inProgress && lightOnly(householdEditions)) { return true }
-        if resume && position?.status == .paused { return true }
+        if resume && isWaiting(position, householdEditions: householdEditions) { return true }
         return replay && !householdEditions.isEmpty
     }
 
-    /// A walk that starts from the top (a replay) over one left with Leave for now clears the
-    /// pause: the saved place is forgotten, so nothing is left waiting to be picked up.
-    static func clearsPause(_ entry: WalkEntry, position: WalkPosition?) -> Bool {
-        entry == .start && position?.status == .paused
+    /// A replay or a resume asked for while a walk is up is dropped, not kept for after it.
+    static func dropsRequests(walkUp: Bool) -> Bool { walkUp }
+
+    /// A walk waiting to be picked up (Settings' "Pick the walk back up"; `decide(resume: true)`):
+    /// one left with Leave for now (`paused`), in any household; and in a household that is not
+    /// light only, one left in progress too (a replay or a picked-up walk the day turned on, or the
+    /// app was closed under). That one never reopens by itself there (W42), so this row is its way
+    /// back; in a light household a walk in progress resumes by itself and is not "waiting".
+    static func isWaiting(_ position: WalkPosition?, householdEditions: [String?]) -> Bool {
+        switch position?.status {
+        case .paused: return true
+        case .inProgress: return !lightOnly(householdEditions)
+        default: return false
+        }
+    }
+
+    /// A walk that starts from the top (a replay) over one waiting to be picked up clears it:
+    /// the saved place is forgotten, so nothing is left waiting.
+    static func clearsPause(_ entry: WalkEntry, position: WalkPosition?, householdEditions: [String?]) -> Bool {
+        entry == .start && isWaiting(position, householdEditions: householdEditions)
     }
 
     /// A walk still up on a later day than the one it opened on is taken down and decided

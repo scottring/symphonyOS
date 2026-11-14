@@ -66,6 +66,8 @@ import SwiftData
     var onWords: ((String) -> Void)?
     var onEnd: (() -> Void)?
     var problemOnStart: String?
+    /// A phone with no on-device recognition, known before anything is asked.
+    var cannotListenHere = false
     var whileStarting: (() -> Void)?
     private(set) var starts = 0
     private(set) var finishes = 0

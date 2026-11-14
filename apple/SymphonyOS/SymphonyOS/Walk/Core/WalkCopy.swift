@@ -100,7 +100,8 @@ enum WalkCopy {
     static let hintGround = "Tap the ones that matter, then Next."
     /// The ground with nothing kept yet: the Next line says "Skip this step", so the hint does not say Next.
     static let hintGroundNone = "Tap the ones that matter."
-    static let hintStartHere = "Tap Next to start here, or hold to speak."
+    /// Names the Next line's own words (`startWithThis`), which is what it reads here.
+    static let hintStartHere = "Tap “\(startWithThis)”, or hold to speak."
     static let hintFirstThing = "Tap Finish to keep it, or hold to say another."
     static let hintSpeaking = "Let go when you’ve said it"
     /// Speech is off for this walk: a tap types, a hold opens the other choices.
@@ -224,7 +225,8 @@ enum WalkCopy {
         if !s.undo.isEmpty {
             out.append(Point(at: .se, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
         }
-        out.append(Point(at: .nw, label: leaveForNow, action: .leave, symbol: "pause", detail: leaveDetail))
+        // "Your place is kept." only where it is: a walk-down is never stored (`placeKept`).
+        out.append(Point(at: .nw, label: leaveForNow, action: .leave, symbol: "pause", detail: s.placeKept ? leaveDetail : nil))
         return out.sorted { order($0.at) < order($1.at) }
     }
 
@@ -336,6 +338,8 @@ enum WalkCopy {
     }
 
     static let orbLabelWelcome = "Quick start. One goal, down to today. About 3 minutes."; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
+    /// On Week and Today, which hold tasks.
+    static let orbLabelTask = "Hold and speak to add a task. Double tap for other choices."
     /// Speech off for this walk: a double tap types.
     static let orbLabelSpeechOff = "Double tap to type it. The other choices are in the actions."
     /// The ground: the light is not taught yet, so its label says nothing about holding it.
@@ -396,7 +400,9 @@ enum WalkCopy {
     static func orbAccessibilityLabel(_ s: WalkState) -> String {
         if s.step == 0 { return orbLabelWelcome }
         if s.speechIsOff { return orbLabelSpeechOff }
-        return s.ground ? orbLabelGround : orbLabel
+        if s.ground { return orbLabelGround }
+        // Week and Today hold tasks, not goals.
+        return s.level == .week || s.level == .today ? orbLabelTask : orbLabel
     }
 
     /// The one-line field's label, read once it holds words (the placeholder says how to use it).

@@ -355,8 +355,8 @@ struct WalkLabelView: View {
                 .foregroundStyle(ink)
                 .padding(.horizontal, 9)
                 .frame(height: 23)
-                .frame(maxWidth: label.frame.width / unit)
-                .fixedSize(horizontal: true, vertical: false)
+                // Offered the label's width and no more: a long name scales down, then truncates,
+                // inside its pill, which hugs a short one.
                 .background(pill)
                 .shadow(color: label.focused ? Color(red: 1, green: 220 / 255, blue: 150 / 255).opacity(0.95) : .clear,
                         radius: 9)

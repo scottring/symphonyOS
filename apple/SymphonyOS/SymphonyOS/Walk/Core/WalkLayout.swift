@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import os
 
 /// Everything the scene draws, worked out from the walk's state in one pass:
 /// the camera, the peak labels, one post per area per level, and every
@@ -67,6 +68,8 @@ struct WalkLayout: Equatable {
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
 
+    /// Faults the layout reports instead of crashing (a state the generated sweep did not make).
+    static let log = Logger(subsystem: "com.symphonyos.app", category: "walk.layout")
     static let centreX: CGFloat = 195           // a zoomed column, and a lone one
     static let zoomK: CGFloat = 0.8
     static let zoomBaseY: CGFloat = 520         // where a zoomed column's post stands
@@ -353,9 +356,10 @@ private struct Builder {
             }
             made = planted(builder)
         }
-        // Not reached (asserted in DEBUG). If it ever is, the conflicting posts already have no hand
-        // left, so the layout is returned as it stands: levelling every other post would gain nothing.
-        assertionFailure("the hand did not settle: a conflict the ruled layout has itself")
+        // Not reached in any state the generated sweep makes. If it ever is, the conflicting posts
+        // already have no hand left, so the layout is returned as it stands (levelling every other post
+        // would gain nothing), and a fault is logged: a Debug build keeps running in a state the sweep missed.
+        WalkLayout.log.fault("the hand did not settle: a conflict the ruled layout has itself (step \(s.step, privacy: .public))")
         return made
     }
 

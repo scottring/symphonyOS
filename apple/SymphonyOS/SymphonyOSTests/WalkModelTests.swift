@@ -379,6 +379,40 @@ struct WalkModelTests {
         #expect(!Dictation.mayListen(onDeviceOnly: true, supportsOnDevice: false))
         #expect(Dictation.mayListen(onDeviceOnly: false, supportsOnDevice: false))   // Tell, as before
         #expect(!Dictation().onDeviceOnly)
+        // Tell (server allowed) never refuses before asking: its start is as it was.
+        #expect(!Dictation().cannotListenHere)
+    }
+
+    /// Final review 2 I3: on a phone that cannot recognise speech on the device, the walk knows before
+    /// anything is asked: it begins by typing (its lesson teaches typing), and a hold never starts the
+    /// listener, so no permission prompt is ever shown.
+    @Test func aPhoneThatCannotListenBeginsTheWalkTyping() throws {
+        let ctx = try walkTestContext()
+        listener.cannotListenHere = true
+        let m = model(ctx)
+        #expect(m.state.speechIsOff)
+        m.choose(.quick)
+        #expect(m.state.lightSymbol == nil || m.state.lightSymbol == "keyboard")
+        m.send(.orbDown)
+        m.send(.orbUp(heldMs: 900))
+        m.send(.orbDown)
+        m.send(.orbUp(heldMs: 80))
+        #expect(listener.starts == 0)
+    }
+
+    /// Final review 2 (minor): Leave for now says "Your place is kept." only in a walk that keeps it;
+    /// a walk-down (no store) is never stored and says nothing of the kind.
+    @Test func onlyAStoredWalkSaysItsPlaceIsKept() throws {
+        let ctx = try walkTestContext()
+        let stored = model(ctx, store: store())
+        let down = model(ctx, store: nil)
+        #expect(stored.state.placeKept && !down.state.placeKept)
+        var s = WalkState(); s.step = 3; s.depth = .quick
+        let p = WalkPeriods.pick(now: now)
+        s.placeKept = true
+        #expect(WalkCopy.points(s, p).first { $0.action == .leave }?.detail == WalkCopy.leaveDetail)
+        s.placeKept = false
+        #expect(WalkCopy.points(s, p).first { $0.action == .leave }?.detail == nil)
     }
 
     /// The first hold asks for permission and the prompt takes the touch away.

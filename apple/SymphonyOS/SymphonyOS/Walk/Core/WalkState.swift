@@ -28,6 +28,9 @@ struct WalkState: Equatable {
     // Speech, for this walk only (never saved): holds in a row that heard nothing; a
     // refusal, after which a hold opens typing; a session that ended while still held.
     var emptyHolds = 0; var speechIsOff = false; var sessionOver = false
+    /// The walk's place is saved as it goes (false for a walk-down, which is never stored), so
+    /// Leave for now may say "Your place is kept." Set by the model; never saved.
+    var placeKept = true
     var orbWasOpen = false                 // the points were open when this press began, so a short press closes them
     /// The light is being taught (once per walk, on the first step where holding it answers),
     /// and it has been: `taught` is saved with the position, so a resume does not teach it again.

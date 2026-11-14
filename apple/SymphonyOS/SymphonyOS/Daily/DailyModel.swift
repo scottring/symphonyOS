@@ -110,6 +110,8 @@ import Observation
         self.handoverMemory = handoverMemory
         self.parse = parse
         self.writer = DailyWriter(context: context, userId: userId, periods: periods)
+        // A phone that can never listen here: the bar types from the start, and nothing is asked.
+        if self.listener.cannotListenHere { bar.speechOff = true }
     }
 
     /// Torn down with a pull-up pending: it is written, straight through the writer

@@ -38,6 +38,9 @@ struct WalkView: View {
                     }
                 }
                 .accessibilityElement(children: .contain)
+                // The stage is laid out in fixed stage points: its words stop growing at extra large,
+                // as the mountain pages' do, so a larger text size never wraps them into the flags.
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 .frame(width: model.art.stage.width, height: model.art.stage.height, alignment: .topLeading)
                 .scaleEffect(stage.scale, anchor: .topLeading)
                 .offset(x: stage.origin.x, y: stage.origin.y)

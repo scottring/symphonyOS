@@ -321,16 +321,17 @@ private struct Saved {
             #expect(may(synced: false, resume: true, paused, editions))
             // Walk the mountain again: from the top, and the pause is cleared.
             #expect(decide(replay: true, paused, editions) == .start)
-            #expect(WalkEntry.clearsPause(.start, position: paused))
+            #expect(WalkEntry.clearsPause(.start, position: paused, householdEditions: editions))
         }
-        // A resume with nothing paused opens nothing; only a paused walk is cleared by a start.
+        // In a light household a resume with nothing paused opens nothing (a walk in progress resumes by
+        // itself there), and only a paused walk is cleared by a start.
         let walking = WalkPosition(s, status: .inProgress, planted: [], periods: p, now: p.today)
         #expect(decide(resume: true, walking, ["light"]) == .none)
         #expect(decide(resume: true, nil, ["light"]) == .none)
-        #expect(!may(synced: false, resume: true, walking, ["full"]))
-        #expect(!WalkEntry.clearsPause(.start, position: walking))
-        #expect(!WalkEntry.clearsPause(.resume, position: paused))
-        #expect(!WalkEntry.clearsPause(.start, position: nil))
+        #expect(may(synced: false, resume: true, walking, ["full"]))       // a full household's interrupted walk: its way back
+        #expect(!WalkEntry.clearsPause(.start, position: walking, householdEditions: ["light"]))
+        #expect(!WalkEntry.clearsPause(.resume, position: paused, householdEditions: ["light"]))
+        #expect(!WalkEntry.clearsPause(.start, position: nil, householdEditions: ["full"]))
         // The saved place keeps its step and status, and the store reports the pause.
         let saved = store(), me = UUID()
         #expect(!saved.hasPausedWalk(for: me))
@@ -340,6 +341,53 @@ private struct Saved {
         #expect(!saved.hasPausedWalk(for: UUID()))
         saved.save(walking, for: me)
         #expect(!saved.hasPausedWalk(for: me))
+    }
+
+    /// Final review 2 I2: in a household that is not light only, a walk left in progress (a replay or a
+    /// picked-up walk the day turned on, or the app was closed under) never reopens by itself (W42),
+    /// so it counts as waiting: Settings offers "Pick the walk back up", which resumes it at its step;
+    /// a replay over it starts from the top and clears it. In a light household nothing changes.
+    @Test func anInterruptedWalkInAFullHouseholdWaitsToBePickedUp() {
+        let p = periods(2026, 11, 13)
+        var s = WalkState(); s.step = 3; s.depth = .quick
+        let walking = WalkPosition(s, status: .inProgress, planted: [], periods: p, now: p.today)
+        let paused = WalkPosition(s, status: .paused, planted: [], periods: p, now: p.today)
+        let finished = WalkPosition(s, status: .finished, planted: [], periods: p, now: p.today)
+        let left = WalkPosition(s, status: .left, planted: [], periods: p, now: p.today)
+        // (position, editions) → waiting?
+        let table: [(WalkPosition?, [String?], Bool)] = [
+            (walking, ["full"], true), (walking, ["light", "full"], true), (walking, [nil], true), (walking, [], true),
+            (walking, ["light"], false), (walking, ["light", "light"], false),
+            (paused, ["full"], true), (paused, ["light"], true),
+            (finished, ["full"], false), (left, ["full"], false), (nil, ["full"], false),
+        ]
+        for (position, editions, waiting) in table {
+            #expect(WalkEntry.isWaiting(position, householdEditions: editions) == waiting)
+            let resumed = WalkEntry.decide(replay: false, resume: true, demoWalk: false, position: position,
+                                           householdEditions: editions, initialSyncFinished: true, goalCount: 2)
+            #expect(resumed == (waiting ? .resume : .none))
+            #expect(WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: false, position: position,
+                                        replay: false, resume: true, householdEditions: editions)
+                    == (waiting || (position?.status == .inProgress && WalkEntry.lightOnly(editions))))
+            #expect(WalkEntry.clearsPause(.start, position: position, householdEditions: editions) == waiting)
+        }
+        // Never reopened by itself in a full household, before or after the first pull.
+        for synced in [true, false] {
+            #expect(WalkEntry.decide(replay: false, demoWalk: false, position: walking, householdEditions: ["full"],
+                                     initialSyncFinished: synced, goalCount: 0) == .none)
+        }
+        // The store reports it for Settings' row.
+        let saved = store(), me = UUID()
+        saved.save(walking, for: me)
+        #expect(saved.hasWaitingWalk(for: me, householdEditions: ["full"]))
+        #expect(!saved.hasWaitingWalk(for: me, householdEditions: ["light"]))
+        #expect(!saved.hasWaitingWalk(for: UUID(), householdEditions: ["full"]))
+    }
+
+    /// A replay or a resume asked for while a walk is up is dropped, never kept to start later.
+    @Test func requestsWhileAWalkIsUpAreDropped() {
+        #expect(WalkEntry.dropsRequests(walkUp: true))
+        #expect(!WalkEntry.dropsRequests(walkUp: false))
     }
 
     /// A walk still up on a later day is taken down and decided again with the new day's periods.

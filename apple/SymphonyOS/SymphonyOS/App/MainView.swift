@@ -293,9 +293,15 @@ extension iOSMainView {
         let store: WalkPositionStore? = WalkPositionStore()
         #endif
         let position = userId.flatMap { store?.load(for: $0) }
-        appState.walkPaused = store?.hasPausedWalk(for: userId) ?? false
         // Oldest first, as sync picks the household whose settings the phone follows.
         let householdRows = (try? modelContext.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        appState.walkPaused = store?.hasWaitingWalk(for: userId, householdEditions: householdRows.map(\.edition)) ?? false
+        // A replay or a resume asked for while a walk is up is not kept to start later (a stale replay
+        // would start from the top and wipe a pause): nothing can ask for one meanwhile but by mistake.
+        if WalkEntry.dropsRequests(walkUp: walk != nil) {
+            appState.walkReplayRequested = false
+            appState.walkResumeRequested = false
+        }
         let replay = appState.walkReplayRequested
         let resume = appState.walkResumeRequested
         guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
@@ -310,7 +316,7 @@ extension iOSMainView {
                                      initialSyncFinished: appState.initialSyncFinished, goalCount: goalCount)
         guard entry != .none else { return }
         // Walking the mountain again over a paused walk starts from the top and clears the pause.
-        if WalkEntry.clearsPause(entry, position: position) {
+        if WalkEntry.clearsPause(entry, position: position, householdEditions: householdRows.map(\.edition)) {
             store?.forget(for: userId)
             appState.walkPaused = false
         }
@@ -336,7 +342,7 @@ extension iOSMainView {
         model.onEnd = { status in
             closeWalk()
             // Leave for now: Today, with the walk waiting to be picked up.
-            appState.walkPaused = store?.hasPausedWalk(for: userId) ?? false
+            appState.walkPaused = store?.hasWaitingWalk(for: userId, householdEditions: householdRows.map(\.edition)) ?? false
             appState.activeTab = .planner
             appState.horizon = .today
             appState.goToToday()

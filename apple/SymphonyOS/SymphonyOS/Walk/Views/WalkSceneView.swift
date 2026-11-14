@@ -97,8 +97,8 @@ struct WalkSceneView: View {
 }
 
 /// The mountain on the 390 × 844 stage, back to front: the stage's sky, the
-/// painting (the art's backdrop, by its own camera for the step), the world (the
-/// peak labels and the posts with their banners) and the dark band at the top. No words. It draws the layout it is given and
+/// painting (the art's backdrop, by its own camera for the step), the dark band at its top, the world (the
+/// peak labels and the posts with their banners), over the band so it dims none of them. No words. It draws the layout it is given and
 /// hands taps to its callbacks, so a page can draw it without the walk's model.
 /// It makes no accessibility container of its own: whoever draws it does
 /// (`WalkSceneView` does), so its peaks and flags sit beside that page's words.
@@ -158,7 +158,6 @@ struct WalkWorldView: View {
             }
             .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
             .animation(reduceMotion ? Self.crossFade : nil, value: layout.camera)
-            band
         }
         .frame(width: art.stage.width, height: art.stage.height)
         .clipped()
@@ -167,10 +166,13 @@ struct WalkWorldView: View {
 
     // MARK: The world
 
-    /// The picture behind, then the world of labels and flags over it.
+    /// The picture behind, the top shade over it, then the world of labels and flags over both: the
+    /// shade darkens the painting behind the words and never dims a flag or a label.
     private var scene: some View {
         ZStack(alignment: .topLeading) {
             picture
+            band
+                .frame(width: art.stage.width, alignment: .top)
             world
         }
     }

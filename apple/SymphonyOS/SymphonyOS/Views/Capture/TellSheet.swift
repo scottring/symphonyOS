@@ -120,6 +120,18 @@ final class Dictation {
         !onDeviceOnly || supportsOnDevice
     }
 
+    /// This instance can never listen on this phone: only on-device recognition will do
+    /// (`onDeviceOnly`) and the phone has none for its language. Known before anything is asked,
+    /// so `start()` asks for no permission then, and the walk and the bar begin by typing. Always
+    /// false when `onDeviceOnly` is false (Tell in a full household): its start is as it was.
+    var cannotListenHere: Bool {
+        #if os(iOS)
+        !Self.mayListen(onDeviceOnly: onDeviceOnly, supportsOnDevice: recognizer?.supportsOnDeviceRecognition ?? false)
+        #else
+        false
+        #endif
+    }
+
     #if os(iOS)
     private let recognizer = SFSpeechRecognizer()
     private let engine = AVAudioEngine()
@@ -141,6 +153,9 @@ final class Dictation {
         let mine = attempt
         asking = mine
         problem = nil
+        // On the phone only, and this phone cannot: said before either permission prompt, never after
+        // both were granted. (With `onDeviceOnly` false this is never true, and nothing here changes.)
+        if cannotListenHere { problem = "Speech isn't available right now — type it instead."; return }
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }

@@ -236,7 +236,14 @@ enum DemoMode {
             case "quick":
                 model.choose(.quick)
             default:
-                break
+                // `name:<words>`: type those words as the light's Type it would (on the ground, an area of
+                // one's own), so a shot can show a long name without typing in the simulator.
+                if step.hasPrefix("name:") {
+                    let words = String(step.dropFirst(5))
+                    model.choose(.type)
+                    model.send(.typeChanged(words))
+                    model.send(.typeSubmitted(words))
+                }
             }
         }
         if walkSheetUp { model.send(.sheetHandle) }
@@ -418,6 +425,7 @@ extension View {
 /// Debug demo only: a listener that hears fixed words the moment it starts, so a
 /// screenshot shows them arriving on the rising flag through `WalkModel`'s own path.
 @MainActor final class DemoWalkListener: WalkListening {
+    let cannotListenHere = false          // the stand-in always hears
     let words: String
     var problem: String?
     var onWords: ((String) -> Void)?
