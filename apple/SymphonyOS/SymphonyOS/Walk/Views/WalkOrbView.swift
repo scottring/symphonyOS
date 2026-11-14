@@ -83,18 +83,13 @@ struct WalkOrbView: View {
             pressStart = nil
             if pressOnLight { model.send(.orbCancelled) }
         }
-        .onChange(of: s.orb) { old, new in
-            // The flag's words, spoken once, politely, as the person lets go: never the partial words.
-            guard case .finishing(let words) = new, !isFinishing(old), !words.isEmpty else { return }
+        .onChange(of: s) { old, new in
+            // The flag's words, spoken once, politely, as they are let go (`WalkCopy.announcement`).
+            guard let words = WalkCopy.announcement(from: old, to: new) else { return }
             let announcement = NSAttributedString(string: words,
                                                   attributes: [.accessibilitySpeechAnnouncementPriority: UIAccessibilityPriority.low])
             UIAccessibility.post(notification: .announcement, argument: announcement)
         }
-    }
-
-    private func isFinishing(_ orb: WalkState.Orb) -> Bool {
-        if case .finishing = orb { return true }
-        return false
     }
 
     // MARK: VoiceOver

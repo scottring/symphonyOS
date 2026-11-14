@@ -198,6 +198,8 @@ enum WalkCopy {
     static func forGoal(_ name: String) -> String { "for \(name)" }
     static func nextEvent(_ time: String) -> String { "Next · \(time)" }
     static func ringLabel(done: Int, total: Int) -> String { "\(done) of \(total) done" }
+    /// What the ring shows: "1/3".
+    static func ring(done: Int, total: Int) -> String { "\(done)/\(total)" }
     /// The sheet's date under "Today": "Friday, 13 November", as the Today step's eyebrow reads it.
     static func endingDate(_ p: WalkPeriods) -> String { format(p.today, "EEEE, d MMMM") }
     /// A next event's time for `nextEvent`: "2:30 pm", in the walk's own calendar and time zone.
@@ -206,9 +208,27 @@ enum WalkCopy {
     // MARK: Settings
 
     static let replayButton = "Walk the mountain again"
-    static let replayFooter = "Start at the top and walk down to today. Nothing you have is changed."
+    static let replayFooter = "Start at the top and walk down to today. What you already planned stays. To stop part-way, back up to the start and choose Not now."
 
     // MARK: VoiceOver
+
+    /// What VoiceOver says as a flag's words are let go, between two states one change
+    /// apart; nil when nothing is to be said. Once per flag: on letting go with words
+    /// (`finishing`), when the first words arrive after letting go with none, or, when the
+    /// session had already ended and the person then let go, as the flag is planted
+    /// (straight from `speaking`, a flag or peak added). Never the partial words.
+    static func announcement(from old: WalkState, to new: WalkState) -> String? {
+        func said(_ words: String) -> Bool { !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if case .finishing(let words) = new.orb, said(words) {
+            if case .finishing(let before) = old.orb, said(before) { return nil }     // already said
+            return words
+        }
+        if case .speaking(let words) = old.orb, said(words), new.orb == .idle,
+           new.items.count > old.items.count || new.kept.count > old.kept.count {
+            return words
+        }
+        return nil
+    }
 
     static let orbLabelWelcome = "Hold to begin"; static let orbLabel = "Hold and speak to plant a flag; tap for more"
     static let rowDone = "Done"; static let rowOpen = "Not done"

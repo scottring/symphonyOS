@@ -302,7 +302,7 @@ final class WalkFlowTests {
         m.send(.orbUp(heldMs: 900))
         #expect(m.state.typing == "")
         m.send(.typeChanged(words))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted(words))
     }
 
     /// Speech refused on the first hold: every level is typed, and the rows are the same
@@ -318,7 +318,7 @@ final class WalkFlowTests {
         #expect(m.state.typing == "" && m.state.note == WalkCopy.speechOff)
         m.send(.orbUp(heldMs: 900))
         m.send(.typeChanged("feel strong again"))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted("feel strong again"))
         m.choose(.next)
         await typeIt(m, "lift twice a week")
         m.choose(.next)

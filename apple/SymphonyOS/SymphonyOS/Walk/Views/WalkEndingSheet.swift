@@ -292,7 +292,7 @@ struct WalkRing: View {
                 .stroke(EndingPaper.green, style: StrokeStyle(lineWidth: 8 * unit, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.easeOut(duration: 0.5), value: progress)
-            Text("\(done)/\(total)")
+            Text(WalkCopy.ring(done: done, total: total))
                 .font(.custom("DMSans-SemiBold", size: 15))
                 .monospacedDigit()
                 .foregroundStyle(EndingPaper.ink)

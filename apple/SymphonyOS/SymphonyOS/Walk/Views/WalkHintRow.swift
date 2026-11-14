@@ -11,6 +11,9 @@ struct WalkHintRow: View {
     @FocusState private var fieldFocused: Bool
     /// Return was pressed: the reducer's submit closes the field, so the blur that follows is not a dismiss.
     @State private var submitted = false
+    /// The field's own words. Return sends them with the submit, so a blur that reached the
+    /// walk first (and closed the field there) cannot lose them.
+    @State private var text = ""
 
     init(model: WalkModel) {
         self.model = model
@@ -122,8 +125,8 @@ struct WalkHintRow: View {
             if !hint.isEmpty {
                 hintText(hint)
             }
-            TextField("", text: Binding(get: { model.state.typing ?? "" },
-                                        set: { model.send(.typeChanged($0)) }),
+            TextField("", text: Binding(get: { text },
+                                        set: { text = $0; model.send(.typeChanged($0)) }),
                       prompt: Text(WalkCopy.typePlaceholder).foregroundStyle(.white.opacity(0.7)))
                 .textFieldStyle(.plain)
                 .font(.custom("DMSans-Regular", size: 16))
@@ -134,7 +137,7 @@ struct WalkHintRow: View {
                 .accessibilityLabel(WalkCopy.typeFieldLabel)
                 .onSubmit {
                     submitted = true
-                    model.send(.typeSubmitted)
+                    model.send(.typeSubmitted(text))
                 }
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
@@ -142,11 +145,13 @@ struct WalkHintRow: View {
         }
         .onAppear {
             submitted = false
+            text = model.state.typing ?? ""
             fieldFocused = true
         }
         .onChange(of: fieldFocused) { _, focused in
             // Only a blur with no return before it dismisses: after a submit it would close
-            // nothing (the submit already planted and closed), and it must never drop the words.
+            // nothing (the submit already planted and closed). If the blur arrives first, the
+            // submit that follows still plants: it carries the words (`.typeSubmitted(text)`).
             guard !focused else { return }
             if submitted {
                 submitted = false

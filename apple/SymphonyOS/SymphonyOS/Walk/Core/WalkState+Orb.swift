@@ -66,8 +66,11 @@ extension WalkState {
         case .typeChanged(let text):
             if typing != nil { typing = text }
             return []
-        case .typeSubmitted:
-            guard let text = typing else { return [] }
+        case .typeSubmitted(let text):
+            // Return and the blur can reach here in either order: the words come with the
+            // submit, so a dismiss a moment before it loses nothing. A dismiss with no
+            // return after it (tapping away) still discards them.
+            guard typing != nil || !isBlank(text) else { return [] }
             let effects = plant(text, env)
             typing = nil
             return effects

@@ -199,12 +199,47 @@ struct WalkCopyTests {
         #expect(WalkCopy.forGoal("Feel strong again") == "for Feel strong again")
         #expect(WalkCopy.nextEvent("2:30 pm") == "Next · 2:30 pm")
         #expect(WalkCopy.ringLabel(done: 1, total: 3) == "1 of 3 done")
+        #expect(WalkCopy.ring(done: 1, total: 3) == "1/3")
         #expect(WalkCopy.replayButton == "Walk the mountain again")
-        #expect(WalkCopy.replayFooter == "Start at the top and walk down to today. Nothing you have is changed.")
+        #expect(WalkCopy.replayFooter == "Start at the top and walk down to today. What you already planned stays. To stop part-way, back up to the start and choose Not now.")
         #expect(WalkCopy.orbLabelWelcome == "Hold to begin")
         #expect(WalkCopy.orbLabel == "Hold and speak to plant a flag; tap for more")
         #expect(WalkCopy.rowDone == "Done"); #expect(WalkCopy.rowOpen == "Not done")
         #expect(WalkLevel.allCases.map(WalkCopy.levelName) == ["Year", "Season", "Month", "Week", "Today"])
+    }
+
+    /// A flag's words are announced once, as they are let go: on letting go with words,
+    /// when the first words arrive after letting go with none, or, when the session had
+    /// already ended, as the flag is planted. Never the partial words, never twice.
+    @Test func eachFlagIsAnnouncedOnce() {
+        func with(_ orb: WalkState.Orb, items: Int = 0) -> WalkState {
+            var s = state(step: 1)
+            s.orb = orb
+            s.items = (0..<items).map { _ in item(.year, "Feel strong again") }
+            return s
+        }
+        let say = WalkCopy.announcement
+        // Let go while speaking: the words, once; the plant that follows says nothing more.
+        #expect(say(with(.speaking(live: "feel strong")), with(.finishing(live: "feel strong"))) == "feel strong")
+        #expect(say(with(.finishing(live: "feel strong")), with(.finishing(live: "feel strong again"))) == nil)
+        #expect(say(with(.finishing(live: "feel strong again")), with(.idle, items: 1)) == nil)
+        // Let go with nothing yet: announced when the words arrive.
+        #expect(say(with(.speaking(live: "")), with(.finishing(live: ""))) == nil)
+        #expect(say(with(.finishing(live: "")), with(.finishing(live: "feel strong"))) == "feel strong")
+        // The session ended by itself, then the person let go: announced as it is planted.
+        #expect(say(with(.speaking(live: "feel strong")), with(.idle, items: 1)) == "feel strong")
+        // A cancel, or sliding out to the points: nothing planted, nothing said.
+        #expect(say(with(.speaking(live: "feel strong")), with(.idle)) == nil)
+        #expect(say(with(.speaking(live: "feel strong")), with(.holding(hover: .n))) == nil)
+        #expect(say(with(.speaking(live: "fee")), with(.speaking(live: "feel"))) == nil)
+        // On the ground the words name a peak: planted when a peak is kept.
+        var ground = state(step: 1)
+        ground.ground = true
+        ground.orb = .speaking(live: "garden")
+        var named = ground
+        named.orb = .idle
+        named.kept = [UUID()]
+        #expect(say(ground, named) == "garden")
     }
 
     @Test func whatVoiceOverSays() {

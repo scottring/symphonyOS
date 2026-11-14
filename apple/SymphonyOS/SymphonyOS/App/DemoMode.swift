@@ -200,7 +200,7 @@ enum DemoMode {
             case "undo":
                 model.choose(.type)
                 model.send(.typeChanged("Two early nights a week"))
-                model.send(.typeSubmitted)
+                model.send(.typeSubmitted("Two early nights a week"))
             case "next":
                 model.choose(.next)
             default:

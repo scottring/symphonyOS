@@ -47,7 +47,7 @@ struct WalkModelTests {
         m.choose(.next)
         m.choose(.type)
         m.send(.typeChanged(words))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted(words))
     }
 
     /// A saved place on Season, built as the walk would save it.
@@ -152,7 +152,7 @@ struct WalkModelTests {
 
         m.choose(.type)
         m.send(.typeChanged("um"))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted("um"))
         #expect(m.state.note == WalkCopy.nothingToPlant)
         scheduler.advance(WalkState.noteMs)
         #expect(m.state.note == nil)

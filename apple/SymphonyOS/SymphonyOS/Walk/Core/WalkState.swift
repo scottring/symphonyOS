@@ -340,7 +340,8 @@ struct WalkState: Equatable {
 
 enum WalkEvent: Equatable {
     case orbDown, orbHeld, orbMoved(CGPoint), orbUp(heldMs: Int), orbCancelled
-    case heard(String), speechUnavailable, typeChanged(String), typeSubmitted, typeDismissed, point(CompassPoint)
+    /// `typeSubmitted` carries the field's words, so a blur that closed the field first cannot lose them.
+    case heard(String), speechUnavailable, typeChanged(String), typeSubmitted(String), typeDismissed, point(CompassPoint)
     /// The listening session ended (its last words are in); the finish wait ran out;
     /// permission was given after the prompts took the touch.
     case listenEnded, finishExpired, speechReady

@@ -90,7 +90,7 @@ struct WalkSoundTests {
         m.send(.orbUp(heldMs: 120))                       // a tap: the compass opens
         m.choose(.type)
         m.send(.typeChanged("feel strong again"))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted("feel strong again"))
         #expect(sound.played == [.bag, .poles, .plant])
         m.choose(.back)                                   // back down to the ground
         let health = try #require(m.state.areas.first { $0.name == "Health" })
@@ -157,7 +157,7 @@ struct WalkSoundTests {
         m.send(.orbUp(heldMs: 120))
         m.choose(.type)
         m.send(.typeChanged("feel strong again"))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted("feel strong again"))
         #expect(sound.played.last == .plant)
         scheduler.advance(129)
         #expect(sound.felt == [.bag, .poles])
@@ -171,7 +171,7 @@ struct WalkSoundTests {
         m.choose(.next)
         m.choose(.type)
         m.send(.typeChanged("feel strong again"))
-        m.send(.typeSubmitted)
+        m.send(.typeSubmitted("feel strong again"))
         #expect(sound.played == [.plant])
         m.close()
         scheduler.advance(1_000)

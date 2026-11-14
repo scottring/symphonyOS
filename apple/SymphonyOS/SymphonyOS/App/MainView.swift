@@ -269,6 +269,11 @@ extension iOSMainView {
         #if DEBUG
         if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
         #endif
+        // Never under a sheet or behind a keyboard: whatever field has the keyboard lets it
+        // go, and the dock's capture sheet closes. (Today's own Tell and Add sheets, and the
+        // half-open display's Tell sheet, are kept by those views and can still sit above it.)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        showCapture = false
         withAnimation(animated ? walkFade : nil) { walk = model }
     }
 

@@ -47,7 +47,8 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 - Season: a plain task, bucket `quarter`, `season_start`; `goal_id` → the year goal.
 - Month: a plain task, bucket `month`, `month_start`; `source_id` → the season task, `goal_id` copied from it.
 - Week: a task on its day, or on the week; `source_id` → the month task, `goal_id` copied.
-- First thing today: a `task_focus` row.
+- First thing today: a `task_focus` row. One said on Today is a week task dated today; under a week flag it names that flag's month line (`source_id`) and goal, never the week task.
+- Marking a first thing also dates that task today; when the mark leaves it, its earlier day comes back (within one session: a relaunch leaves it on today).
 - A life area is a `goal_areas` row, saved only once something is planted on it; an existing personal area with the same name is reused.
 - Never sent: `is_goal`, `goal_task_id`, `supports_goal_task_id`.
 
@@ -55,29 +56,36 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 
 **Parents first.** A row whose sent links name a parent whose insert is still queued waits for it; a `task_focus` row waits for its task the same way. A child stops waiting once the parent's insert has failed 10 times. A parent is lost only when the server refuses the child with a foreign-key error (23503) and the parent is neither on the phone nor queued: that link is cleared and the null is sent.
 
-**When it opens.** By itself only in a household that is light only, with no goals, after the first sync has finished. A saved walk in progress resumes at once, and "Walk the mountain again" (Settings) opens at once when the household row is already on the phone; neither waits for the sync. It never starts by itself in a full household. A replay starts with nothing counted as planted.
+**When it opens.** By itself only in a household that is light only, with no goals, after the first sync has finished. The first pull is reported (`SyncEngine.start` / `resync`, `onFirstPull`) as soon as it is in, before the realtime channels join, so the walk does not wait on them. A saved walk in progress resumes at launch in a light household only, at once, without waiting for the sync; in a full (or mixed, or not yet known) household it is left. "Walk the mountain again" (Settings) opens at once when the household row is already on the phone, and starts from the top. It never starts by itself in a full household. A replay starts with nothing counted as planted. When it opens, the keyboard is dismissed and the dock's capture sheet closes; Today's Tell and Add sheets, and the half-open display's Tell sheet, can still sit above it.
+
+**Leaving it.** "Not now" on Welcome, or "Go to Today" at the end. Part-way, the way out is to back up to Welcome and choose Not now.
 
 **Saved position.** In `UserDefaults` under `walk.position.<user id>` (`WalkPositionStore`), saved from the moment a depth is chosen. Undo lives in memory only and does not survive a relaunch.
 
 **Behaviour a change must keep:**
-- Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes.
+- Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes. Anything the person does in that second (a tap on a flag or a peak, Undo, a compass point through VoiceOver) plants the flag first, under the parent shown when they let go, then takes effect (`WalkEvent.leavesAWaitingFlag`).
 - The walk listens on the phone only. Where on-device recognition is missing, holding opens typing.
-- A first empty hold shows a quiet note; a second in a row opens typing. Refused or unavailable speech opens typing, and every hold for the rest of that walk types instead.
+- A first empty hold shows a quiet note; a second in a row opens typing. Refused or unavailable speech opens typing, and every hold for the rest of that walk types instead. A session that dies mid-hold with nothing heard opens typing with "Nothing came through" and does not switch speech off: the next hold listens again.
+- A typed flag carries its words with return (`.typeSubmitted(text)`), so it is planted whether return or the field losing focus reaches the walk first.
 - "Walk another one down" (`.walkAnother`) starts clean: no undo, examples, note, selection or open post carried over.
+- Undoing or pulling up the newest flag of a level hands "last planted" back to the newest one the person still has there, so the next step still links.
+- Moving a year goal to another peak does not move the flags already under it (known gap).
 - The Year camera stop is −495 (`WalkArt`), not the mockup's −553, so the peak labels clear the orb.
 - When examples are short of room, your own flags on that post fold to one line carrying "+n"; at least one example always shows.
 - On a crowded ridge (six or more columns) one post is open at a time, and its banners narrow to the gap between its neighbours (never below 44 pt).
 - Sounds are synthesized placeholders until the recordings land in `Resources/WalkSounds`. They are silent while the walk's own listening holds the audio session; haptics always play, sound off or not.
 - The ending's rows are today's own personal tasks (planted by the walk or not) and exist only on step 6.
 
-**Accessibility.** The light is one VoiceOver button (`walk.orb`): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. Flags that take no tap (`Banner.taps`, which agrees with the reducer) and peaks that take none (`Label.tappable`) read as text; a peak that is kept (ground) or focused (Year) carries the selected trait (`Label.selected`). The flag's words are announced once, as the person lets go. The scene is hidden from VoiceOver under the raised ending sheet; with it down the heading is read first. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, the light does not breathe, and the live flag and the ending sheet arrive in the same 0.25 s.
+**Accessibility.** The light is one VoiceOver button (`walk.orb`): a double-tap opens or closes the points, and each compass point is a custom action, so "Type it" plants without a press and hold. Flags that take no tap (`Banner.taps`, which agrees with the reducer) and peaks that take none (`Label.tappable`) read as text; a peak that is kept (ground) or focused (Year) carries the selected trait (`Label.selected`). The flag's words are announced once (`WalkCopy.announcement`): as the person lets go, or when they arrive after an empty let-go, or as the flag is planted when the session had ended first. The scene is hidden from VoiceOver under the raised ending sheet; with it down the heading is read first. With Reduce Motion the camera cross-fades in 0.25 s instead of gliding 1.4 s, banners do not flutter, the light does not breathe, and the live flag and the ending sheet arrive in the same 0.25 s.
 
-**Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk. The picture's pale edge margins (left and bottom) are painted over by `scripts/repair-walk-overlook-edges.swift`; run it again on any new picture.
+**Other screens.** The 390 × 844 stage scales to fit and letterboxes in `#00106e`; there is no Duo or landscape layout. With `-HalfOpen laptop` the half-open display covers the walk. The picture's pale edge margins (left and bottom) are painted over by `scripts/repair-walk-overlook-edges.swift`; run it again on any new picture, and re-run the layout's generated-state sweep (`WalkLayoutTests`) whenever a new picture (`WalkArt`) is added.
 
 Not designed yet:
 - On the Duo's inside screen the stage is letterboxed with navy bars, which show seams beside the stage's lighter sky and its rocks.
 - There the system status column overlaps the raised ending sheet's top-right corner.
 - The walk stays reachable by VoiceOver under the half-open display.
+
+**Speech is shared with Tell.** `Dictation` (`Views/Capture/TellSheet.swift`) serves both. What Tell must keep: its record-only session (others ducked, the session let go on stop), `stop()` as a cancel, and recognition that may use the server when on-device is unsupported. The walk's instance sets `playsAlongside` (its sounds play while it listens) and `onDeviceOnly` (never a server: no on-device recogniser opens typing), and uses `finish()` and `onEnd`.
 
 **Launch arguments** (Debug, with `-SymphonyDemo`; add `-SymphonyLight` for the light edition):
 - `-SymphonyWalk`: open the walk over an empty store.

@@ -171,14 +171,14 @@ struct WalkOrbTests {
         _ = s.apply(.point(.w), env)
         #expect(s.typing == "" && s.orb == .idle)
         _ = s.apply(.typeChanged("run a 5K"), env)
-        _ = s.apply(.typeSubmitted, env)
+        _ = s.apply(.typeSubmitted("run a 5K"), env)
         #expect(s.items.map(\.title).contains("Run a 5K"))
         #expect(s.typing == nil)
 
         var t = state(step: 1)
         t.typing = ""
         let before = t.items
-        _ = t.apply(.typeSubmitted, env)
+        _ = t.apply(.typeSubmitted(""), env)
         #expect(t.items == before && t.typing == nil)
     }
 
@@ -187,6 +187,32 @@ struct WalkOrbTests {
         s.typing = "half"
         _ = s.apply(.typeDismissed, env)
         #expect(s.typing == nil && s.items.isEmpty)
+    }
+
+    /// Return and the field losing focus may reach the walk in either order: the submit
+    /// carries the field's words, so they are planted either way. Tapping away (a dismiss
+    /// with no return) still discards them, and the light is usable at once.
+    @Test func aTypedFlagDoesNotDependOnTheOrderOfReturnAndBlur() {
+        var s = state(step: 1, planted: true)
+        _ = s.act(.type, env)
+        _ = s.apply(.typeChanged("run a 5K"), env)
+        _ = s.apply(.typeDismissed, env)                         // the blur first
+        let fx = s.apply(.typeSubmitted("run a 5K"), env)
+        #expect(s.items.map(\.title) == ["Feel strong again", "Run a 5K"])
+        #expect(s.typing == nil)
+        #expect(fx.contains(.save))
+
+        var t = state(step: 1, planted: true)
+        _ = t.act(.type, env)
+        _ = t.apply(.typeChanged("half a thought"), env)
+        _ = t.apply(.typeDismissed, env)                         // tapping away: no return follows
+        #expect(t.items.count == 1 && t.typing == nil)
+        _ = t.apply(.orbDown, env)
+        #expect(t.orb == .holding(hover: nil))
+        // A stray empty submit with the field already closed does nothing.
+        var u = state(step: 1)
+        #expect(u.apply(.typeSubmitted(""), env) == [])
+        #expect(u.note == nil)
     }
 
     @Test func theOrbIgnoresPressesWhileTyping() {
@@ -405,7 +431,7 @@ struct WalkOrbTests {
         speak(&s); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
         #expect(s.typing == nil && s.note == WalkCopy.nothingToPlant)
         // A typed plant resets it too.
-        _ = s.act(.type, env); _ = s.apply(.typeChanged("run a 5K"), env); _ = s.apply(.typeSubmitted, env)
+        _ = s.act(.type, env); _ = s.apply(.typeChanged("run a 5K"), env); _ = s.apply(.typeSubmitted("run a 5K"), env)
         speak(&s); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
         #expect(s.typing == nil && s.note == WalkCopy.nothingToPlant)
         #expect(s.items.map(\.title) == ["Feel strong", "Run a 5K"])
@@ -492,7 +518,7 @@ struct WalkOrbTests {
             var t = ended
             let items = t.items
             for event: WalkEvent in [.finishExpired, .listenEnded, .orbDown, .orbHeld, .orbUp(heldMs: 900),
-                                     .typeSubmitted, .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered] {
+                                     .typeSubmitted("feel strong again"), .sheetHandle, .walkAnother, .goToToday, .undo, .calendarAnswered] {
                 #expect(t.apply(event, env) == [])
             }
             for action: WalkAction in [.next, .back, .quick, .notNow, .undo, .calendar] {
