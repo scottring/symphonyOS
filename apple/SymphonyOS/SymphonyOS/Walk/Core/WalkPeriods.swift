@@ -99,13 +99,13 @@ struct WalkPeriods: Equatable {
     }
 
     /// Where a Planner switcher row opens: the date `selectedDate` takes, or nil to leave it.
-    /// Full: only Today moves it, to now. Light: the row of the horizon on screen leaves it
-    /// where the steppers put it; every other row opens on the walk's period for it (Week
-    /// and Today on today), so the pages show what the walk filed.
+    /// Full: only Today moves it, to now. Light: Today always comes back to today; the row
+    /// of any other horizon on screen leaves it where the steppers put it; every other row
+    /// opens on the walk's period for it (Week on today), so the pages show what it filed.
     static func switcherDate(for horizon: Horizon, viewing: Horizon, edition: Edition, now: Date,
                              seasons: [SeasonBoundary]?) -> Date? {
         guard edition == .light else { return horizon == .today ? now : nil }
-        guard horizon != viewing else { return nil }
+        guard horizon != viewing || horizon == .today else { return nil }
         return pick(now: now, seasons: seasons).pageDate(for: horizon)
     }
 }

@@ -511,6 +511,8 @@ struct WalkModelTests {
     }
 
     /// A replay asked for and still waiting never outlives the person who asked.
+    /// Proves what `signedOut()` clears; that sign-out calls it (`ContentView.stopSync`,
+    /// private to a view) is not reachable from here and is checked by reading.
     @Test func signingOutForgetsAWaitingReplay() {
         let app = AppState()
         app.walkReplayRequested = true

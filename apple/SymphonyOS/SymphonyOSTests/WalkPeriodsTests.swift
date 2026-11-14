@@ -112,6 +112,7 @@ struct WalkPeriodsTests {
             WalkPeriods.switcherDate(for: h, viewing: viewing, edition: edition, now: now, seasons: nil)
         }
         #expect(opens(.today, viewing: .month, .full) == now)
+        #expect(opens(.today, viewing: .today, .full) == now)
         for h in [Horizon.week, .month, .season, .year] {
             #expect(opens(h, viewing: .today, .full) == nil)
         }
@@ -120,8 +121,10 @@ struct WalkPeriodsTests {
         #expect(opens(.month, viewing: .today, .light) == day(2026, 11, 1))
         #expect(opens(.season, viewing: .today, .light) == day(2026, 12, 1))
         #expect(opens(.year, viewing: .today, .light) == day(2027, 1, 1))
-        for h in Horizon.allCases {
-            #expect(opens(h, viewing: h, .light) == nil)                        // the page on screen stays put
+        // The page on screen stays put, except Today, which always comes back to today.
+        #expect(opens(.today, viewing: .today, .light) == day(2026, 11, 13))
+        for h in [Horizon.week, .month, .season, .year] {
+            #expect(opens(h, viewing: h, .light) == nil)
         }
     }
 }

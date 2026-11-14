@@ -156,7 +156,8 @@ struct iOSMainView: View {
         }
         .onChange(of: hinge) { _, _ in updatePosture() }
         .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
-        .onAppear { updatePosture(); applyEdition(); considerWalk() }
+        // A walk there at launch (a resume) shows at once, with no fade over Today.
+        .onAppear { updatePosture(); applyEdition(); considerWalk(animated: false) }
         // MainView is mounted only while signed in; forget the edition, and take
         // the walk down, when it goes.
         .onDisappear {
@@ -210,13 +211,14 @@ extension iOSMainView {
     /// light household, resumed where it was left, or replayed from Settings. Called on
     /// appear and whenever the first pull finishes, the edition changes, a replay is asked
     /// for or someone else signs in; it does nothing while a walk is up, and before the first
-    /// pull only a resume or a replay may open (`WalkEntry.mayDecide`). The households and
+    /// pull only a resume or a replay may open (`WalkEntry.mayDecide`). It fades in, except
+    /// on appear (`animated: false`), where it is there from the start. The households and
     /// goals are counted from the store as it is now, not from a `@Query` that may lag.
     ///
     /// Debug demo: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]`
     /// opens it once, over an empty in-memory store or over the mockup's preview at step N,
     /// then drives it into a state for a screenshot. A demo never reads or saves a position.
-    private func considerWalk() {
+    private func considerWalk(animated: Bool = true) {
         let userId = auth.currentUser?.id
         #if DEBUG
         let demo = DemoMode.isOn
@@ -267,7 +269,7 @@ extension iOSMainView {
         #if DEBUG
         if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
         #endif
-        withAnimation(walkFade) { walk = model }
+        withAnimation(animated ? walkFade : nil) { walk = model }
     }
 
     private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }
