@@ -152,9 +152,8 @@ struct DailyGateTests {
 
     /// The dock is judged by the page on screen, not by Today being built: with all five pages
     /// built it gives way on every one of them, and only on a light window. A page this window
-    /// does not draw light (the Duo's upright inside screen and the spread until Tasks 17 and 18,
-    /// a phone on its side, the outside screen) keeps the dock, and so does a page the gate does
-    /// not list, even while Today is built.
+    /// does not draw light (the spread until Task 18, a phone or the outside screen on its side)
+    /// keeps the dock, and so does a page the gate does not list, even while Today is built.
     @Test func theDockGivesWayOnEveryLightPageAndOnNoOther() {
         let shapes: [TodayLayout] = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
         for h in Horizon.allCases {
@@ -164,7 +163,7 @@ struct DailyGateTests {
                         == DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
                 #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
             }
-            for l in [TodayLayout.dayPage, .journal, .glanceWide] {
+            for l in [TodayLayout.journal, .glanceWide] {
                 #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
             }
         }
@@ -181,8 +180,8 @@ struct DailyGateTests {
         }
     }
 
-    /// While the light half-open display is up the page under it is not drawn, so nothing there
-    /// can listen, write or answer a Tell. A full household's page is never touched.
+    /// While the light half-open display is up the page under it is inert (drawn, out of reach), so
+    /// nothing there can listen, write or answer a Tell. A full household's page is never touched.
     @Test func theLightHalfOpenDisplayCoversThePage() {
         #expect(DailyGate.coversPage(edition: .light, halfOpen: true))
         #expect(!DailyGate.coversPage(edition: .light, halfOpen: false))
@@ -210,5 +209,92 @@ struct DailyGateTests {
         #expect(!DailyGate.dropsPage(covered: true, lightPage: true))
         #expect(!DailyGate.dropsPage(covered: false, lightPage: false))
         #expect(!DailyGate.dropsPage(covered: false, lightPage: true))
+    }
+
+    // MARK: The Duo (Task 17)
+
+    /// The outside screen (`.glance`) and the inside screen held upright (`.dayPage`) draw the light
+    /// pages; the spread (`.journal`, Task 18) and a short wide window (`.glanceWide`) do not yet,
+    /// and a full household never does.
+    @Test func theOutsideAndUprightInsideAreBuilt() {
+        #expect(DailyGate.shows(.today, edition: .light, layout: .glance))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .dayPage))
+        #expect(!DailyGate.shows(.today, edition: .light, layout: .journal))
+        #expect(!DailyGate.shows(.today, edition: .light, layout: .glanceWide))
+        for l in [TodayLayout.oneColumn, .glance, .glanceWide, .dayPage, .journal] {
+            #expect(!DailyGate.shows(.today, edition: .full, layout: l), "\(l)")
+        }
+    }
+
+    /// A window of each shape the gate lists, with safe insets it meets (the Duo's outside screen as
+    /// its simulator reports it: 0 at the top, 34 at the foot, the system's 84-point column beside
+    /// the page, which the page stands clear of, so the page is 382 wide).
+    private let windows: [TodayLayout: (size: CGSize, top: CGFloat, bottom: CGFloat)] = [
+        .oneColumn: (CGSize(width: 390, height: 844), 44, 34),
+        .glance: (CGSize(width: 382, height: 678), 0, 34),
+        .dayPage: (CGSize(width: 626, height: 890), 44, 34),
+    ]
+
+    /// A guard against the gate and the Planner disagreeing: every page the gate lists, on every
+    /// window it lists, is a light page the Planner draws (never the full Planner under a hidden
+    /// dock, nor the dock over a light page), and its numbers on such a window keep three rows and
+    /// the bar on the window. A layout added to the gate must bring a window here.
+    @Test func everyListedPageIsDrawnLightOnEveryListedWindow() {
+        for l in DailyGate.layouts {
+            guard let w = windows[l] else {
+                Issue.record("the gate lists \(l), which has no window here")
+                continue
+            }
+            for h in DailyGate.horizons {
+                #expect(DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
+                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
+                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
+                #expect(!DailyGate.dropsPage(covered: true, lightPage: DailyGate.shows(h, edition: .light, layout: l)))
+
+                let page = DailyGate.page(h)
+                let shape = DailyMetrics.shape(for: l, height: w.size.height, safeTop: w.top, safeBottom: w.bottom,
+                                               waiting: false)
+                let m: DailyMetrics
+                switch page {
+                case .today:
+                    #expect(h == .today)
+                    m = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                    #expect(m.rowsTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY, "\(h) \(l)")
+                case .week:
+                    #expect(h == .week)
+                    m = DailyMetrics.week(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                    #expect(m.rowsTop + DailyMetrics.weekDayTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY, "\(h) \(l)")
+                case .mountain(let level):
+                    #expect(DailyGate.mountain(h) == level)
+                    m = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape)
+                }
+                let window = CGRect(x: 0, y: w.top, width: w.size.width, height: w.size.height - w.top - w.bottom)
+                for r in m.touchTargets { #expect(window.contains(r), "\(h) \(l): \(r) off the window's safe part") }
+            }
+        }
+        // Every horizon has a light page; the gate's own mountain rule agrees with it.
+        for h in Horizon.allCases {
+            switch DailyGate.page(h) {
+            case .mountain(let level): #expect(DailyGate.mountain(h) == level)
+            case .today, .week: #expect(DailyGate.mountain(h) == nil)
+            }
+        }
+    }
+
+    /// Ruling D14 leftover (a): a row's Details over a light page closes when the half-open display
+    /// covers it, so the display's bar never listens behind a sheet; it stays open otherwise.
+    @Test func coveringThePageClosesItsDetails() {
+        #expect(!DailyGate.keepsDetails(covered: true))
+        #expect(DailyGate.keepsDetails(covered: false))
+        #expect(!DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .light, halfOpen: true)))
+        #expect(DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .full, halfOpen: true)))
+    }
+
+    /// Leftover (c): the half-open display keeps the screen on only while half open and signed in.
+    @Test func theScreenStaysOnOnlyHalfOpenAndSignedIn() {
+        #expect(DailyGate.staysAwake(halfOpen: true, signedIn: true))
+        #expect(!DailyGate.staysAwake(halfOpen: true, signedIn: false))
+        #expect(!DailyGate.staysAwake(halfOpen: false, signedIn: true))
+        #expect(!DailyGate.staysAwake(halfOpen: false, signedIn: false))
     }
 }

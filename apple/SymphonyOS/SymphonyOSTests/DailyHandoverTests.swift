@@ -273,6 +273,68 @@ struct DailyHandoverTests {
         app.signedOut()
         #expect(app.handover == false)
     }
+
+    // MARK: The Duo (Task 17)
+
+    /// Light Today is the page on the outside screen and on the inside screen held upright, so a walk
+    /// finished there hands its light over; on the spread (until Task 18) it does not.
+    @Test func theOutsideAndUprightInsideScreensHandOver() {
+        for l in [TodayLayout.glance, .dayPage] {
+            #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
+                                        lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: l)), "\(l)")
+        }
+        #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
+                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .journal)) == false)
+    }
+
+    /// The outside screen: the walk fills the whole 466 × 678 window, its stage letterboxed there,
+    /// while the page stands clear of the system's 84-point column. The light starts where the walk
+    /// drew it, in the page's points, inside the page, and lands on the bar this window draws
+    /// (the short shape's, on the page's 382 width), 34 above the foot.
+    @Test func onTheOutsideScreenItTravelsFromTheWalksLightToTheShortBar() {
+        let window = CGSize(width: 466, height: 678), page = CGRect(x: 0, y: 0, width: 382, height: 678)
+        let stage = WalkStage(device: window)
+        let start = DailyHandover.start(window: window, page: page.origin)
+        #expect(start.centre == stage.toDevice(WalkOrb.centre))
+        #expect(start.diameter == 2 * WalkOrb.radius * stage.scale)
+        #expect(page.contains(start.centre))
+
+        // With the column on the left the page stands in by it, and the same light is that much to its left.
+        let left = DailyHandover.start(window: window, page: CGPoint(x: 84, y: 0))
+        #expect(left.centre == CGPoint(x: stage.toDevice(WalkOrb.centre).x - 84, y: stage.toDevice(WalkOrb.centre).y))
+
+        let bar = DailyMetrics.today(size: page.size, safeTop: 0, safeBottom: 34,
+                                     shape: DailyMetrics.shape(for: .glance, height: 678, safeTop: 0, safeBottom: 34,
+                                                               waiting: false)).bar
+        let end = DailyHandover.end(bar: bar)
+        #expect(end.centre == CGPoint(x: bar.field.maxX - DailyMetrics.lightInset - bar.light / 2, y: bar.field.midY))
+        #expect(bar.field.maxY == CGFloat(678 - 34 - 8))    // the safe foot, and 8 above it
+        #expect(page.contains(end.centre))
+        // Every point of the travel stays on the page.
+        for p in stride(from: 0.0, through: 1.0, by: 0.05) {
+            #expect(page.contains(DailyHandover.light(at: p, from: start, to: end).centre), "\(p)")
+        }
+    }
+
+    /// The inside screen upright: page and window are one, the stage letterboxed in it; the light lands
+    /// on the tall bar at that width.
+    @Test func onTheUprightInsideScreenItTravelsFromTheWalksLightToTheBar() {
+        let window = CGSize(width: 626, height: 890)
+        let stage = WalkStage(device: window)
+        let start = DailyHandover.start(window: window)
+        #expect(start.centre == stage.toDevice(WalkOrb.centre))
+        #expect(start.diameter == 2 * WalkOrb.radius * stage.scale)
+        let bar = DailyMetrics.today(size: window, safeTop: 44, safeBottom: 34,
+                                     shape: DailyMetrics.shape(for: .dayPage, height: 890, safeTop: 44, safeBottom: 34,
+                                                               waiting: false)).bar
+        #expect(bar.field == CGRect(x: 64, y: 800, width: 498, height: 48))
+        let end = DailyHandover.end(bar: bar)
+        #expect(end.centre == CGPoint(x: 562 - 5 - 19, y: 824))
+        let page = CGRect(origin: .zero, size: window)
+        for p in stride(from: 0.0, through: 1.0, by: 0.05) {
+            #expect(page.contains(DailyHandover.light(at: p, from: start, to: end).centre), "\(p)")
+        }
+    }
 }
 
 #if os(iOS)

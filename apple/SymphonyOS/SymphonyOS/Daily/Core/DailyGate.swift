@@ -8,7 +8,7 @@ enum DailyGate {
     static let horizons: Set<Horizon> = [.today, .week, .month, .season, .year]
     /// Window shapes the light pages are built for. Tasks 17 and 18 add theirs; never
     /// `.glanceWide`, where a phone on its side keeps the old screens.
-    static let layouts: Set<TodayLayout> = [.oneColumn]
+    static let layouts: Set<TodayLayout> = [.oneColumn, .glance, .dayPage]
     /// The add bar is built (Task 9).
     static let barBuilt = true
     /// The light half-open display is built (Task 19).
@@ -31,10 +31,23 @@ enum DailyGate {
     }
 
     /// The light half-open display is up over the Planner (`halfOpen`: the phone is set down
-    /// partly open): the page under it is not drawn, so only the display's own bar can listen,
-    /// write or answer a Tell. A full household's page is never touched.
+    /// partly open): a light page under it stays drawn but inert (`dropsPage`), so only the
+    /// display's own bar can listen, write or answer a Tell. A full household's page is never touched.
     static func coversPage(edition: Edition, halfOpen: Bool, built: Bool = halfOpenBuilt) -> Bool {
         halfOpen && self.halfOpen(edition: edition, built: built)
+    }
+
+    /// A row's Details, open over a light page, stays open only while the page is not covered: under
+    /// the half-open display it closes, so the display, and its bar when it takes a Tell, are seen
+    /// rather than a sheet over them. (A task's own words in Details are kept as they are typed.)
+    static func keepsDetails(covered: Bool) -> Bool {
+        !covered
+    }
+
+    /// The light half-open display keeps the screen on only while the phone is set down half open
+    /// and someone is signed in; signing out, or opening flat, lets it sleep again.
+    static func staysAwake(halfOpen: Bool, signedIn: Bool) -> Bool {
+        halfOpen && signedIn
     }
 
     /// Under the light half-open display (ruling D14) a light page stays as it was, drawn but inert,
@@ -104,6 +117,21 @@ enum DailyGate {
         guard edition == .light else { return nil }
         if walkIsWaiting(position) { return .waiting }
         return walkIsOffered(position, goalCount: goalCount, edition: edition) ? .whenReady : nil
+    }
+
+    /// What the light Planner draws for a page the gate shows. Every horizon has one, so a page
+    /// the gate lists is never the full Planner under a hidden dock (`LightPlannerView` switches on
+    /// this, with no other case).
+    enum Page: Equatable { case today, week, mountain(WalkLevel) }
+
+    static func page(_ horizon: Horizon) -> Page {
+        switch horizon {
+        case .today: .today
+        case .week: .week
+        case .month: .mountain(.month)
+        case .season: .mountain(.season)
+        case .year: .mountain(.year)
+        }
     }
 
     /// The mountain pages: Month, Season and Year are the walk's own mountain at that level

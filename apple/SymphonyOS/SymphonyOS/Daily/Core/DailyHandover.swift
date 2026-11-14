@@ -81,10 +81,13 @@ enum DailyHandover {
         }
     }
 
-    /// Where the walk's light stands in this window, and how wide.
-    static func start(window: CGSize) -> (centre: CGPoint, diameter: CGFloat) {
+    /// Where the walk's light stood, and how wide, in the page's own points: the walk fills the
+    /// whole `window` (its stage letterboxed there), while the page may stand in from the window's
+    /// side, clear of a system column (the Duo's outside screen), with its top-left at `page`.
+    static func start(window: CGSize, page: CGPoint = .zero) -> (centre: CGPoint, diameter: CGFloat) {
         let stage = WalkStage(device: window)
-        return (stage.toDevice(WalkOrb.centre), 2 * WalkOrb.radius * stage.scale)
+        let centre = stage.toDevice(WalkOrb.centre)
+        return (CGPoint(x: centre.x - page.x, y: centre.y - page.y), 2 * WalkOrb.radius * stage.scale)
     }
 
     /// Where the bar's light stands (its diameter, at the field's right end, `lightInset` in).

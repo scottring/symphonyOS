@@ -12,9 +12,9 @@ import UIKit
 ///
 /// It keeps what the old half-open display does around its edges: the screen stays on while it is
 /// up, the day turns at midnight, and `-TodaySize` pins its size in Debug (scaled down to fit a
-/// smaller simulator). It owns its own `DailyModel` (pre-flight finding 8); the Planner's page is
-/// not drawn under it (`DailyGate.coversPage`), so this bar is the only one that can listen, write
-/// or answer a Tell Symphony. Everything it shows is read by `DailyTentPage` and placed by
+/// smaller simulator). It owns its own `DailyModel` (pre-flight finding 8); a light page under it
+/// stays drawn but inert (`DailyGate.coversPage`, ruling D14), so this bar is the only one that can
+/// listen, write or answer a Tell Symphony. Everything it shows is read by `DailyTentPage` and placed by
 /// `DailyMetrics.tent`; it only draws, and sends what is touched to the model.
 struct LightHalfOpenView: View {
     let posture: DuoPosture
@@ -86,11 +86,15 @@ struct LightHalfOpenView: View {
         .onDisappear {
             // Cleared only when the phone is no longer half open: when the household's edition swaps
             // this display for the old one, the old one keeps the screen on.
-            if !appState.posture.isHalfOpen { UIApplication.shared.isIdleTimerDisabled = false }
+            // Signed out while half open: nobody's display is up any more, so the screen may sleep.
+            if !staysAwake { UIApplication.shared.isIdleTimerDisabled = false }
             model?.close()
             model = nil
         }
-        .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
+        .onChange(of: auth.currentUser?.id) { _, _ in
+            makeModel()
+            if !staysAwake { UIApplication.shared.isIdleTimerDisabled = false }
+        }
         .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
         // The Lock Screen's Tell Symphony control or a `symphony://tell` link: this bar listens, in
         // sight; asked for while the walk shows, it waits and is answered as the walk closes.
@@ -101,9 +105,14 @@ struct LightHalfOpenView: View {
         }
     }
 
-    /// The screen stays on while the phone is set down half open.
+    /// The screen stays on while the phone is set down half open, for someone signed in
+    /// (`DailyGate.staysAwake`).
     private func keepAwake() {
-        if appState.posture.isHalfOpen { UIApplication.shared.isIdleTimerDisabled = true }
+        if staysAwake { UIApplication.shared.isIdleTimerDisabled = true }
+    }
+
+    private var staysAwake: Bool {
+        DailyGate.staysAwake(halfOpen: appState.posture.isHalfOpen, signedIn: auth.currentUser != nil)
     }
 
     // MARK: The display

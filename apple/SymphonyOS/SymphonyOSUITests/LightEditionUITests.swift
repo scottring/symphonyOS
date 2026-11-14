@@ -284,8 +284,7 @@ final class LightEditionUITests: XCTestCase {
         let sign = any["daily.halfOpen.sign"]
         XCTAssertTrue(sign.waitForExistence(timeout: 15), "no sign on the 28th")
         XCTAssertTrue(sign.label.contains("November"), "not the month's sign: \(sign.label)")
-        XCTAssertFalse(any["daily.today"].exists, "the page under the display can be reached")
-        XCTAssertEqual(any.matching(identifier: "daily.bar.light").count, 1, "a second bar under the display")
+        assertThePageUnderTheDisplayIsOutOfReach(app)
 
         let start = sign.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
         start.press(forDuration: 0.15, thenDragTo: start.withOffset(CGVector(dx: 160, dy: 0)))
@@ -314,7 +313,7 @@ final class LightEditionUITests: XCTestCase {
     @MainActor func testATellOnTheHalfOpenDisplayListensThere() throws {
         let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-10", "-SymphonyDailyState", "hear"])
         let any = app.descendants(matching: .any)
-        let light = any["daily.bar.light"]
+        let light = any["daily.halfOpen"].descendants(matching: .any)["daily.bar.light"]
         XCTAssertTrue(light.waitForExistence(timeout: 15))
         XCTAssertEqual(light.label, "Speak it")
         app.open(try XCTUnwrap(URL(string: "symphony://tell")))
@@ -322,8 +321,44 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: listening, evaluatedWith: light)], timeout: 10), .completed,
                        "the display's bar did not listen")
         XCTAssertTrue(any["daily.halfOpen"].exists)
-        XCTAssertFalse(any["daily.today"].exists)
-        XCTAssertEqual(any.matching(identifier: "daily.bar.light").count, 1)
+        assertThePageUnderTheDisplayIsOutOfReach(app)
+        // The page kept under the display took no part in the Tell: its own light is not listening.
+        let pageLight = any["daily.today"].descendants(matching: .any)["daily.bar.light"]
+        if pageLight.exists { XCTAssertEqual(pageLight.label, "Speak it", "the page under the display listened") }
+    }
+
+    /// Ruling D14 as XCUITest can see it: at most one light page lies under the display, kept (the
+    /// Debug marker `daily.coveredPage`), and nothing of it can be touched: its bar's light, Inbox
+    /// and More are not hittable, the display's light is the one that is, and there is no dock.
+    /// (XCUITest lists elements SwiftUI hides from VoiceOver, even under a constant
+    /// `accessibilityHidden(true)`, so whether VoiceOver skips the page is not asserted here.)
+    private func assertThePageUnderTheDisplayIsOutOfReach(_ app: XCUIApplication, file: StaticString = #filePath,
+                                                          line: UInt = #line) {
+        let any = app.descendants(matching: .any)
+        let display = any["daily.halfOpen"].descendants(matching: .any)
+        XCTAssertTrue(display["daily.bar.light"].isHittable, "the display's light cannot be touched", file: file, line: line)
+        let page = any["daily.today"].descendants(matching: .any)
+        for id in ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.lookBack", "daily.nav.week"] {
+            let element = page[id]
+            if element.exists { XCTAssertFalse(element.isHittable, "\(id) on the page under the display", file: file, line: line) }
+        }
+        XCTAssertFalse(app.buttons["Planner"].exists, "the dock under the display", file: file, line: line)
+        XCTAssertFalse(app.buttons["Routines"].exists, file: file, line: line)
+    }
+
+    /// The inside screen held upright (626 × 890) is a light window now: set down half open, light
+    /// Today stays underneath, kept but out of reach (ruling D14), with no dock. (`daily.coveredPage`
+    /// is a Debug demo marker for the kept page. The posture is pinned for the whole run by
+    /// `-HalfOpen`, so opening flat again cannot be driven here; the page's return is pinned in the
+    /// model's tests, `DailyModelTests`.)
+    @MainActor func testTheUprightInsideScreenKeepsLightTodayUnderTheDisplay() throws {
+        let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-10"])
+        let any = app.descendants(matching: .any)
+        let kept = any["daily.coveredPage"]
+        XCTAssertTrue(kept.waitForExistence(timeout: 15), "no light page kept under the display")
+        XCTAssertEqual(kept.value as? String, "today")
+        XCTAssertTrue(any["daily.today"].exists, "light Today is not the page under the display")
+        assertThePageUnderTheDisplayIsOutOfReach(app)
     }
 
     /// A full household set down half open keeps the old display, dinner and all.

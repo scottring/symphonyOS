@@ -603,4 +603,85 @@ struct DailyMetricsTests {
         #expect(DailyMetrics.tent(size: book, split: 400, across: false).timeSize < 112)
         #expect(DailyMetrics.tent(size: laptop, split: 480, across: true).header.minY > 480)
     }
+
+    // MARK: The Duo, outside and upright inside (Task 17)
+
+    /// "Duo, outside screen": the board's own numbers, on the board's own window.
+    @Test func theOutsideBoard() {
+        let m = DailyMetrics.today(size: CGSize(width: 466, height: 678), safeTop: 22, safeBottom: 0, shape: .short)
+        #expect(m.picture == CGRect(x: -17, y: -34, width: 500, height: 500))
+        #expect(m.band.height == 240)
+        #expect(m.sheetTop == 190)
+        #expect(m.sheetRadius == 26)
+        #expect(m.sign.plank == CGRect(x: 42, y: 96, width: 350, height: 60))
+        #expect(m.sign.post == CGRect(x: 70, y: 82, width: 7, height: 130))
+        #expect(m.card == CGRect(x: 16, y: 280, width: 434, height: 42))
+        #expect(m.rowsTop == 332)
+        #expect(m.row == 52)
+        #expect(m.bar.field == CGRect(x: 68, y: 604, width: 330, height: 48))
+        #expect(m.bar.more.origin == CGPoint(x: 8, y: 600))
+        #expect(m.bar.inbox.origin == CGPoint(x: 402, y: 600))
+        #expect(m.lookBack == nil)
+        #expect(m.navGap == 22)
+    }
+
+    /// The Duo's windows as their pages get them, with the safe insets they may meet: the outside
+    /// screen (its simulator reports 0 at the top and 34 at the foot, and an 84-point system column
+    /// beside the page, which the page stands clear of: 382 wide; the board's 466 with 22 / 0 too),
+    /// and the inside screen held upright (626 × 890). Today with and without the waiting line,
+    /// Week, and the mountain pages' bar (Today's): three rows end above the fade, the row of words
+    /// stands on the shade, the grabber is centred, every target is 44 and apart and off the safe
+    /// insets (nothing in the home-indicator area), the sign shows wholly above the sheet.
+    @Test func theDuoWindowsKeepTheirRowsTheirSignAndTheirBar() {
+        let outsides: [(CGSize, CGFloat, CGFloat)] = [
+            (CGSize(width: 382, height: 678), 0, 34), (outside, 22, 0), (outside, 0, 34), (CGSize(width: 382, height: 678), 22, 0)]
+        let insides: [(CGSize, CGFloat, CGFloat)] = [0, 20, 32, 44, 59].flatMap { top in
+            [0, 20, 34].map { bottom in (CGSize(width: 626, height: 890), CGFloat(top), CGFloat(bottom)) } }
+        var failures: [String] = []
+        for (layout, windows) in [(TodayLayout.glance, outsides), (.dayPage, insides)] {
+            for (size, top, bottom) in windows { for line in [false, true] {
+                let shape = DailyMetrics.shape(for: layout, height: size.height, safeTop: top, safeBottom: bottom, waiting: line)
+                if layout == .glance && shape != .short { failures.append("\(size): the outside screen is not short") }
+                let today = DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape, waiting: line)
+                let week = DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom,
+                                             shape: DailyMetrics.shape(for: layout, height: size.height, safeTop: top,
+                                                                       safeBottom: bottom, waiting: false))
+                for (m, isWeek) in [(today, false), (week, true)] {
+                    let at = "\(layout) \(Int(size.width))×\(Int(size.height)) \(Int(top))/\(Int(bottom)) line \(line) \(isWeek ? "week" : "today")"
+                    func fail(_ what: String) { failures.append("\(at): \(what)") }
+                    let rows = m.rowsTop + (isWeek ? DailyMetrics.weekDayTop : 0) + 3 * m.row + 2 * m.rowGap
+                    if rows > m.bar.fade.minY { fail("three rows end below the fade") }
+                    if m.shadeSolid < m.navTop + DailyMetrics.navHeight || m.shade >= m.sheetTop { fail("the words are off the shade") }
+                    if m.grabber.midX != size.width / 2 || m.grabber.minY != m.sheetTop + 9 { fail("grabber \(m.grabber)") }
+                    if m.lookBack != nil && shape == .short { fail("a handle on a short window") }
+                    let targets = m.touchTargets
+                    for r in targets {
+                        if r.width < touch || r.height < touch { fail("\(r) under 44") }
+                        if r.minY < top || r.maxY > size.height - bottom || r.minX < 0 || r.maxX > size.width { fail("\(r) in the insets") }
+                    }
+                    for i in targets.indices { for j in targets.indices where j > i {
+                        if !targets[i].intersection(targets[j]).isEmpty { fail("\(targets[i]) meets \(targets[j])") }
+                    } }
+                    if m.sheetTop < top + wordsRow { fail("the sheet over the row of words") }
+                    if !isWeek {
+                        if m.sign == .none { fail("no sign") } else {
+                            let turn = (m.sign.plank.width + m.sign.point) * CGFloat(sin(largestTurn * .pi / 180))
+                            if min(m.sign.post.minY, m.sign.plank.minY - turn) < top + wordsRow + clearance { fail("sign on the words") }
+                            if m.sign.plank.maxY + turn > m.sheetTop { fail("plank reaches the sheet") }
+                            if m.sign.plank.maxX + m.sign.point > size.width { fail("plank off the page") }
+                        }
+                    }
+                }
+            } }
+        }
+        #expect(failures.isEmpty, "\(failures.count) failures, first: \(failures.prefix(5))")
+
+        // The upright inside screen is the Today board at that width: tall, the board's offsets down
+        // the page, the bar's insets kept and the field taking the rest.
+        let up = DailyMetrics.today(size: CGSize(width: 626, height: 890), safeTop: 44, safeBottom: 34,
+                                    shape: DailyMetrics.shape(for: .dayPage, height: 890, safeTop: 44, safeBottom: 34, waiting: false))
+        #expect(up.sheetTop == 286 && up.lookBack?.midX == 313)
+        #expect(up.bar.field == CGRect(x: 64, y: 800, width: 498, height: 48))
+        #expect(up.bar.inbox == CGRect(x: 626 - 6 - 56, y: 796, width: 56, height: 56))
+    }
 }

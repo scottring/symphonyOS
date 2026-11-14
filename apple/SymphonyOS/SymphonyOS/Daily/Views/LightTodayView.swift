@@ -15,6 +15,8 @@ struct LightTodayView: View {
     let safeTop: CGFloat
     let safeBottom: CGFloat
     let layout: TodayLayout
+    /// Where the walk's light stood, in this page's points, for the handover (`DailyHandover.start`).
+    let handoverFrom: (centre: CGPoint, diameter: CGFloat)
     /// A word in the row of words.
     let go: (Horizon) -> Void
     /// A page on a date: where a sign leads.
@@ -81,7 +83,7 @@ struct LightTodayView: View {
                                  listening: DailyCopy.listening(.today), lightShown: travel == nil, touched: { interrupt(.touch) })
                 }
                 if let travel {
-                    HandoverLight(progress: travel, from: DailyHandover.start(window: size), to: DailyHandover.end(bar: m.bar))
+                    HandoverLight(progress: travel, from: handoverFrom, to: DailyHandover.end(bar: m.bar))
                         .frame(width: size.width, height: size.height)
                 }
                 #if DEBUG
@@ -107,8 +109,12 @@ struct LightTodayView: View {
         .onChange(of: appState.handover) { _, _ in startHandover() }
         // Listening, a note or Undo taking the line slot ends the travel at once.
         .onChange(of: model.bar.slot) { _, slot in interrupt(.slot(slot)) }
-        // Set down half open (the display covers this page, drawn or not): the travel ends with no line.
-        .onChange(of: covered) { _, covered in if covered { interrupt(.covered) } }
+        // Set down half open (the display covers this page, which stays, inert): the travel ends with no
+        // line, and a row's Details closes, so the display and its bar are seen, not a sheet over them.
+        .onChange(of: covered) { _, covered in
+            if covered { interrupt(.covered) }
+            if !DailyGate.keepsDetails(covered: covered) { opened = nil }
+        }
         // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet;
         // asked for while the walk shows, it is answered as the walk closes.
         .onChange(of: appState.tellRequested) { _, _ in answerTell() }

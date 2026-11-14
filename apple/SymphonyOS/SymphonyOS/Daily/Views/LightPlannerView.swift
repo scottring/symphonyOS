@@ -8,7 +8,9 @@ import UIKit
 /// `DailyGate.shows` says one is built; everywhere else it draws `full()`, the Planner
 /// every household has. The model reads the day again when the app becomes active and
 /// once a minute (so a new day arrives past midnight), and is told the page went away
-/// (`.left`) when it disappears or the app goes to the background.
+/// (`.left`) when it disappears or the app goes to the background. A light page fills the window
+/// from top to foot but stands within its side edges: where the system keeps a column of its own
+/// (the Duo's outside screen) nothing of the page is drawn in it, only the plain ground behind.
 struct LightPlannerView<Full: View>: View {
     private let full: () -> Full
 
@@ -52,7 +54,7 @@ struct LightPlannerView<Full: View>: View {
         ZStack {
             if DailyGate.dropsPage(covered: covered, lightPage: showsLight) {
                 DailyPalette.sky.ignoresSafeArea()
-            } else if showsLight, let level = DailyGate.mountain(appState.horizon) {
+            } else if showsLight, case .mountain(let level) = DailyGate.page(appState.horizon) {
                 mountain(level)
             } else if showsLight {
                 light
@@ -66,6 +68,15 @@ struct LightPlannerView<Full: View>: View {
             Color.clear
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size = TodayView.pinnedSize ?? $0 }
             WindowInsetsReader { insets = $0 }
+            #if DEBUG
+            // A demo marker for the UI tests: a light page kept, inert, under the half-open display.
+            if DemoMode.isOn, covered, showsLight {
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityIdentifier("daily.coveredPage")
+                    .accessibilityValue(appState.horizon.rawValue)
+            }
+            #endif
         }
         .onAppear {
             // Appearing again (a sheet or a pushed page going away) keeps the model, its Undo and its lit row.
@@ -108,26 +119,38 @@ struct LightPlannerView<Full: View>: View {
         if let model, let userId = auth.currentUser?.id {
             GeometryReader { proxy in
                 let page = TodayView.pinnedSize ?? proxy.size
-                switch appState.horizon {
+                switch DailyGate.page(appState.horizon) {
                 case .today:
                     LightTodayView(model: model, userId: userId, seasons: seasons, size: page,
                                    safeTop: insets.top, safeBottom: insets.bottom, layout: layout,
-                                   go: go, open: open)
+                                   handoverFrom: handoverFrom(page: page), go: go, open: open)
                         .frame(width: page.width, height: page.height)
                 case .week:
                     LightWeekView(model: model, userId: userId, seasons: seasons, size: page,
                                   safeTop: insets.top, safeBottom: insets.bottom, layout: layout, go: go)
                         .frame(width: page.width, height: page.height)
-                default:
-                    full()      // a page the gate lists but this switch does not draw yet: the Planner every household has
+                case .mountain:
+                    EmptyView()     // never: the body draws a mountain page with `mountain(_:)`
                 }
             }
-            .ignoresSafeArea()
+            #if DEBUG
+            .modifier(PinnedFit())
+            #endif
+            .ignoresSafeArea(edges: .vertical)
+            .background(DailyPalette.sky.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onDisappear { model.send(.left) }
         } else {
             DailyPalette.sky.ignoresSafeArea()
         }
+    }
+
+    /// Where the walk's light stood as a walk ends onto Today: the walk fills the whole window, while
+    /// the page stands within the window's side edges (clear of the system's column on the Duo's
+    /// outside screen), its top-left `insets.left` in from the window's.
+    private func handoverFrom(page: CGSize) -> (centre: CGPoint, diameter: CGFloat) {
+        DailyHandover.start(window: CGSize(width: page.width + insets.left + insets.right, height: page.height),
+                            page: CGPoint(x: insets.left, y: 0))
     }
 
     /// Month, Season and Year: the mountain at that level, a fresh page for each.
@@ -139,7 +162,11 @@ struct LightPlannerView<Full: View>: View {
                                  safeBottom: insets.bottom, layout: layout, go: go)
                     .frame(width: page.width, height: page.height)
             }
-            .ignoresSafeArea()
+            #if DEBUG
+            .modifier(PinnedFit())
+            #endif
+            .ignoresSafeArea(edges: .vertical)
+            .background(DailyPalette.sky.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onDisappear { model.send(.left) }
             .id(level)
@@ -193,6 +220,24 @@ struct LightPlannerView<Full: View>: View {
         #endif
     }
 }
+
+#if DEBUG
+/// `-TodaySize` pins a light page to a window larger than this simulator's (a Duo screen on an
+/// iPhone 17): the page is scaled down to the room there is, so it can be seen whole, as the
+/// half-open display does. Nothing changes with no size pinned, or room enough.
+private struct PinnedFit: ViewModifier {
+    func body(content: Content) -> some View {
+        if let pinned = TodayView.pinnedSize, pinned.width > 0, pinned.height > 0 {
+            GeometryReader { room in
+                content.scaleEffect(min(1, room.size.width / pinned.width, room.size.height / pinned.height),
+                                    anchor: .topLeading)
+            }
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 extension DailyModel.Scene {
     /// The scene's phase, as the model reads it (`DailyModel.sceneChanged`).
