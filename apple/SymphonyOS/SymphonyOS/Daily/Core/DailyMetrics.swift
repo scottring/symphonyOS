@@ -40,7 +40,14 @@ struct DailyMetrics: Equatable {
             CGRect(x: plank.minX, y: plank.minY, width: plank.width + point, height: plank.height)
         }
 
-        /// Week has no signpost.
+        /// The post and plank moved up together (frames in the plank's space stay).
+        func moved(up d: CGFloat) -> Sign {
+            Sign(post: post.offsetBy(dx: 0, dy: -d), plank: plank.offsetBy(dx: 0, dy: -d), point: point,
+                 strip: strip, nail: nail, eyebrow: eyebrow, title: title,
+                 eyebrowSize: eyebrowSize, titleSize: titleSize)
+        }
+
+        /// No signpost: Week's, and Today's where the window leaves it no room.
         static let none = Sign(post: .zero, plank: .zero, point: 0, strip: .zero, nail: 0,
                                eyebrow: .zero, title: .zero, eyebrowSize: 0, titleSize: 0)
     }
@@ -108,16 +115,75 @@ struct DailyMetrics: Equatable {
     static let lightInset: CGFloat = 5
     /// Two band flags' feet stand at least this far apart in height.
     static let flagsApart: CGFloat = 4
+    /// The row of words from `navTop`: 14 above and below the 11.5 pt words, rounded up to 44.
+    static let navHeight: CGFloat = 44
+    /// The signpost never stands closer than this to the row of words.
+    static let signClearance: CGFloat = 8
+    /// The largest turn `Signpost.hand` gives a plank, in degrees (0.7…1.7).
+    static let signTurn: Double = 1.7
 
     /// Short: the Duo's outside screen, and any window under 760 high.
     static func shape(for layout: TodayLayout, height: CGFloat) -> Shape {
         layout == .glance || height < shortHeight ? .short : .tall
     }
 
+    /// The shape Today takes on this window: as `shape(for:height:)`, and short also where the
+    /// tall board's three rows would not end above the fade (with the waiting line when it shows).
+    static func shape(for layout: TodayLayout, height: CGFloat, safeTop: CGFloat, safeBottom: CGFloat,
+                      waiting: Bool) -> Shape {
+        guard shape(for: layout, height: height) == .tall else { return .short }
+        // The width moves nothing up or down, so the board's own width stands in for it.
+        let tall = board(size: CGSize(width: 390, height: height), safeTop: safeTop, safeBottom: safeBottom,
+                         shape: .tall, waiting: waiting)
+        return tall.shortfall > 0 ? .short : .tall
+    }
+
     // MARK: Today
 
+    /// Today's board stretched to the window. Three rows always end above the fade: where the
+    /// board would put them lower, the sheet and everything on it rise by exactly the shortfall
+    /// and the band gives up that height (`risen(by:)`). The bar, the fade and the row of words
+    /// never move.
     static func today(size: CGSize, safeTop: CGFloat, safeBottom: CGFloat, shape: Shape = .tall,
                       waiting: Bool = false) -> DailyMetrics {
+        let m = board(size: size, safeTop: safeTop, safeBottom: safeBottom, shape: shape, waiting: waiting)
+        return m.risen(by: m.shortfall)
+    }
+
+    /// How far below the fade's top three rows would end (0: they fit).
+    private var shortfall: CGFloat { max(0, rowsTop + 3 * row + 2 * rowGap - bar.fade.minY) }
+
+    /// The sheet and everything on it moved up by `rise`, the band shortened by it. The sign moves
+    /// up with the band's lower edge but keeps `signClearance` under the row of words; if its plank
+    /// would then not stand wholly above the sheet's top edge, the page shows no sign.
+    private func risen(by rise: CGFloat) -> DailyMetrics {
+        guard rise > 0 else { return self }
+        func up(_ r: CGRect) -> CGRect { r.offsetBy(dx: 0, dy: -rise) }
+        let sheetTop = self.sheetTop - rise
+        let lookBack = self.lookBack.map(up)
+
+        var sign = self.sign
+        if sign != .none {
+            let turn = (sign.plank.width + sign.point) * CGFloat(sin(Self.signTurn * .pi / 180))
+            let top = min(sign.post.minY, sign.plank.minY - turn)
+            let lift = min(rise, max(0, top - (navTop + Self.navHeight + Self.signClearance)))
+            sign = sign.moved(up: lift)
+            if sign.plank.maxY + turn > min(sheetTop, lookBack?.minY ?? sheetTop) { sign = .none }
+        }
+
+        return DailyMetrics(
+            size: size, navTop: navTop, navGap: navGap,
+            band: CGRect(x: band.minX, y: band.minY, width: band.width, height: band.height - rise),
+            picture: picture, sheetTop: sheetTop, sheetRadius: sheetRadius,
+            sign: sign, bar: bar, lookBack: lookBack, waiting: waiting.map(up),
+            header: up(header), ring: ring, card: card == .zero ? card : up(card),
+            rowsTop: rowsTop - rise, rowsTopNoCard: rowsTopNoCard - rise,
+            row: row, rowGap: rowGap, inset: inset)
+    }
+
+    /// The board's numbers on this window, before any rise.
+    private static func board(size: CGSize, safeTop: CGFloat, safeBottom: CGFloat, shape: Shape,
+                              waiting: Bool) -> DailyMetrics {
         let navTop = safeTop
         let tall = shape == .tall
         let sheetTop = navTop + (tall ? 242 : 168)
