@@ -1,0 +1,28 @@
+#!/bin/sh
+# One bridge pass, started through LaunchServices: macOS only grants the
+# Reminders permission to the .app when it's launched with `open`.
+#
+# `open` never starts a second copy of a running app. So a copy that never
+# finishes stops every later pass without a word — on 2026-11-03 one launch
+# stayed suspended before main for ten days and no list synced. A pass takes
+# seconds: a copy that is stopped, or has run for 10 minutes, is stuck, and
+# is killed here before the next pass starts.
+BIN="__APP_PATH__/Contents/MacOS/reminders-bridge"
+LOG="__LOG_PATH__"
+
+for pid in $(pgrep -f "$BIN"); do
+  state=$(ps -o stat= -p "$pid" | tr -d ' ')
+  ran=$(ps -o etime= -p "$pid" | tr -d ' ')   # [[dd-]hh:]mm:ss
+  stuck=no
+  case "$state" in T*) stuck=yes ;; esac
+  case "$ran" in
+    *-*|*:*:*) stuck=yes ;;                     # a day, or an hour or more
+    *) [ "${ran%%:*}" -ge 10 ] && stuck=yes ;;  # ten minutes or more
+  esac
+  if [ "$stuck" = yes ]; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) [run] killing a stuck bridge (pid $pid, state $state, running $ran)" >> "$LOG"
+    kill -9 "$pid"
+  fi
+done
+
+exec /usr/bin/open -o "$LOG" --stderr "$LOG" "__APP_PATH__" --args "__CONFIG_PATH__"

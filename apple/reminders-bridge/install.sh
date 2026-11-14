@@ -10,7 +10,8 @@ set -euo pipefail
 #   1. Builds the binary in release mode
 #   2. Wraps it as RemindersBridge.app under ~/.local/share/
 #   3. Ad-hoc code-signs the bundle
-#   4. Generates a launchd plist that runs `open` against the bundle
+#   4. Generates a launchd plist that runs run-bridge.sh, which clears a
+#      stuck copy and then runs `open` against the bundle
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BRIDGE_DIR="$REPO_ROOT/apple/reminders-bridge"
@@ -21,6 +22,7 @@ LOG_DIR="$HOME/Library/Logs"
 LAUNCHAGENT_DIR="$HOME/Library/LaunchAgents"
 LABEL="com.symphony.reminders-bridge"
 LOG_PATH="$LOG_DIR/symphony-reminders-bridge.log"
+RUN_PATH="$APP_DIR/RemindersBridge-run.sh"
 
 mkdir -p "$APP_DIR" "$CONFIG_DIR" "$LOG_DIR" "$LAUNCHAGENT_DIR"
 
@@ -69,11 +71,16 @@ EOF
 echo "==> Code-signing bundle (ad-hoc)"
 codesign --force --deep --sign - "$APP_PATH"
 
-echo "==> Generating launchd plist"
-PLIST_PATH="$LAUNCHAGENT_DIR/$LABEL.plist"
+echo "==> Writing the run script"
 sed -e "s|__APP_PATH__|$APP_PATH|g" \
     -e "s|__CONFIG_PATH__|$CONFIG_DIR/config.json|g" \
     -e "s|__LOG_PATH__|$LOG_PATH|g" \
+    "$BRIDGE_DIR/run-bridge.sh.template" > "$RUN_PATH"
+chmod 755 "$RUN_PATH"
+
+echo "==> Generating launchd plist"
+PLIST_PATH="$LAUNCHAGENT_DIR/$LABEL.plist"
+sed -e "s|__RUN_PATH__|$RUN_PATH|g" \
     "$BRIDGE_DIR/com.symphony.reminders-bridge.plist.template" > "$PLIST_PATH"
 
 if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
