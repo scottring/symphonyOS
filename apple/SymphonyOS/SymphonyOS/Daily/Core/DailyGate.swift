@@ -1,8 +1,12 @@
 import Foundation
 
-/// The one place that decides whether a light page shows. A full household, and any
-/// mixed or unknown one (which `Edition.resolve` already makes full), keeps every
-/// screen it has today; a light household gets a light page only once it is built.
+/// The one place that decides whether a light page shows. A full household, and a mixed
+/// one (which `Edition.resolve` makes full), keeps every screen it has today; a light
+/// household gets a light page only once it is built. The edition it is handed is
+/// `AppState.edition`, read by `Edition.current`: until this sign-in's first pull has
+/// finished it is only what was remembered for this person, and with nothing remembered
+/// it is full, so an empty store (a fresh install) or another account's household row left
+/// on the phone never shows a light page.
 enum DailyGate {
     /// Light pages that are built. Tasks 11 and 14 add theirs.
     static let horizons: Set<Horizon> = [.today, .week, .month, .season, .year]

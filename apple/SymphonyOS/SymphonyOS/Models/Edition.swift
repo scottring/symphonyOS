@@ -23,6 +23,22 @@ enum Edition: String {
         householdEditions.isEmpty ? (lastKnown ?? .light) : resolve(householdEditions)
     }
 
+    /// The edition the app runs as for this sign-in. Until its first pull has finished
+    /// (`firstPullFinished`), the household rows on the phone may be none yet (a fresh
+    /// install) or another account's (sign-out keeps the store): only what was remembered
+    /// for THIS person counts, and with nothing remembered it is full, never light. Once
+    /// the pull is in, the rows decide, as `resolve(_:lastKnown:)` does.
+    static func current(_ householdEditions: [String?], lastKnown: Edition?, firstPullFinished: Bool) -> Edition {
+        guard firstPullFinished else { return lastKnown ?? .full }
+        return resolve(householdEditions, lastKnown: lastKnown)
+    }
+
+    /// Whether this list may be remembered for the signed-in person: only a non-empty list
+    /// the first pull has brought in, never rows that were on the phone before it.
+    static func remembers(_ householdEditions: [String?], firstPullFinished: Bool) -> Bool {
+        firstPullFinished && !householdEditions.isEmpty
+    }
+
     func allows(_ feature: Feature) -> Bool {
         self == .full
     }

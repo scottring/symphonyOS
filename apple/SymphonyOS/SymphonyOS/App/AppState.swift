@@ -168,17 +168,35 @@ final class AppState {
         activeTab = .planner
     }
 
-    /// The signed-in person is gone: their first pull, any replay, resume or Tell they asked
-    /// for that is still waiting, and the pause the app was showing go with them.
+    /// The signed-in person is gone: their first pull, any replay or resume they asked for that
+    /// is still waiting, the pause the app was showing, and everything of their session on screen
+    /// (the light pages' Inbox or More, the page and the date, the edition) go with them, so
+    /// nothing of one sign-in greets the next. A Tell still waiting goes too in a light household
+    /// (`dropsWaitingTell`); a full household keeps it, as before the light edition, and it opens
+    /// after the next sign-in.
     func signedOut() {
-        tellRequested = false           // a Tell still waiting (say, behind the walk) is dropped, not answered
+        dropWaitingTellIfLight()
         initialSyncFinished = false
         walkReplayRequested = false
         walkPaused = false
         walkResumeRequested = false
         walkDown = nil
-        handover = false
-        dailyLastDay = nil
+        leaveDaily()                    // the dock flag, Inbox or More, the last light day, a handover
+        horizon = .today
+        selectedDate = .now
+        edition = .full                 // unknown until the next sign-in reads it (`Edition.current`)
+    }
+
+    /// Whether a Tell still waiting is dropped as its person goes (signed out, or someone else
+    /// signed in): in a light household it is (behind the walk it was theirs, never the next
+    /// person's); a full household's Tell is kept, as it always was.
+    static func dropsWaitingTell(edition: Edition) -> Bool {
+        edition == .light
+    }
+
+    /// Drops a waiting Tell when `dropsWaitingTell` says so (read before the edition is reset).
+    func dropWaitingTellIfLight() {
+        if Self.dropsWaitingTell(edition: edition) { tellRequested = false }
     }
 
     // MARK: - Date Navigation

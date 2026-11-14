@@ -82,11 +82,15 @@ struct iOSMainView: View {
         if let demoEdition {
             edition = demoEdition
         } else {
+            // Before this sign-in's first pull the rows may be none yet or another account's:
+            // only this person's memory counts, else full (`Edition.current`); nothing is
+            // remembered until the pull is in.
             let memory = EditionMemory()
             let userId = auth.currentUser?.id
             let editions = households.map(\.edition)
-            edition = Edition.resolve(editions, lastKnown: memory.lastKnown(for: userId))
-            if !editions.isEmpty { memory.remember(edition, for: userId) }
+            let pulled = appState.initialSyncFinished
+            edition = Edition.current(editions, lastKnown: memory.lastKnown(for: userId), firstPullFinished: pulled)
+            if Edition.remembers(editions, firstPullFinished: pulled) { memory.remember(edition, for: userId) }
         }
         let changedToLight = edition == .light && appState.edition != .light
         // No longer light (an invite accepted, the household row synced): the dock is back at
@@ -172,13 +176,14 @@ struct iOSMainView: View {
         // the walk down, when it goes.
         .onDisappear {
             CalendarFeed.shared.edition = nil
-            appState.tellRequested = false      // a Tell waiting behind the walk is dropped, not answered
+            appState.dropWaitingTellIfLight()   // light: a Tell waiting behind the walk is dropped, not answered
             closeWalk()
             appState.walkReplayRequested = false
             appState.walkResumeRequested = false
         }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
-        .onChange(of: appState.initialSyncFinished) { _, _ in considerWalk() }
+        // The first pull is in (or a new sign-in starts over): the edition is read again first.
+        .onChange(of: appState.initialSyncFinished) { _, _ in applyEdition(); considerWalk() }
         .onChange(of: appState.edition) { _, _ in considerWalk() }
         .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
         .onChange(of: appState.walkResumeRequested) { _, _ in considerWalk() }
@@ -186,7 +191,7 @@ struct iOSMainView: View {
         // Someone else signed in (or nobody is): the walk up, and a replay still
         // waiting, are not theirs.
         .onChange(of: auth.currentUser?.id) { _, _ in
-            appState.tellRequested = false      // a Tell waiting behind the walk was not theirs
+            appState.dropWaitingTellIfLight()   // light: a Tell waiting behind the walk was not theirs
             closeWalk()
             appState.walkReplayRequested = false
             appState.walkResumeRequested = false
@@ -322,7 +327,8 @@ extension iOSMainView {
         #endif
         // The edition from the same rows the decision read (the demo's is its launch argument).
         let edition = demo ? appState.edition
-            : Edition.resolve(householdRows.map(\.edition), lastKnown: EditionMemory().lastKnown(for: userId))
+            : Edition.current(householdRows.map(\.edition), lastKnown: EditionMemory().lastKnown(for: userId),
+                              firstPullFinished: appState.initialSyncFinished)
         let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
                               edition: edition, seasons: householdRows.first?.seasons,
                               store: store, listener: opening.listener)
