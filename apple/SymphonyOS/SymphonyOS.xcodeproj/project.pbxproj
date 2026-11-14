@@ -52,6 +52,7 @@
 		307BCF9BB18ECAD6D4CEFAB8 /* DockLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */; };
 		30D02C1243BC999F654F3957 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37846053B387BAA8FC10D3E6 /* UserProfile.swift */; };
 		3347A8A85D27BF705AE97C82 /* PendingChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779DC68DE6348BF47C96A130 /* PendingChange.swift */; };
+		336D0A98057FECDA7CC636D0 /* DailyAddTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FC9F553DCC602CDBC35AA0 /* DailyAddTests.swift */; };
 		34196EFC75ABC5854A38F5B0 /* DMSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 03604927E77497336FD51F47 /* DMSans-SemiBold.ttf */; };
 		345A03B2728966CE5D57458D /* Edition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E0C9C5D59DC16582C09AD07 /* Edition.swift */; };
 		359161FFAA1A1E3364948A20 /* WalkWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB41AA36899F9E925114A11 /* WalkWriter.swift */; };
@@ -226,6 +227,7 @@
 		FB97C68042921BA69DA1E83A /* FamilyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03612661785F1EE17B02E03 /* FamilyMember.swift */; };
 		FBC7FD7E2A3E599D46489B47 /* WalkOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E087899B5C5E4DE9FEE71D16 /* WalkOrbView.swift */; };
 		FDDCF7DABEBF1BCA94649B26 /* DailyDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3994EC645C219CD7FA8A66EE /* DailyDay.swift */; };
+		FEAFECC06EEFC1ED6AE74E53 /* DailyAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191780CDF86B2023BD7D3525 /* DailyAdd.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -288,6 +290,7 @@
 		169FC19A952F954EECF671DF /* DayGlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayGlanceTests.swift; sourceTree = "<group>"; };
 		1819AEB94BF4C55147945909 /* SymphonyWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyWidgets.swift; sourceTree = "<group>"; };
 		187DEF77B7597EB968E30562 /* PeriodPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodPlanView.swift; sourceTree = "<group>"; };
+		191780CDF86B2023BD7D3525 /* DailyAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAdd.swift; sourceTree = "<group>"; };
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		1D73CE19B7F2E740A74F4192 /* ScopeRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeRuleTests.swift; sourceTree = "<group>"; };
@@ -403,6 +406,7 @@
 		9CB3AEE2C54522D3756F63C5 /* WalkWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkWordsTests.swift; sourceTree = "<group>"; };
 		9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkCopy.swift; sourceTree = "<group>"; };
 		9F45CDE5093407A022589D06 /* ListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsView.swift; sourceTree = "<group>"; };
+		A0FC9F553DCC602CDBC35AA0 /* DailyAddTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAddTests.swift; sourceTree = "<group>"; };
 		A1D31FA63E65DA22E03392AD /* PlannerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerComponents.swift; sourceTree = "<group>"; };
 		A48DEE8D67C715E1A3A6D4F5 /* AccountDeletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
 		A932C77F9DCE9A3582897E6A /* GlanceToDoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceToDoTests.swift; sourceTree = "<group>"; };
@@ -548,6 +552,7 @@
 		253F923C92C9A14C494A1E15 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				191780CDF86B2023BD7D3525 /* DailyAdd.swift */,
 				280D6248D6B7D7FAC51B6710 /* DailyClock.swift */,
 				14CE7964034D05C26EAF67D9 /* DailyCopy.swift */,
 				3994EC645C219CD7FA8A66EE /* DailyDay.swift */,
@@ -877,6 +882,7 @@
 				2DA3F6E2C9518EE578D16841 /* CalendarFeedTests.swift */,
 				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
 				D32F0BBA293AAE16EF7CCA0C /* CarriedRoutinesTests.swift */,
+				A0FC9F553DCC602CDBC35AA0 /* DailyAddTests.swift */,
 				5EABBD682C44E45ACC12563E /* DailyCopyTests.swift */,
 				D7978C63C97BAA9E1FC41791 /* DailyDayTests.swift */,
 				39CC4B0224C6FC309282FD25 /* DailyGateTests.swift */,
@@ -1226,6 +1232,7 @@
 				5C17CC50C06C21FE279844E9 /* CalendarFeedTests.swift in Sources */,
 				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
 				83E6A0E1DACEF68A62C34134 /* CarriedRoutinesTests.swift in Sources */,
+				336D0A98057FECDA7CC636D0 /* DailyAddTests.swift in Sources */,
 				7A68CC4FEB610D3E2963C234 /* DailyCopyTests.swift in Sources */,
 				EEF38F323061F5AA94B025CF /* DailyDayTests.swift in Sources */,
 				08FAC3B23154783D2E60D88E /* DailyGateTests.swift in Sources */,
@@ -1305,6 +1312,7 @@
 				E8B5EA11D41BBF3272A9E57F /* ContentView.swift in Sources */,
 				B820B5F6590A811B1B4343E6 /* CookSession.swift in Sources */,
 				B8FCCA25AA5225D0C499716B /* CookView.swift in Sources */,
+				FEAFECC06EEFC1ED6AE74E53 /* DailyAdd.swift in Sources */,
 				9FFF3C3E678CFBE926AF8126 /* DailyClock.swift in Sources */,
 				4781ED40A58BF18C0BE6847F /* DailyCopy.swift in Sources */,
 				FDDCF7DABEBF1BCA94649B26 /* DailyDay.swift in Sources */,
