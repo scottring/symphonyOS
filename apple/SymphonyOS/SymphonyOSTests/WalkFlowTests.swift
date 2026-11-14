@@ -34,7 +34,7 @@ final class WalkFlowTests {
 
     private func model(_ ctx: ModelContext, entry: WalkEntry = .start) -> WalkModel {
         WalkModel(context: ctx, userId: me, entry: entry, position: entry == .resume ? store.load(for: me) : nil,
-                  edition: .light, now: now, store: store, scheduler: scheduler, listener: listener)
+                  edition: .light, now: now, store: store, scheduler: scheduler, listener: listener, sound: FakeWalkSound())
     }
 
     private func fetch<T: PersistentModel>(_ ctx: ModelContext, _ type: T.Type) -> [T] {

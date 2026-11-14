@@ -44,6 +44,7 @@ extension Dictation: WalkListening {}
     /// Ids of rows this walk planted: what makes a flag "mine" after a reload.
     @ObservationIgnored private var planted: Set<UUID>
     @ObservationIgnored private let listener: WalkListening
+    @ObservationIgnored private let sound: WalkSoundPlaying
     /// Counts the holds that asked to listen; each session's callbacks carry their hold's number.
     @ObservationIgnored private var holdCount = 0
     @ObservationIgnored private var session: Session = .none
@@ -63,7 +64,7 @@ extension Dictation: WalkListening {}
 
     init(context: ModelContext, userId: UUID, entry: WalkEntry, position: WalkPosition?, edition: Edition,
          now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
-         scheduler: WalkScheduling? = nil, listener: WalkListening? = nil) {
+         scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil) {
         let periods = WalkPeriods.pick(now: now, seasons: seasons)
         let resuming = entry == .resume ? position : nil
         let planted = Set(resuming?.planted ?? [])
@@ -96,6 +97,7 @@ extension Dictation: WalkListening {}
             dictation.onDeviceOnly = true
             return dictation
         }()
+        self.sound = sound ?? WalkSound.shared
     }
 
     private var env: WalkEnv { WalkEnv(periods: periods, now: now) }
@@ -117,6 +119,7 @@ extension Dictation: WalkListening {}
     func close() {
         cancelListening()
         for timer in [WalkTimer.hold, .undo, .note, .finish] { scheduler.cancel(key: Self.key(timer)) }
+        for name in WalkSoundName.allCases { scheduler.cancel(key: Self.key(name)) }
         closed = true
     }
 
@@ -134,8 +137,9 @@ extension Dictation: WalkListening {}
                 onEnd?(status)
             case .listen(let on): listen(on)
             case .finishListening: finishListening()
-            case .sound, .askCalendar:
-                break                       // Tasks 19 and 20
+            case .sound(let name, let ms): play(name, after: ms)
+            case .askCalendar:
+                break                       // Task 20
             }
         }
     }
@@ -246,6 +250,19 @@ extension Dictation: WalkListening {}
         }
     }
 
+    /// At once, or through the scheduler under a key of that sound's own, so
+    /// `close()` can take back a sound still waiting.
+    private func play(_ name: WalkSoundName, after ms: Int) {
+        guard ms > 0 else {
+            sound.play(name)
+            return
+        }
+        scheduler.after(ms, key: Self.key(name)) { [weak self] in
+            guard let self, !self.closed else { return }
+            self.sound.play(name)
+        }
+    }
+
     private func save(_ status: WalkStatus) {
         store?.save(WalkPosition(state, status: status, planted: planted, periods: periods, now: now), for: userId)
     }
@@ -258,6 +275,8 @@ extension Dictation: WalkListening {}
         case .finish: "finish"
         }
     }
+
+    private static func key(_ sound: WalkSoundName) -> String { "sound.\(sound.rawValue)" }
 
     private func wait(_ timer: WalkTimer, _ ms: Int?) {
         let key = Self.key(timer)

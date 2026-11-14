@@ -4,8 +4,8 @@ import SwiftData
 @testable import Symphony
 
 // Fakes shared by the walk's model tests. Task 14 made this file with the
-// scheduler and the in-memory store; Task 16 added the listener; later tasks
-// add their fakes here.
+// scheduler and the in-memory store; Task 16 added the listener; Task 19 the
+// sound; later tasks add their fakes here.
 
 /// Time for tests: nothing waits; `advance` moves a pretend clock and runs
 /// what fell due, in time order; `settle` runs the async work handed over.
@@ -93,6 +93,18 @@ import SwiftData
 
     func end() {
         onEnd?()
+    }
+}
+
+/// Sounds for tests: nothing is heard and no haptic is felt; each sound asked
+/// for is noted, in order, at the moment the model plays it.
+@MainActor final class FakeWalkSound: WalkSoundPlaying {
+    private(set) var played: [WalkSoundName] = []
+
+    init() {}
+
+    func play(_ name: WalkSoundName) {
+        played.append(name)
     }
 }
 
