@@ -82,9 +82,12 @@ import SwiftData
     }
 
     /// Undo of an add: the row goes whole, and the area it alone used, if this writer made it.
+    /// A delete is queued too (`queueDeleteAfterRemove`): the insert may be on the wire as Undo
+    /// is tapped, and would otherwise reach the server and come back by itself.
     func takeBack(_ added: Added) {
         guard owns(added.id) else { return }
         walk.remove(added.id, level: added.level)
+        queueDeleteAfterRemove(added.id, level: added.level)
         if let areaId = added.areaId { walk.dropAreaIfUnused(areaId) }
     }
 
@@ -124,6 +127,18 @@ import SwiftData
     func pullUp(_ id: UUID, level: WalkLevel) {
         guard owns(id) else { return }
         walk.remove(id, level: level)
+        queueDeleteAfterRemove(id, level: level)
+    }
+
+    /// After `WalkWriter.remove` has taken a row back: a delete is queued for it even when its
+    /// insert was still queued (and so dropped). That insert may already be on the wire (the push
+    /// runs every few seconds); the delete then takes the row off the server, and while it waits it
+    /// keeps the realtime echo of the insert from bringing the row back. For a row that never went
+    /// up it deletes nothing. Kept out of `WalkWriter.remove`, whose `restore` reads a queued delete
+    /// as "the row reached the server"; the light pages never restore a removed row.
+    private func queueDeleteAfterRemove(_ id: UUID, level: WalkLevel) {
+        context.queueSync(table: level == .year ? "goals" : "tasks", recordId: id, type: "delete")
+        try? context.save()
     }
 
     /// Whether `pullUp` would take this row: it exists on the level named and is mine.
@@ -160,10 +175,20 @@ import SwiftData
         if let old, old != area?.id { walk.dropAreaIfUnused(old) }
     }
 
-    /// Moves today's first-thing mark from `previous` to `id` (either may be nil).
+    /// Moves today's first-thing mark from `previous` to `id` (either may be nil), and leaves
+    /// exactly one of my "chosen for today" rows for today: `id`'s (none when `id` is nil). The
+    /// first thing is read as my oldest such row (`DailyDay.firstThing`), so any other one (an
+    /// Inbox item sent to Today, a row made elsewhere) would be read as first instead.
     func setFirst(_ id: UUID?, previous: UUID?) {
         if let id, myTask(id) == nil { return }
         walk.setFirstThing(id, previous: previous)
+        let today = periods.today
+        // Only my rows on my own tasks: those are the ones `DailyDay.firstThing` can read.
+        let others = Set(((try? context.fetch(FetchDescriptor<TaskFocus>())) ?? [])
+            .filter { $0.userId == userId && PlanCalendar.sameDay($0.date, today) && $0.taskId != id && $0.taskId != previous }
+            .map(\.taskId))
+            .filter { myTask($0) != nil }
+        for other in others { walk.setFirstThing(nil, previous: other) }
     }
 
     // MARK: Plumbing

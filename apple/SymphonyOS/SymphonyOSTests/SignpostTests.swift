@@ -332,10 +332,29 @@ struct SignpostTests {
         #expect(f.ending == nil)
         #expect(Signpost.pick(f)?.kind == .firstToday)
 
-        let late = Signpost.facts(tasks: [], goals: [], focus: [], commitments: [], today: day(2026, 11, 29), me: me,
-                                  seasons: nil)
+        // Near November's end the sign needs something of mine in November to look back at.
+        let november = task("Clear the attic"); november.bucket = "month"; november.monthStart = day(2026, 11, 1)
+        let late = Signpost.facts(tasks: [november], goals: [], focus: [], commitments: [], today: day(2026, 11, 29),
+                                  me: me, seasons: nil)
         #expect(late.ending == Signpost.ending(today: day(2026, 11, 29), seasons: nil))
         #expect(late.ending != nil)
+    }
+
+    /// Final review (minor): "November ends · Look back before it turns" only for a month that holds
+    /// one of my goals: never for an empty month, no plan at all, or only someone else's goal.
+    @Test func theMonthEndsSignNeedsSomethingInTheMonth() {
+        let late = day(2026, 11, 29)
+        let empty = Signpost.facts(tasks: [], goals: [], focus: [], commitments: [], today: late, me: me, seasons: nil)
+        #expect(empty.ending == nil)
+        let theirs = task("Their month goal", user: other); theirs.bucket = "month"; theirs.monthStart = day(2026, 11, 1)
+        let december = task("Plan the holidays"); december.bucket = "month"; december.monthStart = day(2026, 12, 1)
+        let weekOnly = task("Call the tiler", on: late)
+        let notMine = Signpost.facts(tasks: [theirs, december, weekOnly], goals: [], focus: [], commitments: [],
+                                     today: late, me: me, seasons: nil)
+        #expect(notMine.ending == nil)
+        let mine = task("Clear the attic"); mine.bucket = "month"; mine.monthStart = day(2026, 11, 1); mine.completed = true
+        let held = Signpost.facts(tasks: [mine], goals: [], focus: [], commitments: [], today: late, me: me, seasons: nil)
+        #expect(held.ending?.name == "November")
     }
 
     @Test func theWeekCountsDoneAndDatedTasksOnce() {

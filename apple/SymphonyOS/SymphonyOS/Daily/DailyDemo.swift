@@ -191,10 +191,17 @@ extension DemoMode {
         let strength = plant(.season, "Strength twice a week", "Health", under: strong)
         let bathroomSeason = plant(.season, "Bathroom done by February", "Home", under: bathroom)
         if seed == "quiet" {
-            // The long words as goals too, for the Month page's cloths.
+            // The long words as goals too, for the Month page's cloths. They are filed into the calendar's
+            // own month (the walk's month on the 10th; on the 28th the walk has moved on to December), so
+            // the month that ends holds something to look back at and "‹Month› ends" shows.
             let sundays = plant(.season, "A slow Sunday every month", "People", under: weekends)
-            plant(.month, longTitle, "People", under: sundays)
-            plant(.month, longWord, "People", under: sundays)
+            let thisMonth = WalkWriter(context: ctx, userId: userId,
+                                       periods: MountainPage.periods(level: .month, selected: today, today: today, seasons: nil))
+            for title in [longTitle, longWord] {
+                let area = areas.first { $0.name == "People" }
+                let item = WalkItem(id: UUID(), level: .month, title: title, areaId: area?.id, parentId: sundays.id)
+                thisMonth.create(item, parent: sundays)
+            }
         }
         let gym = plant(.month, "Find a gym that fits", "Health", under: strength)
         let tile = plant(.month, "Pick the tile and pay the deposit", "Home", under: bathroomSeason)

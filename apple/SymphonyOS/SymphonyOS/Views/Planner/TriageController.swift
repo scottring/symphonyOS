@@ -42,26 +42,48 @@ final class TriageController {
                  assumedLifeArea: String? = nil) {
         guard !tasks.isEmpty else { return }
         let unclassified = tasks.filter(PlanWriter.needsLifeArea)
+        // Only the light edition passes an assumed life area: it alone takes the light move.
+        let light = assumedLifeArea != nil
         if unclassified.isEmpty {
-            perform(tasks, to: destination, areas: [:], context: context, userId: userId, members: members)
+            perform(tasks, to: destination, areas: [:], context: context, userId: userId, members: members, light: light)
         } else if let assumedLifeArea {
             // The light edition has one life area: no sheet, just that one.
             let areas = Dictionary(unclassified.map { ($0.id, assumedLifeArea) }, uniquingKeysWith: { first, _ in first })
-            perform(tasks, to: destination, areas: areas, context: context, userId: userId, members: members)
+            perform(tasks, to: destination, areas: areas, context: context, userId: userId, members: members, light: true)
         } else {
             areaRequest = AreaRequest(tasks: tasks, unclassified: unclassified, destination: destination)
         }
     }
 
+    /// `light` (the light edition, from `request` only): Today is the light pages' Today (`lightMove`).
+    /// Every other caller, and every full household, moves exactly as before.
     func perform(_ tasks: [SymphonyTask], to destination: PlanWriter.Destination, areas: [UUID: String],
-                 context: ModelContext, userId: UUID, members: [FamilyMember]) {
+                 context: ModelContext, userId: UUID, members: [FamilyMember], light: Bool = false) {
         let writer = PlanWriter(context: context, userId: userId)
         var snap = PlanWriter.Snapshot()
         for t in tasks {
-            snap.merge(writer.move(t, to: destination, lifeArea: areas[t.id], members: members))
+            guard light, let move = Self.lightMove(destination, now: Date()) else {
+                snap.merge(writer.move(t, to: destination, lifeArea: areas[t.id], members: members))
+                continue
+            }
+            var moved = writer.move(t, to: move, lifeArea: areas[t.id], members: members)
+            // Never the first thing unasked: the "chosen for today" rows the move made are taken back.
+            if !moved.createdFocus.isEmpty {
+                writer.undo(PlanWriter.Snapshot(createdFocus: moved.createdFocus))
+                moved.createdFocus = []
+            }
+            snap.merge(moved)
         }
         let noun = tasks.count == 1 ? "“\(tasks[0].title)”" : "\(tasks.count) items"
         show(Toast(message: "Moved \(noun) to \(Self.label(for: destination))", snapshot: snap))
+    }
+
+    /// In the light edition, Today from the Inbox is a plain day today: the light pages count no
+    /// deferral (ruling D13), and the first thing is the person's own choice, never a "chosen for
+    /// today" row made by sending something to Today (`perform` takes back the one the move makes).
+    /// nil: every other destination moves as it always has.
+    static func lightMove(_ destination: PlanWriter.Destination, now: Date) -> PlanWriter.Destination? {
+        destination == .today ? .day(PlanCalendar.day(now), allDay: true) : nil
     }
 
     func undo(context: ModelContext, userId: UUID) {

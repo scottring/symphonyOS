@@ -91,7 +91,28 @@ struct DailyWriterTests {
         let t = try #require(task(ctx, added.id))
         #expect(t.scheduledFor == nil)
         #expect(t.bucket == "week")
-        #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open" })
+        // The writer's own week (8 to 14 November), stamp and commitment both.
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, periods.weekStart) } == true)
+        #expect(PlanCalendar.sameDay(periods.weekStart, day(2026, 11, 8)))
+        #expect(commitments(ctx, t.id).contains {
+            $0.level == "week" && $0.status == "open" && PlanCalendar.sameDay($0.periodStart, periods.weekStart)
+        })
+    }
+
+    /// Final review C1: Week on next week hands the writer that week's periods, and a task with no day
+    /// is filed there: stamp and commitment on 15 November, never the week that is ending.
+    @Test func aTaskWithNoDayIsFiledIntoTheWeekItIsGiven() throws {
+        let ctx = try walkTestContext()
+        let next = day(2026, 11, 15)
+        let added = writer(ctx).add(.task(title: "Buy paint", day: nil, at: nil, here: true),
+                                    periods: WalkPeriods.pick(now: next))
+        let t = try #require(task(ctx, added.id))
+        #expect(t.scheduledFor == nil)
+        #expect(t.bucket == "week")
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, next) } == true)
+        let week = commitments(ctx, t.id).filter { $0.level == "week" }
+        #expect(week.count == 1)
+        #expect(week.first.map { PlanCalendar.sameDay($0.periodStart, next) } == true)
     }
 
     @Test func aTimeSaidIsKept() throws {
@@ -228,11 +249,12 @@ struct DailyWriterTests {
         #expect(t.monthStart.map { PlanCalendar.sameDay($0, day(2026, 11, 1)) } == true)
         #expect(commitments(ctx, t.id).contains { $0.level == "month" && PlanCalendar.sameDay($0.periodStart, day(2026, 11, 1)) })
 
-        // Take-back stays on the long-lived writer, and so does the area it made.
+        // Take-back stays on the long-lived writer, and so does the area it made. Only a delete of the
+        // row is left queued (final review I2: its insert may already have been on the wire).
         w.takeBack(added)
         #expect(task(ctx, added.id) == nil)
         #expect(areas(ctx).isEmpty)
-        #expect(pending(ctx).isEmpty)
+        #expect(onlyADelete(ctx, of: added.id, in: "tasks"))
 
         // With no periods, the writer's own.
         let own = w.add(.goal(title: "Clear the attic", level: .month), kept: [home])
@@ -248,15 +270,58 @@ struct DailyWriterTests {
         w.takeBack(added)
         #expect(task(ctx, added.id) == nil)
         #expect(commitments(ctx, added.id).isEmpty)
-        #expect(!pending(ctx).contains { $0.recordId == added.id })
-        #expect(pending(ctx).isEmpty)
+        // Its insert, commitments and focus never go up; one delete is queued in case the insert was on the wire.
+        #expect(onlyADelete(ctx, of: added.id, in: "tasks"))
 
         // A year goal's area this writer made goes with it.
+        for c in pending(ctx) { ctx.delete(c) }
         let g = w.add(.goal(title: "Run a marathon", level: .year), kept: [health], focusArea: health.id)
         w.takeBack(g)
         #expect(goal(ctx, g.id) == nil)
         #expect(areas(ctx).isEmpty)
-        #expect(pending(ctx).isEmpty)
+        #expect(onlyADelete(ctx, of: g.id, in: "goals"))
+    }
+
+    /// The only change queued is one delete of this row, in this table.
+    private func onlyADelete(_ ctx: ModelContext, of id: UUID, in table: String) -> Bool {
+        let queued = pending(ctx)
+        return queued.count == 1 && queued[0].tableName == table && queued[0].recordId == id && queued[0].changeType == "delete"
+    }
+
+    /// Final review I2: Undo of an add is tapped while its insert is being pushed (the change is
+    /// still queued, so the writer drops it, but the request is already on the wire). A delete is
+    /// queued, so the row comes off the server and its realtime echo cannot bring it back.
+    @Test func undoOfAnAddInFlightQueuesADelete() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let added = w.add(.task(title: "Book the plumber", day: nil, at: nil, here: true))
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == added.id && $0.changeType == "insert" })
+        w.takeBack(added)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == added.id && $0.changeType == "delete" })
+        #expect(!pending(ctx).contains { $0.recordId == added.id && $0.changeType == "insert" })
+    }
+
+    /// The same for a pull-up written while the row's insert is still queued (added a moment ago).
+    @Test func aPullUpOfARowInFlightQueuesADelete() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let added = w.add(.task(title: "Book the plumber", day: periods.today, at: nil, here: true))
+        let g = w.add(.goal(title: "Run a marathon", level: .year), kept: [health], focusArea: health.id)
+        w.pullUp(added.id, level: .week)
+        w.pullUp(g.id, level: .year)
+        #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == added.id && $0.changeType == "delete" })
+        #expect(pending(ctx).contains { $0.tableName == "goals" && $0.recordId == g.id && $0.changeType == "delete" })
+        #expect(!pending(ctx).contains { [added.id, g.id].contains($0.recordId) && $0.changeType == "insert" })
+    }
+
+    /// After the insert reached the server, Undo still queues exactly one delete.
+    @Test func undoOfAnAddAfterThePushQueuesOneDelete() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let added = w.add(.task(title: "Book the plumber", day: nil, at: nil, here: true))
+        try pushAll(ctx)
+        w.takeBack(added)
+        #expect(pending(ctx).filter { $0.tableName == "tasks" && $0.recordId == added.id && $0.changeType == "delete" }.count == 1)
     }
 
     @Test func pullUpThenPutBackRestoresTheLinks() throws {
@@ -292,6 +357,9 @@ struct DailyWriterTests {
         _ = try #require(w.move(added.id, to: thursday))
         let t = try #require(task(ctx, added.id))
         #expect(PlanCalendar.sameDay(t.scheduledFor, thursday))
+        #expect(t.bucket == "timed")
+        #expect(t.isAllDay)
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, PlanCalendar.weekStart(thursday)) } == true)
         #expect(commitments(ctx, t.id).contains { $0.level == "week" && $0.status == "open" })
         #expect(focus(ctx).isEmpty)
 
@@ -435,6 +503,7 @@ struct DailyWriterTests {
         w.setDone(row(ctx, added.id), true, today: periods.today)
         let t = try #require(task(ctx, added.id))
         #expect(t.completed)
+        #expect(t.completedAt != nil)                   // stamped on completion, as the app's own path does
         #expect(pending(ctx).contains { $0.tableName == "tasks" && $0.recordId == t.id && $0.changeType == "update" })
 
         try pushAll(ctx)
@@ -480,6 +549,40 @@ struct DailyWriterTests {
         #expect(focus(ctx).map(\.taskId) == [b.id])
         w.setFirst(nil, previous: b.id)
         #expect(focus(ctx).isEmpty)
+    }
+
+    /// Final review I1: a second "chosen for today" row of mine (an Inbox item sent to Today, a row
+    /// made on the web) is read as first if it is older. Marking a row first leaves exactly one of my
+    /// rows for today, its own; marking it not first leaves none.
+    @Test func theFirstThingLeavesExactlyOneFocusRow() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let a = w.add(.task(title: "Call the vet", day: periods.today, at: nil, here: true))
+        let b = w.add(.task(title: "Water the plants", day: periods.today, at: nil, here: true))
+        let c = w.add(.task(title: "Post the parcel", day: periods.today, at: nil, here: true))
+        // Two rows already there, B's the older: B reads as first though nobody chose it here.
+        let older = TaskFocus(taskId: b.id, userId: me, date: periods.today)
+        older.createdAt = Date(timeIntervalSinceNow: -3600)
+        ctx.insert(older)
+        ctx.insert(TaskFocus(taskId: a.id, userId: me, date: periods.today))
+        // Someone else's row on that day is not mine to touch.
+        let theirs = TaskFocus(taskId: c.id, userId: other, date: periods.today)
+        ctx.insert(theirs)
+        try ctx.save()
+        try pushAll(ctx)
+        let mineToday = { self.focus(ctx).filter { $0.userId == self.me } }
+        #expect(DailyDay.firstThing(focus: focus(ctx), tasks: tasks(ctx), today: periods.today, me: me) == b.id)
+
+        w.setFirst(c.id, previous: a.id)
+        #expect(mineToday().map(\.taskId) == [c.id])
+        #expect(DailyDay.firstThing(focus: focus(ctx), tasks: tasks(ctx), today: periods.today, me: me) == c.id)
+        #expect(focus(ctx).contains { $0.id == theirs.id })
+        // Each removed row goes from the server too.
+        #expect(pending(ctx).filter { $0.tableName == "task_focus" && $0.changeType == "delete" }.count == 2)
+
+        w.setFirst(nil, previous: c.id)
+        #expect(mineToday().isEmpty)
+        #expect(DailyDay.firstThing(focus: focus(ctx), tasks: tasks(ctx), today: periods.today, me: me) == nil)
     }
 
     @Test func someoneElsesRowIsNeverTouched() throws {
@@ -589,6 +692,64 @@ struct DailyWriterTests {
             #expect(t.context == "personal")
             #expect(t.userId == me)
         }
+    }
+}
+
+/// Final review I1: the Inbox sends an item to Today through `TriageController`, which the full app
+/// shares. Only the light edition (an assumed life area) takes the light move: a plain day today, no
+/// deferral counted (ruling D13), never the first thing unasked. A full household's is as it was.
+@MainActor
+struct LightTriageTests {
+    let me = UUID()
+
+    private func inboxTask(_ ctx: ModelContext, _ title: String, context: String? = "personal") throws -> SymphonyTask {
+        let t = SymphonyTask(userId: me, title: title, context: context)
+        ctx.insert(t)
+        try ctx.save()
+        return t
+    }
+
+    private func focus(_ ctx: ModelContext) -> [TaskFocus] { (try? ctx.fetch(FetchDescriptor<TaskFocus>())) ?? [] }
+
+    @Test func lightTodayFromTheInboxIsNotFirstAndCountsNoDeferral() throws {
+        let ctx = try walkTestContext()
+        let a = try inboxTask(ctx, "Renew the passport")
+        let b = try inboxTask(ctx, "Order the logs", context: nil)
+        let triage = TriageController()
+        triage.request([a], to: .today, context: ctx, userId: me, members: [], assumedLifeArea: "personal")
+        triage.request([b], to: .today, context: ctx, userId: me, members: [], assumedLifeArea: "personal")
+        let today = PlanCalendar.day(Date())
+        for t in [a, b] {
+            #expect(PlanCalendar.sameDay(t.scheduledFor, today))
+            #expect(t.isAllDay)
+            #expect(t.deferCount == 0)
+            #expect(t.context == "personal")
+        }
+        #expect(focus(ctx).isEmpty)
+        #expect(DailyDay.firstThing(focus: focus(ctx), tasks: [a, b], today: today, me: me) == nil)
+        #expect(triage.toast?.message == "Moved “Order the logs” to Today")
+        // Undo puts it back where it was.
+        triage.undo(context: ctx, userId: me)
+        #expect(b.scheduledFor == nil)
+        #expect(b.deferCount == 0)
+    }
+
+    @Test func aFullHouseholdsTodayFromTheInboxIsUnchanged() throws {
+        let ctx = try walkTestContext()
+        let a = try inboxTask(ctx, "Renew the passport")
+        let triage = TriageController()
+        triage.request([a], to: .today, context: ctx, userId: me, members: [], assumedLifeArea: nil)
+        #expect(PlanCalendar.sameDay(a.scheduledFor, PlanCalendar.day(Date())))
+        #expect(a.deferCount == 1)
+        #expect(focus(ctx).map(\.taskId) == [a.id])
+    }
+
+    @Test func onlyTodayTakesTheLightMove() {
+        let now = Date()
+        #expect(TriageController.lightMove(.today, now: now) == .day(PlanCalendar.day(now), allDay: true))
+        #expect(TriageController.lightMove(.thisWeek, now: now) == nil)
+        #expect(TriageController.lightMove(.someday, now: now) == nil)
+        #expect(TriageController.lightMove(.day(now, allDay: false), now: now) == nil)
     }
 }
 #endif

@@ -62,6 +62,14 @@ enum DailyCopy {
         }
     }
 
+    /// Week's empty field, saying the week the page shows (where a task with no day goes):
+    /// "Add to this week", "Add to next week", and "Add to the week" for any other.
+    static func weekPlaceholder(_ start: Date, today: Date) -> String {
+        if holds(start, today) { return "Add to this week" }
+        if holds(PlanCalendar.addDays(start, -7), today) { return "Add to next week" }
+        return "Add to the week"
+    }
+
     /// The bar's empty field in fewer words, for a field too narrow for `placeholder` (the Duo's
     /// outside screen, a 375-point phone): "Add a goal" on Month, Season and Year; Today's and
     /// Week's are short already.
@@ -203,10 +211,13 @@ enum DailyCopy {
         }
     }
 
-    /// Where an add went that is not on this page: "It’s on Friday the 20th."
+    /// Where an add went that is not on this page: "It’s on Friday the 20th."; in another month
+    /// than today's, the month too: "It’s on Thursday the 15th of April."
     static func itsOn(_ day: Date, today: Date) -> String {
         let n = PlanCalendar.calendar.component(.day, from: day)
-        return "It’s on \(weekday(day)) the \(WalkPeriods.ordinal(n))."
+        let sameMonth = PlanCalendar.sameDay(PlanCalendar.monthStart(day), PlanCalendar.monthStart(today))
+        let month = sameMonth ? "" : " of \(monthName(day))"
+        return "It’s on \(weekday(day)) the \(WalkPeriods.ordinal(n))\(month)."
     }
 
     /// What a tap on a sign does, for VoiceOver; keyed by `Signpost.Kind.rawValue`.

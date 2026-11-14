@@ -148,6 +148,86 @@ struct DailyModelTests {
         #expect(m.bar.undoShowing)
     }
 
+    // MARK: Week on another week (final review C1)
+
+    /// Saturday 14 November, the week's last day: the "Tomorrow" sign opens Week on next week
+    /// (15 to 21 November). A task said there with no day is filed into THAT week (stamp and
+    /// commitment), stands on the page, says nothing (it is here), and Undo takes it back.
+    @Test func aTaskWithNoDayOnNextWeeksPageIsFiledThere() throws {
+        let ctx = try walkTestContext()
+        clock.now = day(2026, 11, 14, 12)
+        let next = day(2026, 11, 15)
+        let m = model(ctx)
+        m.page = .week
+        m.week = next
+        type(m, "Buy paint")
+
+        let t = try #require(task(ctx, titled: "Buy paint"))
+        #expect(t.scheduledFor == nil)
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, next) } == true)
+        let week = ((try? ctx.fetch(FetchDescriptor<TaskCommitment>())) ?? []).filter { $0.taskId == t.id && $0.level == "week" }
+        #expect(week.count == 1)
+        #expect(week.first.map { PlanCalendar.sameDay($0.periodStart, next) } == true)
+        #expect(m.bar.note == nil)
+        #expect(m.bar.undoShowing)
+        #expect(m.reveal?.id == t.id)
+
+        // On the page it was added from: next week's Any day.
+        let page = DailyWeek.make(tasks: tasks(ctx), goals: [], commitments: (try? ctx.fetch(FetchDescriptor<TaskCommitment>())) ?? [],
+                                  focus: [], events: { _ in [] }, weekStart: next, today: m.today, me: me)
+        #expect(page.days.contains { $0.date == nil && $0.lines.contains { if case .task(let r) = $0 { r.id == t.id } else { false } } })
+
+        m.send(.undoTapped)
+        #expect(task(ctx, titled: "Buy paint") == nil)
+    }
+
+    /// On next week's page a day said inside it lands there with no note; a day said off the page
+    /// (today) lands on today and says where it went.
+    @Test func aDaySaidOnAnotherWeeksPageSaysSoOnlyWhenItIsOffThePage() throws {
+        let ctx = try walkTestContext()
+        clock.now = day(2026, 11, 14, 12)
+        var answer = CaptureParser.Result(title: "Bins", date: day(2026, 11, 17, 12), hasTime: false)
+        let m = model(ctx, parse: { _ in answer })
+        m.page = .week
+        m.week = day(2026, 11, 15)
+        type(m, "Bins Tuesday")
+        let bins = try #require(task(ctx, titled: "Bins"))
+        #expect(PlanCalendar.sameDay(bins.scheduledFor, day(2026, 11, 17)))
+        #expect(m.bar.note == nil)
+
+        answer = CaptureParser.Result(title: "Call mum", date: day(2026, 11, 14, 12), hasTime: false)
+        type(m, "Call mum today")
+        let call = try #require(task(ctx, titled: "Call mum"))
+        #expect(PlanCalendar.sameDay(call.scheduledFor, day(2026, 11, 14)))
+        #expect(m.bar.note == DailyCopy.itsOn(day(2026, 11, 14), today: m.today))
+    }
+
+    /// The week Week shows is read only on Week: Today's bar files into the clock's week whatever
+    /// week was last on Week.
+    @Test func theWeekShownIsReadOnlyOnWeek() throws {
+        let ctx = try walkTestContext()
+        clock.now = day(2026, 11, 14, 12)
+        let m = model(ctx, parse: { _ in CaptureParser.Result(title: "Buy milk", date: nil, hasTime: false) })
+        m.week = day(2026, 11, 15)
+        m.page = .today
+        type(m, "Buy milk")
+        let t = try #require(task(ctx, titled: "Buy milk"))
+        #expect(PlanCalendar.sameDay(t.scheduledFor, day(2026, 11, 14)))
+        #expect(t.weekStart.map { PlanCalendar.sameDay($0, day(2026, 11, 8)) } == true)
+    }
+
+    /// In the minute after midnight, before the minute tick reads the new day, an add lands on the new
+    /// day, never yesterday's.
+    @Test func anAddJustAfterMidnightLandsOnTheNewDay() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        clock.now = day(2026, 11, 11, 0).addingTimeInterval(20)
+        type(m, "Feed the cat")
+        let t = try #require(task(ctx, titled: "Feed the cat"))
+        #expect(PlanCalendar.sameDay(t.scheduledFor, day(2026, 11, 11)))
+        #expect(PlanCalendar.sameDay(m.today, day(2026, 11, 11)))
+    }
+
     @Test func aGoalAddedFromAMountainPageHangsWhereThePageSays() throws {
         let ctx = try walkTestContext()
         // 28 November: the walk's own periods have moved on to December, but the page is November's.

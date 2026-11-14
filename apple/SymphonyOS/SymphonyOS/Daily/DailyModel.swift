@@ -31,6 +31,10 @@ import Observation
     /// The bar's light wears the handover's halo: from the walk's light arriving for `DailyHandover.lineMs`.
     private(set) var handoverHalo = false
     var page: DailyAdd.Page = .today
+    /// The week Week shows (a day in it), set by Week beside `page`: the bar's words are read
+    /// against that week, and a task with no day is filed into it (`DailyAdd.otherWeek`). Read
+    /// only while `page` is `.week`; nil there means the clock's week.
+    var week: Date?
     /// The light half-open display is over the page (`cover()`): the page stays as it was, but its
     /// bar cannot start or add and it takes no Tell.
     private(set) var covered = false
@@ -232,6 +236,7 @@ import Observation
     /// Ticks a row off, or back on. Any tick puts the lit row out, and ends the Undo
     /// before it: the change it offered is no longer the last thing.
     func toggle(_ row: DailyDay.Row) {
+        refreshDay()                    // in the minute after midnight, never yesterday's
         endUndo()
         writer.setDone(row, !row.done, today: today)
         lit = nil
@@ -239,6 +244,7 @@ import Observation
 
     /// Onto a day, or with `day` nil onto the week with no day; Undo puts it back.
     func move(_ taskId: UUID, to day: Date?) {
+        refreshDay()
         guard let snapshot = writer.move(taskId, to: day) else { return }
         offerUndo(.moved(snapshot), note: nil, row: taskId)
     }
@@ -276,6 +282,7 @@ import Observation
 
     /// Moves the first-thing mark. Not undone by Undo, so it ends the Undo before it.
     func setFirst(_ id: UUID?, previous: UUID?) {
+        refreshDay()
         endUndo()
         writer.setFirst(id, previous: previous)
     }
@@ -325,12 +332,23 @@ import Observation
         }
     }
 
+    /// The week the page's words are read against: the week Week shows, else the writer's own.
+    private var pageWeek: Date {
+        guard page == .week, let week else { return periods.weekStart }
+        return PlanCalendar.weekStart(week)
+    }
+
     private func add(_ words: String) {
-        guard let read = DailyAdd.read(words, on: page, today: today, weekStart: periods.weekStart, parse: parse)
+        refreshDay()                    // in the minute after midnight, never yesterday's
+        let shown = pageWeek
+        guard let read = DailyAdd.read(words, on: page, today: today, weekStart: shown, parse: parse)
         else { return }
         let added: DailyWriter.Added
         if case .goal = read, let h = hanging {
             added = writer.add(read, kept: h.kept, focusArea: h.focusArea, parent: h.parent, periods: h.periods)
+        } else if let other = DailyAdd.otherWeek(for: read, shownWeek: shown, writersWeek: periods.weekStart) {
+            // Week on another week: a task with no day is filed into that week, where the page shows it.
+            added = writer.add(read, periods: WalkPeriods.pick(now: other, seasons: seasons))
         } else {
             added = writer.add(read)
         }

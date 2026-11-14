@@ -70,6 +70,15 @@ struct DailyCopyTests {
         #expect(DailyCopy.heading(.year, periods: march, today: day(2026, 3, 10)) == ("2026", "This year"))
     }
 
+    /// Week's field says the week the page shows, where a task with no day goes (final review C1).
+    @Test func weeksPlaceholderSaysWhichWeek() {
+        let today = day(2026, 11, 14)
+        #expect(DailyCopy.weekPlaceholder(day(2026, 11, 8), today: today) == "Add to this week")
+        #expect(DailyCopy.weekPlaceholder(day(2026, 11, 15), today: today) == "Add to next week")
+        #expect(DailyCopy.weekPlaceholder(day(2026, 11, 22), today: today) == "Add to the week")
+        #expect(DailyCopy.weekPlaceholder(day(2026, 11, 1), today: today) == "Add to the week")
+    }
+
     @Test func placeholders() {
         #expect(DailyCopy.placeholder(.today, periods: periods) == "Add to today")
         #expect(DailyCopy.placeholder(.week, periods: periods) == "Add to this week")
@@ -130,6 +139,9 @@ struct DailyCopyTests {
         #expect(DailyCopy.date(day(2026, 11, 10)) == "Tuesday, 10 November")
         #expect(DailyCopy.dayLabel(day(2026, 11, 10)) == ("TUE", "10"))
         #expect(DailyCopy.itsOn(day(2026, 11, 20), today: day(2026, 11, 10)) == "It’s on Friday the 20th.")
+        // Another month than today's is named (final review, minor).
+        #expect(DailyCopy.itsOn(day(2027, 4, 15), today: day(2026, 11, 10)) == "It’s on Thursday the 15th of April.")
+        #expect(DailyCopy.itsOn(day(2026, 12, 1), today: day(2026, 11, 30)) == "It’s on Tuesday the 1st of December.")
         #expect(DailyCopy.done(3) == "3 done")
         #expect(DailyCopy.tomorrow("Choose the tile") == "Tomorrow: Choose the tile")
     }

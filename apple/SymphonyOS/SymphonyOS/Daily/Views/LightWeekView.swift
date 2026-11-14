@@ -77,8 +77,9 @@ struct LightWeekView: View {
             if low == nil {
                 DailyPaperFade(fade: m.bar.fade, size: size)
                 if let chosen { movePanel(chosen, m) }
-                DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.week, periods: model.periods),
-                             shortPlaceholder: DailyCopy.shortPlaceholder(.week),
+                // The week the page shows, where a task with no day goes ("Add to next week").
+                DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.weekPlaceholder(weekStart, today: model.today),
+                             shortPlaceholder: DailyCopy.weekPlaceholder(weekStart, today: model.today),
                              listening: DailyCopy.listening(.week))
             }
             #if DEBUG
@@ -94,8 +95,10 @@ struct LightWeekView: View {
         .task(id: calendar.readKey(for: weekStart)) { await calendar.refreshWeek(weekStart) }
         .onAppear {
             model.page = .week
+            model.week = weekStart          // the bar reads and files into the week on the page
             readWalk()
         }
+        .onChange(of: weekStart) { _, start in model.week = start }
         .onChange(of: appState.walkPaused) { _, _ in readWalk() }
         // A Tell taken while the whole plan shows: the sheet rises first, so the bar that answers is
         // there (a Tell from outside also opens Today, which answers it).

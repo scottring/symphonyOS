@@ -158,7 +158,12 @@ enum Signpost {
         f.anyDay = anyDay.map { Named(id: $0.id, title: $0.title) }
         f.weekCount = onTheWeek.count
         f.monthGoal = monthGoal.map { Named(id: $0.id, title: $0.title) }
-        f.ending = ending(today: today, seasons: seasons)
+        // "‹Month› ends · Look back before it turns" only when that month holds something of mine to
+        // look back at: one of my goals for it (the Month page the sign opens shows them).
+        let thisMonth = MountainPage.periods(level: .month, selected: today, today: today, seasons: seasons)
+        let monthHolds = WalkLoad.items(goals: goals, tasks: mine, periods: thisMonth, me: me, planted: [])
+            .contains { $0.level == .month }
+        f.ending = monthHolds ? ending(today: today, seasons: seasons) : nil
         f.noPiece = noPiece.map { Named(id: $0.id, title: $0.title) }
         f.seasonWord = periods.seasonWord
         return f

@@ -133,6 +133,8 @@ struct LightPlannerView<Full: View>: View {
             appState.dailyLastDay = turn.lastDay
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
+        // The household's seasons arrived (the first pull) or changed (Settings): the model's periods are read again.
+        .onChange(of: seasons) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
         .task {
             while !Task.isCancelled {
@@ -184,6 +186,7 @@ struct LightPlannerView<Full: View>: View {
             model = nil
             return
         }
+        let old = model
         model?.close()
         #if DEBUG
         let listener = DemoMode.isOn ? DemoMode.dailyListener : nil    // `-SymphonyDailyState speak`
@@ -195,8 +198,16 @@ struct LightPlannerView<Full: View>: View {
         let memory = SignpostMemory()
         let handoverMemory = HandoverMemory()
         #endif
-        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory,
-                           handoverMemory: handoverMemory)
+        let made = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory,
+                              handoverMemory: handoverMemory)
+        // Made again under a page that stays up (the seasons changed in Settings): the page on screen,
+        // its week and where its goals hang are kept, since the page does not appear again to set them.
+        if let old {
+            made.page = old.page
+            made.week = old.week
+            made.hanging = old.hanging
+        }
+        model = made
         if covered { model?.cover() }
     }
 
