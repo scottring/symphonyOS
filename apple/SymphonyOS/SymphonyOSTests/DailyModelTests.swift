@@ -626,6 +626,45 @@ struct DailyModelTests {
         #expect(listener.finishes == 0)
     }
 
+    /// Task 15 fix round 1: a walk opening over a light page (a walk-down, the waiting line's
+    /// resume, a walk from Settings) stops a listening bar: it is idle, its listener stopped, and
+    /// nothing it heard is added, then or when the walk closes. The cold-launch case too: a Tell
+    /// answered just before a resumed walk shows is stopped as the walk shows.
+    @Test func aWalkShowingStopsTheBarAndAddsNothingItHeard() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        listener.hear("Call the plumber about the leak")
+        m.walkShowingChanged(true)
+        #expect(m.bar.mic == .idle)
+        #expect(listener.stops == 1)
+        listener.end()
+        scheduler.advance(WalkOrb.finishMs + 1000)
+        m.walkShowingChanged(false)
+        #expect(tasks(ctx).isEmpty)
+        #expect(m.bar.mic == .idle)
+
+        // Cold launch: the Tell is taken before the walk shows, then the walk shows.
+        let cold = model(try walkTestContext())
+        let app = asked()
+        #expect(cold.answerTell(app))
+        await scheduler.settle()
+        #expect(cold.bar.mic == .listening)
+        app.walkShowing = true
+        cold.walkShowingChanged(app.walkShowing)
+        #expect(cold.bar.mic == .idle)
+        #expect(listener.stops == 2)
+        listener.hear("Book the dentist")
+        #expect(cold.bar.draft == "")                     // nothing from that session reaches the bar
+
+        // Closing the walk starts nothing.
+        cold.walkShowingChanged(false)
+        await scheduler.settle()
+        #expect(cold.bar.mic == .idle)
+        #expect(listener.starts == 2)
+    }
+
     // MARK: The day, the sign, the lit row
 
     @Test func aNewDayIsReadWhenTheAppComesBack() throws {

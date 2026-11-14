@@ -262,9 +262,11 @@ struct MountainPageView: View {
             case .walkDown(let id):
                 // The walk opens one level down, about this flag, and comes back to this page.
                 guard let page else { continue }
-                appState.walkDown = DailyWalkDown.page(page, flag: id, from: horizon, date: appState.selectedDate,
-                                                       periods: model.periods, now: model.today, seasons: seasons,
-                                                       userId: userId)
+                let down = DailyWalkDown.page(page, flag: id, from: horizon, date: appState.selectedDate,
+                                              periods: model.periods, now: model.today, seasons: seasons,
+                                              userId: userId)
+                for event in down?.bar ?? [] { model.send(event) }     // the bar lets go first
+                appState.walkDown = down
             case .open(let horizon):
                 appState.horizon = horizon
             }

@@ -74,6 +74,8 @@ struct LightPlannerView<Full: View>: View {
         // Set down half open: the page's bar stops listening and its Undo goes before the display's
         // own bar takes over (the page itself is no longer drawn).
         .onChange(of: covered) { _, covered in if covered { model?.cover() } }
+        // A walk shows over whatever light page is up: its bar never listens under it.
+        .onChange(of: appState.walkShowing) { _, showing in model?.walkShowingChanged(showing) }
         // Gone (another tab, signed out, the household become full): the dock comes back, and the
         // model stops listening and cancels its timers (a pending pull-up is written).
         .onDisappear {

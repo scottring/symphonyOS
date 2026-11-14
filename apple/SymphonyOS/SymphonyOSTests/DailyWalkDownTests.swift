@@ -25,7 +25,7 @@ struct DailyWalkDownTests {
         ctx.insert(goal)
         try ctx.save()
         let down = try #require(DailyWalkDown.sign(.walkDown(goal.id, .year), goals: [goal], tasks: [], areaRows: [],
-                                                   saved: nil, periods: periods, now: today, date: today,
+                                                   saved: nil, periods: periods, now: today,
                                                    seasons: nil, me: me))
         return (down, goal.id)
     }

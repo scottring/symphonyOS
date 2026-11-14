@@ -47,7 +47,7 @@ struct LightTodayView: View {
             let page = read(now: DailyClock.now())
             let line = walkLine
             let m = metrics(waiting: line != nil)
-            let low = lookBack.sheet(on: m)
+            let low = lookBack.sheet(on: m, safeBottom: safeBottom)
             ZStack(alignment: .topLeading) {
                 if low != nil { plan } else { DailyBand(picture: m.picture, height: m.band.height) }
                 DailyTopShade(solid: m.shadeSolid, height: m.shade)
@@ -59,7 +59,8 @@ struct LightTodayView: View {
                                  putAway: { model.dismiss(sign.kind) })
                 }
                 DailySheet(top: low?.sheetTop ?? m.sheetTop, radius: m.sheetRadius, grabber: low?.grabber ?? m.grabber,
-                           lookBack: low?.lookBack ?? m.lookBack, onLookBack: handleTapped, label: lookBack.label(on: .today)) {
+                           lookBack: low?.lookBack ?? m.lookBack, onLookBack: handleTapped, label: lookBack.label(on: .today),
+                           strip: low?.strip) {
                     if let low { header(page, m, at: low.header) } else { sheet(page, m, line: line) }
                 }
                 if low == nil {
@@ -251,12 +252,15 @@ struct LightTodayView: View {
         case .page(let horizon, let day):
             open(horizon, day)
         case .walkDown:
-            // The walk opens one level below the goal the sign names, and comes back to Today.
-            guard let down = DailyWalkDown.sign(sign.target, goals: goals, tasks: tasks, areaRows: goalAreas,
-                                                saved: walkPosition, periods: model.periods, now: model.today,
-                                                date: appState.selectedDate, seasons: seasons, me: userId)
-            else { return }
+            // The walk opens one level below the goal the sign names, and comes back to Today;
+            // the bar lets go first. A sign that could not open it is not put away.
+            let down = DailyWalkDown.sign(sign.target, goals: goals, tasks: tasks, areaRows: goalAreas,
+                                          saved: walkPosition, periods: model.periods, now: model.today,
+                                          seasons: seasons, me: userId)
+            for event in down?.bar ?? [] { model.send(event) }
             appState.walkDown = down
+            if DailyWalkDown.putsAway(sign, walkDown: down) { model.dismiss(sign.kind) }
+            return
         }
         if sign.putAwayWhenFollowed { model.dismiss(sign.kind) }
     }
@@ -270,6 +274,8 @@ struct LightTodayView: View {
     /// Tell asked for from outside, as the model answers it (`DailyGate.tell`); once taken, a
     /// row's Details over the page closes too, so the listening bar is seen.
     private func answerTell() {
+        // With the whole plan showing, the sheet rises first, so the bar that answers is there.
+        lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing)
         if model.answerTell(appState) { opened = nil }
     }
 

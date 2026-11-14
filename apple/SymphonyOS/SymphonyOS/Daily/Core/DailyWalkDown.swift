@@ -20,8 +20,14 @@ struct DailyWalkDown: Equatable {
     /// The household's season boundaries, which the walk reads its periods with.
     let seasons: [SeasonBoundary]?
 
-    /// Where the person is once it is over, however it ends: the page it was started from, on its date.
+    /// Where the person is once it is over, however it ends: the page it was started from, on its
+    /// date. A walk-down from a sign on Today returns to the day it was asked on (`sign(...)`'s
+    /// `now`), never to a date the app was last pointed at.
     var returnsTo: (horizon: Horizon, date: Date) { (from, date) }
+
+    /// Asking for it lets the page's bar go at once (`.left`: it stops listening), as lowering
+    /// the sheet does, so nothing the bar hears is taken while the walk opens over it.
+    var bar: [DailyBar.Event] { [.left] }
 
     // MARK: Asked for
 
@@ -39,10 +45,10 @@ struct DailyWalkDown: Equatable {
 
     /// From a sign on Today (`Signpost.Target.walkDown`): the goal it names among the walk's own
     /// flags for `periods`, read from the person's own personal rows, on the ridge as the
-    /// mountain pages read it (`MountainPage.areas`, with the saved walk's ids). Nil for any
-    /// other target, or a goal that is not one of the walk's at that level.
+    /// mountain pages read it (`MountainPage.areas`, with the saved walk's ids). It returns to
+    /// Today on `now`'s day. Nil for any other target, or a goal that is not one of the walk's at that level.
     static func sign(_ target: Signpost.Target, goals: [Goal], tasks: [SymphonyTask], areaRows: [GoalArea],
-                     saved: WalkPosition?, periods: WalkPeriods, now: Date, date: Date,
+                     saved: WalkPosition?, periods: WalkPeriods, now: Date,
                      seasons: [SeasonBoundary]?, me: UUID) -> DailyWalkDown? {
         guard case .walkDown(let id, let level) = target else { return nil }
         let areas = MountainPage.areas(areaRows, me: me, saved: saved?.areas ?? [])
@@ -52,7 +58,17 @@ struct DailyWalkDown: Equatable {
               MountainPage.canWalkDown(item, in: items) else { return nil }
         let kept = MountainPage.kept(items: [], areas: areas, saved: saved?.kept ?? [], savedAreas: saved?.areas ?? [])
         let position = MountainPage.walkDown(item, items: items, areas: areas, kept: kept, periods: periods, now: now)
-        return DailyWalkDown(userId: me, position: position, from: .today, date: date, seasons: seasons)
+        return DailyWalkDown(userId: me, position: position, from: .today, date: PlanCalendar.day(now),
+                             seasons: seasons)
+    }
+
+    /// Whether following `sign` puts it away for the day: as `putAwayWhenFollowed` says, except
+    /// that a sign that walks a goal down is put away only when its walk-down could be built
+    /// (`walkDown`), so a sign that took you nowhere stays.
+    static func putsAway(_ sign: Signpost.Sign, walkDown: DailyWalkDown?) -> Bool {
+        guard sign.putAwayWhenFollowed else { return false }
+        if case .walkDown = sign.target { return walkDown != nil }
+        return true
     }
 
     // MARK: Opened

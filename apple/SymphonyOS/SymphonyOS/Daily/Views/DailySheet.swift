@@ -16,6 +16,10 @@ struct DailySheet<Content: View>: View {
     let onLookBack: () -> Void
     /// The handle's words.
     var label: String = WalkCopy.lookBackHandle
+    /// Lowered (`DailyMetrics.Lowered.strip`): the whole lowered sheet, down to the safe area's
+    /// foot, is one control that raises it, by a tap or a drag up (`DailyLookBack.stripRaises`),
+    /// read by VoiceOver as the handle's words. Nil: the handle alone is the control.
+    var strip: CGRect? = nil
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -32,25 +36,48 @@ struct DailySheet<Content: View>: View {
                 .accessibilityHidden(true)
             if let lookBack { handle(lookBack) }
             content()
+            if let strip { raiser(strip) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// The words sit at +16…+40 on the sheet, the bottom 24 points of the touch shape.
-    private func handle(_ frame: CGRect) -> some View {
-        Button(action: onLookBack) {
-            Text(label)
-                .font(DailyPalette.sansMedium(12))
-                .foregroundStyle(DailyPalette.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: frame.width, height: 24)
-                .frame(width: frame.width, height: frame.height, alignment: .bottom)
-                .contentShape(Rectangle())
+    /// The words sit at +16…+40 on the sheet, the bottom 24 points of the touch shape. Lowered,
+    /// they are only words: the strip over the whole sheet takes the touch.
+    @ViewBuilder private func handle(_ frame: CGRect) -> some View {
+        let words = Text(label)
+            .font(DailyPalette.sansMedium(12))
+            .foregroundStyle(DailyPalette.muted)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(width: frame.width, height: DailyMetrics.handleWords)
+            .frame(width: frame.width, height: frame.height, alignment: .bottom)
+        if strip == nil {
+            Button(action: onLookBack) { words.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .offset(x: frame.minX, y: frame.minY)
+                .accessibilityIdentifier("daily.lookBack")
+        } else {
+            words
+                .offset(x: frame.minX, y: frame.minY)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
-        .buttonStyle(.plain)
-        .offset(x: frame.minX, y: frame.minY)
-        .accessibilityIdentifier("daily.lookBack")
+    }
+
+    /// The lowered sheet as one control: a tap, or a drag up, raises it.
+    private func raiser(_ frame: CGRect) -> some View {
+        Color.clear
+            .frame(width: frame.width, height: frame.height)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onEnded { value in
+                if DailyLookBack.stripRaises(translation: value.translation) { onLookBack() }
+            })
+            .offset(x: frame.minX, y: frame.minY)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onLookBack() }
+            .accessibilityIdentifier("daily.lookBack")
     }
 }
 

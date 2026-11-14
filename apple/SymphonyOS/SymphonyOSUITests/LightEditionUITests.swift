@@ -73,8 +73,10 @@ final class LightEditionUITests: XCTestCase {
         return (app, sign)
     }
 
-    /// "Walk it down" on a Year flag opens the walk on Season, asking about that flag, with no
-    /// lesson; Leave for now closes it and Year is there again, with no walk left waiting.
+    /// "Walk it down" on a Year flag opens the walk on Season, asking about that flag; Leave for
+    /// now closes it and Year is there again, with no walk left waiting. (That it teaches nothing
+    /// is `DailyWalkDownTests`': the lesson line has no identifier, and this target cannot read
+    /// `WalkCopy`, so a check here would spell its words out.)
     @MainActor func testWalkItDownOpensSeasonAndComesBackToYear() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
@@ -91,7 +93,6 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(orb.waitForExistence(timeout: 30), "the walk did not open")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
             .waitForExistence(timeout: 15), "not the Season question about the flag")
-        XCTAssertFalse(app.staticTexts["Press and hold the light, and say it out loud."].exists, "taught again")
 
         orb.tap()
         let leave = app.buttons["Leave for now"]
@@ -101,26 +102,40 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(year.waitForExistence(timeout: 15), "Year is not there again")
         any["daily.nav.today"].tap()
         XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 15), "Today did not open")
-        XCTAssertFalse(app.buttons["Your walk is waiting. Pick it back up."].waitForExistence(timeout: 3),
+        XCTAssertFalse(any["daily.walkWaiting"].waitForExistence(timeout: 3),
                        "the walk-down was stored as a waiting walk")
     }
 
-    /// The handle on Today's sheet lowers it over the whole plan, with no bar, and raises it again.
+    /// The handle on Today's sheet lowers it over the whole plan, with no bar; a tap anywhere on
+    /// the lowered sheet raises it, and so does a drag up on it.
     @MainActor func testTheHandleShowsTheWholePlanAndComesBack() throws {
         let app = launch(light: true)
         let any = app.descendants(matching: .any)
         let handle = any["daily.lookBack"]
+        let field = any["daily.bar.field"]
         XCTAssertTrue(handle.waitForExistence(timeout: 15), "no handle")
-        XCTAssertEqual(handle.label, "See my whole plan")
+        let raisedLabel = handle.label
         handle.tap()
-        XCTAssertTrue(app.buttons["Show my day"].waitForExistence(timeout: 15), "the sheet did not lower")
-        XCTAssertFalse(any["daily.bar.field"].exists, "the bar is still up over the plan")
+        XCTAssertTrue(field.waitForNonExistence(timeout: 15), "the bar is still up over the plan")
+        let strip = any["daily.lookBack"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 15), "no way back")
+        XCTAssertNotEqual(strip.label, raisedLabel, "the lowered sheet does not say what raising it shows")
+        XCTAssertGreaterThanOrEqual(strip.frame.height, 44)
         attach(app, "whole plan")
-        app.buttons["Show my day"].tap()
-        XCTAssertTrue(app.buttons["See my whole plan"].waitForExistence(timeout: 15), "the sheet did not rise")
-        XCTAssertTrue(any["daily.bar.field"].waitForExistence(timeout: 15), "the bar did not come back")
+
+        // A tap away from the handle's words, low on the strip, raises it.
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.8)).tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "a tap on the lowered sheet did not raise it")
+        XCTAssertEqual(any["daily.lookBack"].label, raisedLabel)
         XCTAssertFalse(app.buttons["walk.orb"].exists, "a walk opened")
         attach(app, "Today again")
+
+        // Lowered again, a drag up raises it too.
+        any["daily.lookBack"].tap()
+        XCTAssertTrue(field.waitForNonExistence(timeout: 15), "the sheet did not lower again")
+        let start = any["daily.lookBack"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -160)))
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "a drag up on the lowered sheet did not raise it")
     }
 
     /// The "No piece this <season> yet" sign walks its goal down; left for now, the walk closes
@@ -141,11 +156,13 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
             .waitForExistence(timeout: 15), "not the Season question about the goal")
         orb.tap()
-        app.buttons["Leave for now"].tap()
+        let leave = app.buttons["Leave for now"]
+        XCTAssertTrue(leave.waitForExistence(timeout: 15), "no Leave for now")
+        leave.tap()
         XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not close it")
         XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 15), "not back on Today")
         XCTAssertFalse(sign.waitForExistence(timeout: 3), "the followed sign was not put away")
-        XCTAssertFalse(app.buttons["Your walk is waiting. Pick it back up."].exists, "the walk-down was stored")
+        XCTAssertFalse(any["daily.walkWaiting"].exists, "the walk-down was stored")
         attach(app, "Today after the walk-down")
     }
 

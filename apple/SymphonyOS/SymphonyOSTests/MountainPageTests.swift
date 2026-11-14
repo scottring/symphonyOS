@@ -667,7 +667,7 @@ struct MountainPageTests {
         }
         func down(_ target: Signpost.Target, _ goals: [Goal], _ tasks: [SymphonyTask]) -> DailyWalkDown? {
             DailyWalkDown.sign(target, goals: goals, tasks: tasks, areaRows: [], saved: nil, periods: periods,
-                               now: today, date: today, seasons: nil, me: me)
+                               now: today, seasons: nil, me: me)
         }
 
         // No piece this fall: a year goal with nothing under it opens Season, about it.
@@ -682,6 +682,13 @@ struct MountainPageTests {
         #expect(fromYear.position.status == .inProgress)
         #expect(fromYear.userId == me)
         #expect(fromYear.returnsTo.horizon == .today && PlanCalendar.sameDay(fromYear.returnsTo.date, today))
+        // Asking for it lets the bar go at once (fix round 1).
+        #expect(fromYear.bar == [.left])
+        // Asked at a moment of the day, it returns to that day, whatever date the app was pointed at.
+        let atTea = try #require(DailyWalkDown.sign(noPiece.target, goals: [lone], tasks: [], areaRows: [], saved: nil,
+                                                    periods: periods, now: today.addingTimeInterval(17 * 3600),
+                                                    seasons: nil, me: me))
+        #expect(atTea.returnsTo.date == today)
 
         // A new week: a month goal of the walk's month and nothing on this week opens Week, about it.
         let piece = row("Strength twice a week", .season, start: periods.season.start, in: "Health", goal: lone.id)
@@ -750,13 +757,32 @@ struct MountainPageTests {
         let strong = goal("Feel strong again", year: periods.year, in: "Health")
         let down = try #require(DailyWalkDown.sign(.walkDown(strong.id, .year), goals: [strong], tasks: [],
                                                    areaRows: [], saved: nil, periods: periods, now: today,
-                                                   date: today, seasons: nil, me: me))
+                                                   seasons: nil, me: me))
         #expect(DailyWalkDown.decide(nil, walkUp: false, userId: me, edition: .light) == .none)
         #expect(DailyWalkDown.decide(down, walkUp: false, userId: me, edition: .light) == .open(down))
         #expect(DailyWalkDown.decide(down, walkUp: true, userId: me, edition: .light) == .drop)
         #expect(DailyWalkDown.decide(down, walkUp: false, userId: me, edition: .full) == .drop)
         #expect(DailyWalkDown.decide(down, walkUp: false, userId: UUID(), edition: .light) == .drop)
         #expect(DailyWalkDown.decide(down, walkUp: false, userId: nil, edition: .light) == .drop)
+    }
+
+    /// A followed sign is put away for the day (ruling 22), except one that walks a goal down
+    /// whose walk-down could not be built: it took the person nowhere, so it stays.
+    @Test func aWalkingSignIsPutAwayOnlyWhenItsWalkOpens() throws {
+        let today = day(2026, 11, 10)
+        let periods = WalkPeriods.pick(now: today)
+        let strong = goal("Feel strong again", year: periods.year, in: "Health")
+        let walking = Signpost.Sign(kind: .noPiece, eyebrow: nil, title: strong.name, target: .walkDown(strong.id, .year),
+                                    seed: "noPiece")
+        let down = try #require(DailyWalkDown.sign(walking.target, goals: [strong], tasks: [], areaRows: [], saved: nil,
+                                                   periods: periods, now: today, seasons: nil, me: me))
+        #expect(DailyWalkDown.putsAway(walking, walkDown: down))
+        #expect(!DailyWalkDown.putsAway(walking, walkDown: nil))
+        let week = Signpost.Sign(kind: .todayOpen, eyebrow: nil, title: "Call the plumber", target: .week(today), seed: "w")
+        #expect(DailyWalkDown.putsAway(week, walkDown: nil))
+        let first = Signpost.Sign(kind: .firstToday, eyebrow: nil, title: "Call the plumber", target: .light(UUID()),
+                                  seed: "f")
+        #expect(!DailyWalkDown.putsAway(first, walkDown: nil))
     }
 
     // MARK: See my whole plan
@@ -779,7 +805,8 @@ struct MountainPageTests {
         #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
         #expect(look.handleTapped(areas: ridge, kept: [area("People").id]) == [.left])   // the bar stops listening
         #expect(look.lowered)
-        #expect(look.label(on: .today) == WalkCopy.showMyDay)
+        #expect(look.label(on: .today) == DailyCopy.showMyDay)
+        #expect(DailyCopy.showMyDay == WalkCopy.showMyDay)
         #expect(look.label(on: .week) == DailyCopy.showMyWeek)
 
         let plan = look.plan(goals: [strong], tasks: tasks, periods: periods, me: me)
@@ -814,8 +841,47 @@ struct MountainPageTests {
         _ = short.handleTapped(areas: ridge, kept: [])
         let tall = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
         let outside = DailyMetrics.today(size: CGSize(width: 466, height: 678), safeTop: 22, safeBottom: 0, shape: .short)
-        #expect(short.sheet(on: tall) == tall.lowered)
-        #expect(short.sheet(on: outside) == nil)
-        #expect(DailyLookBack().sheet(on: tall) == nil)
+        #expect(short.sheet(on: tall, safeBottom: 34) == tall.lowered(safeBottom: 34))
+        #expect(short.sheet(on: outside, safeBottom: 0) == nil)
+        #expect(DailyLookBack().sheet(on: tall, safeBottom: 34) == nil)
+    }
+
+    /// A Tell (the Lock Screen control, `symphony://tell`) while the plan shows raises the sheet
+    /// first, so the bar that answers it is on screen; while the walk shows it waits.
+    @Test func aTellRaisesTheSheetSoTheBarIsThere() {
+        var look = DailyLookBack()
+        let upAlready = look.tellArrives(asked: true, walkShowing: false)
+        #expect(!upAlready)                                              // already up: nothing to do
+        _ = look.handleTapped(areas: ridge, kept: [])
+        let notAsked = look.tellArrives(asked: false, walkShowing: false)
+        #expect(!notAsked)
+        #expect(look.lowered)
+        let waits = look.tellArrives(asked: true, walkShowing: true)
+        #expect(!waits)                                                  // the Tell waits for the walk
+        #expect(look.lowered)
+        let raised = look.tellArrives(asked: true, walkShowing: false)
+        #expect(raised)
+        #expect(!look.lowered)
+        #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
+        let tall = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
+        #expect(look.sheet(on: tall, safeBottom: 34) == nil)              // the bar is drawn again
+    }
+
+    /// The way back from the plan: a tap anywhere on the lowered strip, or a drag mostly up of
+    /// 30 points or more, raises the sheet; a sideways or downward drag, or a short one, does not.
+    @Test func aTapOrADragUpRaisesTheLoweredSheet() {
+        #expect(DailyLookBack.stripRaises(translation: .zero))
+        #expect(DailyLookBack.stripRaises(translation: CGSize(width: 4, height: -6)))           // a tap that wobbled
+        #expect(DailyLookBack.stripRaises(translation: CGSize(width: 0, height: -30)))
+        #expect(DailyLookBack.stripRaises(translation: CGSize(width: 20, height: -120)))
+        #expect(!DailyLookBack.stripRaises(translation: CGSize(width: 0, height: -20)))         // too short to be a raise
+        #expect(!DailyLookBack.stripRaises(translation: CGSize(width: 0, height: 80)))          // down
+        #expect(!DailyLookBack.stripRaises(translation: CGSize(width: 90, height: -40)))        // sideways
+        #expect(!DailyLookBack.stripRaises(translation: .zero, endedAsDrag: true))
+
+        var look = DailyLookBack()
+        _ = look.handleTapped(areas: ridge, kept: [])
+        look.raise()
+        #expect(!look.lowered)
     }
 }

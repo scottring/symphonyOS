@@ -22,6 +22,8 @@ enum DailyCopy {
     // MARK: Today and Week
 
     static let today = "Today", showMyWeek = "Show my week", next = "Next", open = "open"
+    /// What the lowered sheet raises to on Today: the walk's own words for it.
+    static var showMyDay: String { WalkCopy.showMyDay }
     /// The line at the top of Today while a walk left with Leave for now waits; a tap resumes it.
     static let walkWaiting = "Your walk is waiting. Pick it back up."
     /// The line at the top of Today after Not now at Welcome, while there are no goals; a tap starts the walk.

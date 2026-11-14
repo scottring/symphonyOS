@@ -15,15 +15,49 @@ struct DailyLookBack: Equatable {
     private(set) var areas: [WalkArea] = []
     private(set) var kept: [UUID] = []
 
-    /// The handle: lowers the sheet over the plan, or raises it. Lowering lets the bar go, as a
-    /// page going away does (`.left`: it stops listening), since the bar is not drawn there.
+    /// The handle: lowers the sheet over the plan, or, lowered, raises it (a tap anywhere on the
+    /// lowered strip is this too). Lowering lets the bar go, as a page going away does (`.left`:
+    /// it stops listening), since the bar is not drawn there.
     mutating func handleTapped(areas: [WalkArea], kept: [UUID]) -> [DailyBar.Event] {
-        lowered.toggle()
+        guard !lowered else {
+            raise()
+            return []
+        }
+        lowered = true
         expanded = nil
-        self.areas = lowered ? areas : []
-        self.kept = lowered ? kept : []
-        return lowered ? [.left] : []
+        self.areas = areas
+        self.kept = kept
+        return [.left]
     }
+
+    /// Back to the day: the sheet up, nothing open.
+    mutating func raise() {
+        lowered = false
+        expanded = nil
+        areas = []
+        kept = []
+    }
+
+    /// A Tell asked for from outside (`DailyGate.tell`) while the plan shows: the sheet rises
+    /// first, so the bar that answers it, its light and its listening line, are on screen. While
+    /// the walk shows the Tell waits, and so does this. True when it raised the sheet.
+    @discardableResult
+    mutating func tellArrives(asked: Bool, walkShowing: Bool) -> Bool {
+        guard asked, !walkShowing, lowered else { return false }
+        raise()
+        return true
+    }
+
+    /// What a touch on the lowered strip does, decided when the finger lifts: a tap raises the
+    /// sheet, and so does a drag mostly upward of `raiseDrag` points or more; any other drag
+    /// does nothing. A touch is a drag once it moves `DailyTodayPage.dragStarts`, as on the sign.
+    static func stripRaises(translation: CGSize, endedAsDrag: Bool = false) -> Bool {
+        guard endedAsDrag || DailyTodayPage.isDrag(translation) else { return true }
+        return -translation.height >= raiseDrag && abs(translation.height) > abs(translation.width)
+    }
+
+    /// A drag up of this many points on the lowered strip raises the sheet.
+    static let raiseDrag: CGFloat = 30
 
     /// A tap the walk's layout reads on the plan (`WalkLayout.tapEvent`): only "+n" does
     /// anything, and only while the plan shows; a second tap closes that post again.
@@ -36,13 +70,13 @@ struct DailyLookBack: Equatable {
     /// what raising it shows ("Show my day" on Today, "Show my week" on Week).
     func label(on horizon: Horizon) -> String {
         guard lowered else { return WalkCopy.lookBackHandle }
-        return horizon == .week ? DailyCopy.showMyWeek : WalkCopy.showMyDay
+        return horizon == .week ? DailyCopy.showMyWeek : DailyCopy.showMyDay
     }
 
     /// The lowered sheet's numbers on this window: nil while it is up, and on a window with no
     /// handle (short windows), where nothing lowers. While nil the page is as it always is.
-    func sheet(on metrics: DailyMetrics) -> DailyMetrics.Lowered? {
-        lowered ? metrics.lowered : nil
+    func sheet(on metrics: DailyMetrics, safeBottom: CGFloat) -> DailyMetrics.Lowered? {
+        lowered ? metrics.lowered(safeBottom: safeBottom) : nil
     }
 
     /// The plan behind the lowered sheet: the walk's step 6 over every flag of the walk's own

@@ -163,6 +163,14 @@ import Observation
         endUndo()
     }
 
+    /// The walk shows over the page (`AppState.walkShowing`; the page does not go away under
+    /// it): the bar lets go (`.left`), so it never listens under the walk and nothing it heard
+    /// is added. The words stay in the field. It closing changes nothing.
+    func walkShowingChanged(_ showing: Bool) {
+        guard showing else { return }
+        send(.left)
+    }
+
     /// The model taken down: a pending pull-up is written, listening stops, nothing waiting runs.
     func close() {
         commitPullUp()

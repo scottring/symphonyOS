@@ -293,23 +293,36 @@ struct DailyMetrics: Equatable {
         let sheetTop: CGFloat
         /// The grabber on the lowered top, centred on the window as `grabber` is.
         let grabber: CGRect
+        /// The handle's frame; its words stand in its bottom `handleWords` points.
         let lookBack: CGRect
         let header: CGRect
+        /// The whole lowered sheet down to the safe area's foot: one touch that raises it.
+        let strip: CGRect
     }
 
     /// The lowered sheet's top stands this far above the window's foot (the walk's own peek, 716 of 844).
     static let lookBackPeek: CGFloat = 128
+    /// The handle's words: the bottom 24 points of its frame.
+    static let handleWords: CGFloat = 24
 
     /// Today's or Week's sheet lowered: its top `lookBackPeek` above the window's foot, the
-    /// handle and the header where they stand on the sheet, with no waiting line between them.
-    /// Nil where the window has no handle (short windows).
-    var lowered: Lowered? {
+    /// handle and the header where they stand on the sheet, with no waiting line between them,
+    /// except that nothing readable or tappable goes below the safe area's foot: the header
+    /// rises to stand on it, and the handle's words stay above the header. Nil where the
+    /// window has no handle (short windows).
+    func lowered(safeBottom: CGFloat) -> Lowered? {
         guard let lookBack else { return nil }
         let top = size.height - Self.lookBackPeek
+        let foot = size.height - safeBottom
         let headerAt = header.minY - sheetTop - (waiting == nil ? 0 : Self.minTouch)
-        return Lowered(sheetTop: top, grabber: grabber.offsetBy(dx: 0, dy: top - sheetTop),
-                       lookBack: lookBack.offsetBy(dx: 0, dy: top - sheetTop),
-                       header: header.offsetBy(dx: 0, dy: top + headerAt - header.minY))
+        let headerY = min(top + headerAt, foot - header.height)
+        let handleFoot = min(lookBack.maxY + top - sheetTop, headerY)
+        return Lowered(sheetTop: top,
+                       grabber: grabber.offsetBy(dx: 0, dy: top - sheetTop),
+                       lookBack: CGRect(x: lookBack.minX, y: handleFoot - lookBack.height,
+                                        width: lookBack.width, height: lookBack.height),
+                       header: CGRect(x: header.minX, y: headerY, width: header.width, height: header.height),
+                       strip: CGRect(x: 0, y: top, width: size.width, height: max(0, foot - top)))
     }
 
     // MARK: Touch
