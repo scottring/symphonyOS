@@ -479,6 +479,25 @@ struct DailyWriterTests {
         #expect(pending(ctx).isEmpty)
     }
 
+    @Test func canPullUpOnlyWhatIsMineOnItsLevel() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let mine = w.add(.task(title: "Call the vet", day: periods.today, at: nil, here: true))
+        let g = w.add(.goal(title: "Run a marathon", level: .year), kept: [health], focusArea: health.id)
+        let theirs = SymphonyTask(userId: other, title: "Their errand", scheduledFor: periods.today, context: "personal")
+        let ours = SymphonyTask(userId: me, title: "Our errand", scheduledFor: periods.today, context: "family")
+        ctx.insert(theirs)
+        ctx.insert(ours)
+        try ctx.save()
+        #expect(w.canPullUp(mine.id, level: .week))
+        #expect(w.canPullUp(g.id, level: .year))
+        #expect(!w.canPullUp(mine.id, level: .year))
+        #expect(!w.canPullUp(g.id, level: .week))
+        #expect(!w.canPullUp(theirs.id, level: .week))
+        #expect(!w.canPullUp(ours.id, level: .week))
+        #expect(!w.canPullUp(UUID(), level: .week))
+    }
+
     @Test func nothingTheWalkNeverSends() throws {
         let ctx = try walkTestContext()
         let w = writer(ctx)

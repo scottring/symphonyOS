@@ -45,6 +45,8 @@ import Observation
     /// Counts the taps that asked to listen; each session's callbacks carry their tap's number.
     @ObservationIgnored private var tapCount = 0
     @ObservationIgnored private var session: Session = .none
+    /// For tests: called as a pending pull-up is written, with the periods of the writer that wrote it.
+    @ObservationIgnored var onPullUpWritten: ((UUID, WalkPeriods) -> Void)?
 
     private enum Change {
         case added(DailyWriter.Added)
@@ -84,8 +86,10 @@ import Observation
         self.writer = DailyWriter(context: context, userId: userId, periods: periods)
     }
 
+    /// Torn down with a pull-up pending: it is written, straight through the writer
+    /// (no observed state is touched on the way out).
     isolated deinit {
-        commitPullUp()
+        if case .pulledUp(let id, let level) = last { writer.pullUp(id, level: level) }
     }
 
     /// The bar's listener: on the phone only (where it cannot recognise on its own,
@@ -130,8 +134,10 @@ import Observation
 
     // MARK: Rows
 
-    /// Ticks a row off, or back on. Any tick puts the lit row out.
+    /// Ticks a row off, or back on. Any tick puts the lit row out, and ends the Undo
+    /// before it: the change it offered is no longer the last thing.
     func toggle(_ row: DailyDay.Row) {
+        endUndo()
         writer.setDone(row, !row.done, today: today)
         lit = nil
     }
@@ -144,7 +150,8 @@ import Observation
 
     /// Hidden at once and written only when its Undo can no longer be used.
     func pullUp(_ id: UUID, level: WalkLevel) {
-        guard pulledUp != id else { return }
+        // A row the writer would refuse is never hidden: hidden, it would come back with no word.
+        guard pulledUp != id, writer.canPullUp(id, level: level) else { return }
         offerUndo(.pulledUp(id, level), note: nil)
         pulledUp = id
         if lit == id { lit = nil }
@@ -158,15 +165,15 @@ import Observation
         guard old == nil || back != nil else {
             // An area with no name to make it again cannot be put back: this change has no
             // Undo, and the one before it is no longer the last thing.
-            commitPullUp()
-            last = nil
-            forgetUndo()
+            endUndo()
             return
         }
         offerUndo(.area(id, level, back: back), note: nil)
     }
 
+    /// Moves the first-thing mark. Not undone by Undo, so it ends the Undo before it.
     func setFirst(_ id: UUID?, previous: UUID?) {
+        endUndo()
         writer.setFirst(id, previous: previous)
     }
 
@@ -260,7 +267,16 @@ import Observation
         last = nil
         pulledUp = nil
         writer.pullUp(id, level: level)
+        onPullUpWritten?(id, writer.periods)
         return true
+    }
+
+    /// A change Undo cannot take back: the one before it is no longer the last thing,
+    /// so a pending pull-up is written and the Undo goes.
+    private func endUndo() {
+        commitPullUp()
+        last = nil
+        forgetUndo()
     }
 
     /// The Undo pill goes, with nothing left for it to take back.

@@ -313,8 +313,34 @@ struct DailyModelTests {
         // Undo after the window does nothing; a second pull-up of the same row writes nothing more.
         m.send(.undoTapped)
         #expect(task(ctx, titled: "Call the plumber") == nil)
+        m.pullUp(t.id, level: .week)
+        #expect(m.pulledUp == nil)
+        #expect(!m.bar.undoShowing)
         scheduler.advance(WalkState.undoMs)
         #expect(deletes(ctx, t.id) == 1)
+    }
+
+    @Test func aPullUpTheWriterWouldRefuseNeverHidesTheRow() throws {
+        let ctx = try walkTestContext()
+        let theirs = SymphonyTask(userId: UUID(), title: "Their errand", scheduledFor: today, context: "personal")
+        let family = SymphonyTask(userId: me, title: "Our errand", scheduledFor: today, context: "family")
+        ctx.insert(theirs)
+        ctx.insert(family)
+        try ctx.save()
+        let m = model(ctx)
+        for t in [theirs, family] {
+            m.pullUp(t.id, level: .week)
+            #expect(m.pulledUp == nil)
+            #expect(!m.bar.undoShowing)
+        }
+        // On the wrong level, too.
+        let mine = try seededTask(ctx)
+        m.pullUp(mine.id, level: .year)
+        #expect(m.pulledUp == nil)
+        #expect(!m.bar.undoShowing)
+        scheduler.advance(WalkState.undoMs)
+        #expect(pending(ctx).isEmpty)
+        #expect(tasks(ctx).count == 3)
     }
 
     @Test func anotherChangeWritesThePullUpItReplaces() throws {
@@ -368,13 +394,113 @@ struct DailyModelTests {
         let ctx = try walkTestContext()
         let t = try seededTask(ctx)
         let m = model(ctx)
+        var writtenBy: [WalkPeriods] = []
+        m.onPullUpWritten = { _, periods in writtenBy.append(periods) }
+        let yesterday = m.periods
         m.pullUp(t.id, level: .week)
         clock.now = day(2026, 11, 11, 8)
         m.refreshDay()
+        #expect(writtenBy == [yesterday])               // by the writer of the day it was pulled up on
+        #expect(m.periods != yesterday)
         #expect(deletes(ctx, t.id) == 1)
         #expect(task(ctx, titled: "Call the plumber") == nil)
         #expect(m.pulledUp == nil)
         #expect(!m.bar.undoShowing)
+    }
+
+    @Test func droppingTheModelWritesThePullUp() throws {
+        let ctx = try walkTestContext()
+        let t = try seededTask(ctx)
+        do {
+            let m = model(ctx)
+            m.pullUp(t.id, level: .week)
+            #expect(deletes(ctx, t.id) == 0)
+        }
+        #expect(deletes(ctx, t.id) == 1)
+        #expect(task(ctx, titled: "Call the plumber") == nil)
+    }
+
+    // MARK: A tick or a first thing ends the Undo before it
+
+    @Test func aTickEndsTheUndoBeforeIt() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Took my pills")
+        let t = try #require(task(ctx, titled: "Took my pills"))
+        #expect(m.bar.undoShowing)
+        m.toggle(row(t))
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        let kept = try #require(task(ctx, titled: "Took my pills"))
+        #expect(kept.completed)
+    }
+
+    @Test func aTickWritesAPendingPullUpOnce() throws {
+        let ctx = try walkTestContext()
+        let gone = try seededTask(ctx, "Call the plumber")
+        let other = try seededTask(ctx, "Water the plants")
+        let m = model(ctx)
+        m.pullUp(gone.id, level: .week)
+        m.toggle(row(other))
+        #expect(deletes(ctx, gone.id) == 1)
+        #expect(m.pulledUp == nil)
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        scheduler.advance(WalkState.undoMs)
+        #expect(deletes(ctx, gone.id) == 1)
+        #expect(task(ctx, titled: "Water the plants")?.completed == true)
+    }
+
+    @Test func aFirstThingEndsTheUndoBeforeIt() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Took my pills")
+        let t = try #require(task(ctx, titled: "Took my pills"))
+        m.setFirst(t.id, previous: nil)
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        #expect(task(ctx, titled: "Took my pills") != nil)
+        let focus = (try? ctx.fetch(FetchDescriptor<TaskFocus>())) ?? []
+        #expect(focus.map(\.taskId) == [t.id])
+    }
+
+    @Test func aFirstThingWritesAPendingPullUpOnce() throws {
+        let ctx = try walkTestContext()
+        let gone = try seededTask(ctx, "Call the plumber")
+        let other = try seededTask(ctx, "Water the plants")
+        let m = model(ctx)
+        m.pullUp(gone.id, level: .week)
+        m.setFirst(other.id, previous: nil)
+        #expect(deletes(ctx, gone.id) == 1)
+        #expect(m.pulledUp == nil)
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        scheduler.advance(WalkState.undoMs)
+        #expect(deletes(ctx, gone.id) == 1)
+    }
+
+    // MARK: Leaving stops the listener
+
+    @Test func leavingStopsTheListener() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        m.send(.left)
+        #expect(listener.stops == 1)
+        #expect(m.bar.mic == .idle)
+    }
+
+    @Test func leavingWhileThePromptsAreUpStopsTheListener() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        listener.whileStarting = { [weak m] in m?.send(.left) }
+        m.send(.micTapped)
+        await scheduler.settle()
+        #expect(listener.stops == 1)
+        #expect(m.bar.mic == .idle)
+        listener.hear("Too late")                      // nothing from that session reaches the bar
+        #expect(m.bar.draft == "")
     }
 
     // MARK: Speech stays on the phone

@@ -120,6 +120,11 @@ import SwiftData
         walk.remove(id, level: level)
     }
 
+    /// Whether `pullUp` would take this row: it exists on the level named and is mine.
+    func canPullUp(_ id: UUID, level: WalkLevel) -> Bool {
+        level == .year ? myGoal(id) != nil : myTask(id) != nil
+    }
+
     /// Undo of a pull-up: the row comes back with its id and its links, but only with
     /// what the walk's writer remembers (the walk's own short field list). Right for a
     /// row the walk planted; an ordinary task would come back without its links, phone
