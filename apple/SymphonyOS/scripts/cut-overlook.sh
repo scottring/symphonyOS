@@ -74,7 +74,7 @@ imageset WalkOverlookTall "$work/WalkOverlookTall.png"
 cut OverlookToday            0       0.620   1       0.046  0      0.908  1       1456
 cut OverlookTodayWide        0       0.7167  0.85    0.046  0      0.908  0.718   2071
 cut OverlookTodayShort       0       0.683   0.95    0.034  0.068  0.932  0.932   1500
-cut OverlookWeek             0.2     0.498   0.8     0.214  0.471  0.558  0.374   2317
+cut OverlookWeek             0.2     0.498   0.8     0.214  0.471  0.558  0.389   2317
 cut OverlookWeekWide         0.2     0.5243  0.8     0.214  0.471  0.558  0.225   2317
 cut OverlookHalfOpenLaptop   0       0.220   1       0.152  0.133  0.696  0.496   2700
 cut OverlookHalfOpenBook     0       0.215   1       0.33   0.15   0.446  0.729   2896

@@ -66,7 +66,7 @@ extension WalkArt {
             case .todayTall: CGRect(x: 0.046, y: 0, width: 0.908, height: 1)
             case .todayWide: CGRect(x: 0.046, y: 0, width: 0.908, height: 0.718)
             case .todayShort: CGRect(x: 0.034, y: 0.068, width: 0.932, height: 0.932)
-            case .week: CGRect(x: 0.214, y: 0.471, width: 0.558, height: 0.374)
+            case .week: CGRect(x: 0.214, y: 0.471, width: 0.558, height: 0.389)
             case .weekWide: CGRect(x: 0.214, y: 0.471, width: 0.558, height: 0.225)
             case .halfOpenLaptop: CGRect(x: 0.152, y: 0.133, width: 0.696, height: 0.496)
             case .halfOpenBook: CGRect(x: 0.33, y: 0.15, width: 0.446, height: 0.729)

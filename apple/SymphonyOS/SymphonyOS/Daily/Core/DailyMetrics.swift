@@ -110,7 +110,7 @@ struct DailyMetrics: Equatable {
     /// The rows' left and right inset.
     let inset: CGFloat
     /// The shape the board was stretched from.
-    var shape: Shape = .tall
+    let shape: Shape
 
     // MARK: Fixed numbers
 

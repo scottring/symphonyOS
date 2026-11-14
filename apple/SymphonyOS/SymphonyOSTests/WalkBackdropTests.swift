@@ -79,40 +79,82 @@ struct WalkBackdropTests {
     }
 
     /// Zoomed into a column, the picture zooms by the layout's ratio about the same stage point: a
-    /// stage point that showed a spot of the painting before shows it where the layout moves it.
+    /// stage point that showed a spot of the painting before shows it where the layout moves it
+    /// (wherever the picture did not have to be held inside the painting). Zoomed into the outer
+    /// columns too, where holding it shifts the flags against the painting, the column's own post
+    /// still stands on its level's open ground and land (up to four areas, as unzoomed).
     @Test func aZoomMovesThePictureAsItMovesTheFlags() {
+        var anchored = 0, outer = 0
         for step in 1...5 {
+            let level = WalkLevel(rawValue: step)!
             for count in 1...WalkLoad.maxAreas {
-                var s = WalkState()
-                s.areas = ridge(count)
-                s.kept = s.areas.map(\.id)
-                s.step = step
-                let column = s.areas[count / 2].id
-                if step == 1 {
-                    s.focusArea = column
-                } else {
-                    let parent = WalkItem(id: UUID(), level: WalkLevel(rawValue: step - 1)!, title: "Parent", areaId: column)
-                    s.items = [parent]
-                    s.focus[WalkLevel(rawValue: step)!] = parent.id
-                }
-                let zoom = WalkLayout.make(s, today: Self.today, art: art, footing: .level).camera
-                #expect(zoom.k == WalkLayout.zoomK)
-                let stop = art.stops[step], before = art.backdropCamera(step: step, layout: stop)!
-                let after = art.backdropCamera(step: step, layout: zoom)!
-                #expect(abs(after.k / before.k - zoom.k / stop.k) < 0.0001)
-                // The column's foot, on the stage before and after the zoom, shows one spot of the painting
-                // (unless holding the picture on the painting moved it).
-                let world = CGPoint(x: zoom.x + WalkLayout.centreX / zoom.k, y: art.bandY(WalkLevel(rawValue: step)!))
-                let a = CGPoint(x: (world.x - stop.x) * stop.k, y: (world.y - stop.y) * stop.k)
-                let b = CGPoint(x: (world.x - zoom.x) * zoom.k, y: (world.y - zoom.y) * zoom.k)
-                let unheld = WalkLayout.Camera(x: before.x - (stop.x - zoom.x) * zoom.k / after.k,
-                                               y: before.y - (stop.y - zoom.y) * zoom.k / after.k, k: after.k)
-                if unheld == after {
-                    let p = onPainting(a, before), q = onPainting(b, after)
-                    #expect(abs(p.x - q.x) < 0.0001 && abs(p.y - q.y) < 0.0001, "step \(step), \(count) areas")
+                for index in Set([0, count / 2, count - 1]).sorted() {
+                    var s = WalkState()
+                    s.areas = ridge(count)
+                    s.kept = s.areas.map(\.id)
+                    s.step = step
+                    let column = s.areas[index].id
+                    if step == 1 {
+                        s.focusArea = column
+                        s.items = [WalkItem(id: UUID(), level: .year, title: "Own", areaId: column)]
+                    } else {
+                        let parent = WalkItem(id: UUID(), level: WalkLevel(rawValue: step - 1)!, title: "Parent", areaId: column)
+                        s.items = [parent]
+                        if level == .today {
+                            s.firstThing = parent.id
+                        } else {
+                            s.items.append(WalkItem(id: UUID(), level: level, title: "Own", areaId: column, parentId: parent.id))
+                        }
+                        s.focus[level] = parent.id
+                    }
+                    let layout = WalkLayout.make(s, today: Self.today, art: art, footing: .level)
+                    let zoom = layout.camera
+                    #expect(zoom.k == WalkLayout.zoomK, "step \(step), \(count) areas, column \(index)")
+                    let stop = art.stops[step], before = art.backdropCamera(step: step, layout: stop)!
+                    let after = art.backdropCamera(step: step, layout: zoom)!
+                    #expect(abs(after.k / before.k - zoom.k / stop.k) < 0.0001)
+                    let world = CGPoint(x: zoom.x + WalkLayout.centreX / zoom.k, y: art.bandY(level))
+                    let a = CGPoint(x: (world.x - stop.x) * stop.k, y: (world.y - stop.y) * stop.k)
+                    let b = CGPoint(x: (world.x - zoom.x) * zoom.k, y: (world.y - zoom.y) * zoom.k)
+                    let unheld = WalkLayout.Camera(x: before.x - (stop.x - zoom.x) * zoom.k / after.k,
+                                                   y: before.y - (stop.y - zoom.y) * zoom.k / after.k, k: after.k)
+                    if unheld == after {
+                        anchored += 1
+                        let p = onPainting(a, before), q = onPainting(b, after)
+                        #expect(abs(p.x - q.x) < 0.0001 && abs(p.y - q.y) < 0.0001, "step \(step), \(count) areas")
+                    }
+                    if count <= 4, index == 0 || index == count - 1 {
+                        guard let post = layout.posts.first(where: { $0.key == WalkPostKey(level: level, column: column) }) else {
+                            Issue.record("step \(step), \(count) areas: the zoomed column has no post")
+                            continue
+                        }
+                        outer += 1
+                        let foot = onPainting(post.base, after)
+                        #expect(backdrop.open[level]!.contains(foot.x) && backdrop.land[level]!.contains(foot.y),
+                                "step \(step), \(count) areas, column \(index) zoomed: its foot at \(foot)")
+                    }
                 }
             }
         }
+        #expect(anchored > 0, "the anchor was never checked")
+        #expect(outer > 0, "no outer column was checked")
+    }
+
+    /// Planted by hand (`.natural`: up to `WalkFooting.ground` off the band), every post of the
+    /// step's own level still stands on its level's land on the painting, on every generated
+    /// state of Year to Today, zoomed or not.
+    @Test func handPlantedFeetStayOnTheirLand() {
+        var checked = 0
+        for (s, layout) in zip(Generated.all, Generated.naturalLayouts) where (1...5).contains(s.step) {
+            let level = WalkLevel(rawValue: s.step)!
+            let picture = art.backdropCamera(step: s.step, layout: layout.camera)!
+            for post in layout.posts where post.key.level == level {
+                checked += 1
+                let y = onPainting(post.base, picture).y
+                #expect(backdrop.land[level]!.contains(y), "\(Generated.describe(s)): \(post.id) at \(y), footing \(post.footing)")
+            }
+        }
+        #expect(checked > 0)
     }
 
     /// Never past the painting's edge, on any generated state, zoomed or not, and never enlarged

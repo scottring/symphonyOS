@@ -18,6 +18,7 @@ struct WalkArtCutTests {
         (CGSize(width: 390, height: 844), 47, 34, .tall), (CGSize(width: 375, height: 667), 20, 0, .short),
         (CGSize(width: 402, height: 874), 62, 34, .tall), (CGSize(width: 440, height: 956), 62, 34, .tall),
         (CGSize(width: 466, height: 678), 22, 0, .short), (CGSize(width: 382, height: 678), 22, 0, .short),
+        (CGSize(width: 393, height: 852), 59, 34, .tall), (CGSize(width: 375, height: 812), 50, 34, .tall),
         (CGSize(width: 626, height: 890), 44, 34, .tall)]
 
     /// The half-open display's windows: (size, the look half's fold, across).
