@@ -25,6 +25,9 @@ struct WalkState: Equatable {
     var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
     var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
     var orb: Orb = .idle; var typing: String?
+    // Speech, for this walk only (never saved): holds in a row that heard nothing; a
+    // refusal, after which a hold opens typing; a session that ended while still held.
+    var emptyHolds = 0; var speechIsOff = false; var sessionOver = false
     var orbWasOpen = false                 // the points were open when this press began, so a short press closes them
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
@@ -32,7 +35,8 @@ struct WalkState: Equatable {
     var dayBeforeFirst: [UUID: Date?] = [:]    // a task the first-thing mark dated today → its day before; in memory
     var sheetOpen = false; var calendarOffer = false
 
-    enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String) }
+    /// `finishing`: let go, waiting (up to `WalkOrb.finishMs`) for the recogniser's last words.
+    enum Orb: Equatable { case idle, holding(hover: CompassPoint?), open, speaking(live: String), finishing(live: String) }
 
     /// The level this step plants on; nil on Welcome and Look back up.
     var level: WalkLevel? { (1...5).contains(step) ? WalkLevel(rawValue: step) : nil }
@@ -58,7 +62,8 @@ struct WalkState: Equatable {
             return []
         // The orb, speech and typing (Task 11).
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
-             .heard, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point:
+             .heard, .listenEnded, .finishExpired, .speechUnavailable, .speechReady,
+             .typeChanged, .typeSubmitted, .typeDismissed, .point:
             return applyOrb(event, env)
         // Planting, examples, undo, move and pull up (WalkState+Plant.swift).
         case .stubTapped(let key): return openStub(key)
@@ -297,12 +302,15 @@ struct WalkState: Equatable {
 enum WalkEvent: Equatable {
     case orbDown, orbHeld, orbMoved(CGPoint), orbUp(heldMs: Int), orbCancelled
     case heard(String), speechUnavailable, typeChanged(String), typeSubmitted, typeDismissed, point(CompassPoint)
+    /// The listening session ended (its last words are in); the finish wait ran out;
+    /// permission was given after the prompts took the touch.
+    case listenEnded, finishExpired, speechReady
     case areaTapped(UUID), bannerTapped(UUID), stubTapped(WalkPostKey), exampleTapped(String)
     case moveTo(UUID), pullUp, undo, undoExpired, noteExpired, calendarAnswered
     case sheetHandle, rowToggled(UUID), walkAnother, goToToday             // rowToggled carries a task id
 }
 
-enum WalkTimer: Equatable { case hold, undo, note }
+enum WalkTimer: Equatable { case hold, undo, note, finish }
 
 enum WalkWrite: Equatable {
     case area(WalkArea), dropArea(UUID), create(WalkItem, parent: WalkItem?), remove(UUID, WalkLevel), restore(UUID)
@@ -310,7 +318,8 @@ enum WalkWrite: Equatable {
 }
 
 enum WalkEffect: Equatable {
-    case sound(WalkSoundName, afterMs: Int), listen(Bool), write(WalkWrite)
+    /// `listen(false)` cancels; `finishListening` stops the microphone and waits for the last words.
+    case sound(WalkSoundName, afterMs: Int), listen(Bool), finishListening, write(WalkWrite)
     case timer(WalkTimer, ms: Int?)        // nil cancels
     case askCalendar, save, end(WalkStatus)
 }

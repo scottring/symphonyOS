@@ -74,6 +74,7 @@ enum WalkCopy {
         // Blank while the points show (the mockup): the bottom point's label sits on this line.
         // A note gives way too, and is back once they close if it has not run out.
         if s.showsPoints { return "" }
+        if case .finishing = s.orb { return "" }      // waiting for the last words after letting go
         if let note = s.note { return note }
         if s.typing != nil { return "" }
         if case .speaking = s.orb { return "Let go to plant it" }
@@ -173,6 +174,10 @@ enum WalkCopy {
     }
     static let nothingToPlant = "Nothing to plant yet. Hold and speak, or slide left to type."
     static let speechOff = "Speaking isn’t available here, so type it."
+    /// A second hold in a row that heard nothing.
+    static let nothingHeard = "Nothing came through. Type it here."
+    /// The permission prompts took the touch and speech was allowed.
+    static let speakNow = "Now hold the light and speak."
     static let ridgeFull = "The ridge is full. Tap a peak to let one go first."
     static let calendarLine = "See your calendar on Today too"
 

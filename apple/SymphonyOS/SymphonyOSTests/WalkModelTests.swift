@@ -185,6 +185,13 @@ struct WalkModelTests {
         await scheduler.settle()
     }
 
+    /// A hold, nothing heard, let go, and the session's end.
+    private func emptyHold(_ m: WalkModel) async {
+        await hold(m)
+        m.send(.orbUp(heldMs: 900))
+        listener.end()
+    }
+
     @Test func listeningStartsOnTheHoldNotBefore() async throws {
         let m = model(try walkTestContext())
         toYear(m)
@@ -214,85 +221,168 @@ struct WalkModelTests {
         #expect(m.state.orb == .idle)
     }
 
-    @Test func stopIsCalledOnRelease() async throws {
+    /// Letting go finishes (never cancels) the session; the flag is planted once,
+    /// with the last words, when the session ends.
+    @Test func lettingGoWaitsForTheLastWords() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        listener.hear("Finish the")
+        m.send(.orbUp(heldMs: 900))
+        #expect(listener.finishes == 1 && listener.stops == 0)
+        #expect(fetch(ctx, Goal.self).isEmpty)
+        listener.hear("Finish the bathroom")
+        #expect(m.state.orb == .finishing(live: "Finish the bathroom"))
+        #expect(fetch(ctx, Goal.self).isEmpty)
+        listener.end()
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Finish the bathroom"])
+        #expect(m.state.orb == .idle && m.state.typing == nil)
+        #expect(listener.stops == 0)
+    }
+
+    @Test func withNoEndTheFinishTimerPlantsAndCancels() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
         toYear(m)
         await hold(m)
         listener.hear("feel strong")
         m.send(.orbUp(heldMs: 900))
-        #expect(listener.stops == 1)
-        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
-        #expect(m.state.typing == nil)
-    }
-
-    /// Letting go having heard nothing is speech that did not work: the field
-    /// opens with the plain line, nothing is planted, and the mic is stopped once.
-    @Test func lettingGoHavingHeardNothingOpensTyping() async throws {
-        let ctx = try walkTestContext()
-        let m = model(ctx)
-        toYear(m)
-        await hold(m)
-        m.send(.orbUp(heldMs: 900))
-        #expect(m.state.typing == "")
-        #expect(m.state.note == WalkCopy.speechOff)
-        #expect(m.state.orb == .idle)
+        scheduler.advance(WalkOrb.finishMs - 1)
         #expect(fetch(ctx, Goal.self).isEmpty)
-        #expect(listener.stops == 1)
+        scheduler.advance(1)
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+        #expect(listener.stops == 1)                           // gave up waiting: cancelled
+        listener.hear("feel strong again")
+        listener.end()
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+        #expect(m.state.orb == .idle && m.state.typing == nil)
     }
 
-    /// Sliding out to the points or the system taking the touch stops the mic
-    /// but is not a failure of speech: no field opens.
-    @Test func slidingAwayOrACancelStopsWithoutTyping() async throws {
-        let m = model(try walkTestContext())
-        toYear(m)
-        await hold(m)
-        m.send(.orbMoved(WalkOrb.position(of: .s)))
-        #expect(listener.stops == 1)
-        #expect(m.state.typing == nil)
-        m.send(.orbUp(heldMs: 900))
-        #expect(listener.stops == 1)                           // already stopped
-
-        await hold(m)
-        m.send(.orbCancelled)
-        #expect(listener.stops == 2)
-        #expect(m.state.typing == nil)
-        #expect(m.state.orb == .idle)
-    }
-
-    /// A partial result that lands after letting go never fills the next flag,
-    /// even when it lands after the next hold has begun but before it listens.
+    /// A new hold while the last one finishes plants the first flag once; words and
+    /// the end from the first session, arriving during the second, are dropped.
     @Test func wordsFromAnEarlierHoldNeverReachTheNextFlag() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
         toYear(m)
         await hold(m)
+        let firstWords = listener.onWords
+        let firstEnd = listener.onEnd
         listener.hear("feel strong")
         m.send(.orbUp(heldMs: 900))
-        listener.hear("feel strong again")
-        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
-
         m.send(.orbDown)
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+        #expect(listener.stops == 1)
+
         scheduler.advance(WalkOrb.holdMs)
         #expect(m.state.orb == .speaking(live: ""))
-        listener.hear("feel strong again")                     // late, before this hold's listening starts
+        firstWords?("feel strong again")                       // before the second hold's listening starts
         #expect(m.state.orb == .speaking(live: ""))
         await scheduler.settle()
         #expect(listener.starts == 2)
+        firstWords?("feel strong again")                       // while the second hold is listening
+        firstEnd?()
+        #expect(m.state.orb == .speaking(live: ""))
         listener.hear("finish the bathroom")
         #expect(m.state.orb == .speaking(live: "finish the bathroom"))
+        m.send(.orbUp(heldMs: 900))
+        listener.end()
+        #expect(fetch(ctx, Goal.self).map(\.name).sorted() == ["Feel strong", "Finish the bathroom"])
     }
 
-    /// The first hold asks for permission; the prompt takes the touch away. Allowed:
-    /// the orb is at rest and the next hold listens. Refused: typing opens.
+    /// Sliding out to the points or the system taking the touch cancels the mic:
+    /// nothing is planted, nothing is finished, no field opens.
+    @Test func slidingAwayOrACancelStopsWithoutTyping() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        listener.hear("feel strong")
+        m.send(.orbMoved(WalkOrb.position(of: .w)))
+        #expect(listener.stops == 1)
+        #expect(m.state.typing == nil)
+        m.send(.orbCancelled)
+        #expect(listener.stops == 1)                           // already stopped
+
+        await hold(m)
+        listener.hear("feel strong")
+        m.send(.orbCancelled)
+        #expect(listener.stops == 2)
+        #expect(listener.finishes == 0)
+        #expect(m.state.typing == nil)
+        #expect(m.state.orb == .idle)
+        #expect(fetch(ctx, Goal.self).isEmpty)
+    }
+
+    @Test func aFirstEmptyHoldIsQuietTheSecondOpensTyping() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await emptyHold(m)
+        #expect(m.state.note == WalkCopy.nothingToPlant && m.state.typing == nil)
+        await emptyHold(m)
+        #expect(m.state.note == WalkCopy.nothingHeard && m.state.typing == "")
+        #expect(fetch(ctx, Goal.self).isEmpty)
+        #expect(listener.stops == 0)
+    }
+
+    /// A refusal: typing opens, and later holds open it at the hold without asking again.
+    @Test func afterARefusalAHoldOpensTypingWithoutListening() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.problemOnStart = "Allow the microphone in Settings to speak — or type it."
+        await hold(m)
+        #expect(m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        m.send(.orbUp(heldMs: 900))
+        m.send(.typeDismissed)
+        listener.problemOnStart = nil
+
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        #expect(m.state.orb == .idle)                          // never speaking: no flag rises
+        #expect(m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        await scheduler.settle()
+        #expect(listener.starts == 1)
+    }
+
+    /// The session ends while the finger is still down.
+    @Test func aSessionThatEndsMidHold() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        toYear(m)
+        await hold(m)
+        listener.end()                                         // nothing heard: typing at once
+        #expect(m.state.orb == .idle && m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        m.send(.orbUp(heldMs: 900))
+        m.send(.typeDismissed)
+
+        await hold(m)                                          // not latched: the next hold listens
+        #expect(listener.starts == 2)
+        listener.hear("feel strong")
+        listener.end()                                         // words: they stay on the flag
+        #expect(m.state.orb == .speaking(live: "feel strong"))
+        m.send(.orbUp(heldMs: 900))                            // planted at once, no finishing wait
+        #expect(fetch(ctx, Goal.self).map(\.name) == ["Feel strong"])
+        #expect(listener.finishes == 0)
+    }
+
+    @Test func theWalkListensOnlyOnTheDevice() {
+        #expect(Dictation.mayListen(onDeviceOnly: true, supportsOnDevice: true))
+        #expect(!Dictation.mayListen(onDeviceOnly: true, supportsOnDevice: false))
+        #expect(Dictation.mayListen(onDeviceOnly: false, supportsOnDevice: false))   // Tell, as before
+        #expect(!Dictation().onDeviceOnly)
+    }
+
+    /// The first hold asks for permission and the prompt takes the touch away.
+    /// Allowed: a quiet line says to hold again, and the next hold listens.
     @Test func thePermissionPromptLeavesTheOrbUsable() async throws {
         let m = model(try walkTestContext())
         toYear(m)
         listener.whileStarting = { [m] in m.send(.orbCancelled) }
         await hold(m)
         #expect(listener.stops == 1)
-        #expect(m.state.orb == .idle)
-        #expect(m.state.typing == nil)
+        #expect(m.state.orb == .idle && m.state.typing == nil)
+        #expect(m.state.note == WalkCopy.speakNow)
 
         listener.whileStarting = nil
         await hold(m)
@@ -312,6 +402,17 @@ struct WalkModelTests {
         #expect(m.state.orb == .idle)
     }
 
+    /// Let go (not cancelled) while the prompts are up: an empty hold, not "speak now".
+    @Test func aReleaseWhileThePromptIsUpIsAnEmptyHold() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.whileStarting = { [m] in m.send(.orbUp(heldMs: 900)) }
+        await hold(m)
+        #expect(listener.stops == 1 && listener.finishes == 0)
+        #expect(m.state.orb == .idle && m.state.typing == nil)
+        #expect(m.state.note == WalkCopy.nothingToPlant)
+    }
+
     /// A release before the listener's start has even run asks for nothing.
     @Test func aHoldThatEndsBeforeListeningAsksNothing() async throws {
         let m = model(try walkTestContext())
@@ -324,6 +425,35 @@ struct WalkModelTests {
         #expect(listener.stops == 0)
         #expect(m.state.typing == nil)
         #expect(m.state.note == WalkCopy.nothingToPlant)
+    }
+
+    /// A start that comes back after a newer hold began says nothing about that hold.
+    @Test func aStaleStartIsIgnored() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        listener.problemOnStart = "no microphone"
+        listener.whileStarting = { [m, listener, scheduler] in
+            m.send(.orbCancelled)                              // the first hold goes
+            m.send(.orbDown)                                   // and a second one begins before the first start answers
+            scheduler.advance(WalkOrb.holdMs)
+            listener.whileStarting = { [listener] in listener.problemOnStart = nil }
+        }
+        await hold(m)
+        #expect(listener.starts == 2)
+        #expect(m.state.typing == nil)                         // the first start's problem is not this hold's
+        listener.hear("feel strong")
+        #expect(m.state.orb == .speaking(live: "feel strong"))
+    }
+
+    /// The walk ending stops the listener.
+    @Test func endingTheWalkStopsListening() async throws {
+        let m = model(try walkTestContext())
+        toYear(m)
+        await hold(m)
+        m.choose(.back)                                        // to the ground
+        m.choose(.back)                                        // to Welcome
+        m.choose(.notNow)
+        #expect(listener.stops == 1)
     }
 
     // MARK: Resuming

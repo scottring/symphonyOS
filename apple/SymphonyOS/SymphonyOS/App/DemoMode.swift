@@ -372,10 +372,12 @@ extension View {
     let words: String
     var problem: String?
     var onWords: ((String) -> Void)?
+    var onEnd: (() -> Void)?
 
     init(words: String) { self.words = words }
 
     func start() async { onWords?(words) }
+    func finish() { onEnd?() }
     func stop() {}
 }
 #endif

@@ -57,6 +57,7 @@ extension WalkState {
                             areaId: areaId, parentId: parent?.id,
                             day: level == .today ? env.periods.today : said.day, mine: true)
         items.append(item)
+        emptyHolds = 0
 
         var effects: [WalkEffect] = []
         if let a = area(areaId) { effects.append(.write(.area(a))) }
@@ -99,6 +100,7 @@ extension WalkState {
             kept.append(area.id)
             undo.append(.nameArea(area))
         }
+        emptyHolds = 0
         selected = nil
         undoShowing = true
         return [.sound(.plant, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save]

@@ -99,8 +99,21 @@ final class Dictation {
     /// The walk sets it: its sounds keep playing while it listens, and after.
     /// Tell leaves it false (record only, others ducked, the session let go on stop).
     @ObservationIgnored var playsAlongside = false
+    /// The walk sets it: speech is never sent to a server. Where the phone cannot
+    /// recognise on its own, `start()` does not begin and reports speech unavailable.
+    /// Tell leaves it false (on-device when it can, as before).
+    @ObservationIgnored var onDeviceOnly = false
     /// Called on the main actor with each new transcript, the empty one at a start included.
     @ObservationIgnored var onWords: ((String) -> Void)?
+    /// Called on the main actor once a session ends without `stop()`: after `finish()`
+    /// has its last words, or by itself (an error, an interruption). Tell leaves it nil.
+    @ObservationIgnored var onEnd: (() -> Void)?
+
+    /// Whether this recogniser may be used: one that would need a server is refused
+    /// when only on-device recognition will do.
+    nonisolated static func mayListen(onDeviceOnly: Bool, supportsOnDevice: Bool) -> Bool {
+        !onDeviceOnly || supportsOnDevice
+    }
 
     #if os(iOS)
     private let recognizer = SFSpeechRecognizer()
@@ -111,6 +124,8 @@ final class Dictation {
     @ObservationIgnored private var attempt = 0
     /// The start still asking for permission; `stop()` clears it so that start does not begin.
     @ObservationIgnored private var asking: Int?
+    /// While a session that reports its end is live: a call or Siri finishes it.
+    @ObservationIgnored private var interruption: (any NSObjectProtocol)?
     #endif
 
     func start() async {
@@ -126,7 +141,9 @@ final class Dictation {
         }
         guard speech == .authorized else { problem = "Allow Speech Recognition in Settings to speak — or type it."; return }
         guard await AVAudioApplication.requestRecordPermission() else { problem = "Allow the microphone in Settings to speak — or type it."; return }
-        guard let recognizer, recognizer.isAvailable else { problem = "Speech isn't available right now — type it instead."; return }
+        guard let recognizer, recognizer.isAvailable,
+              Self.mayListen(onDeviceOnly: onDeviceOnly, supportsOnDevice: recognizer.supportsOnDeviceRecognition)
+        else { problem = "Speech isn't available right now — type it instead."; return }
         // Stopped (or started again) while the permission prompts were up: do not begin.
         guard asking == mine, !isListening else { return }
         asking = nil
@@ -150,12 +167,13 @@ final class Dictation {
             engine.prepare()
             try engine.start()
             isListening = true
+            watchForInterruptions()
 
             task = Self.listen(recognizer, to: request) { [weak self] words, done in
                 Task { @MainActor in
                     guard let self, self.attempt == mine else { return }
                     if let words { self.hear(words) }
-                    if done { self.stop() }
+                    if done { self.end() }
                 }
             }
         } catch {
@@ -196,12 +214,16 @@ final class Dictation {
     private static func playAlong() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
     }
-    #endif
 
-    func stop() {
-        #if os(iOS)
-        asking = nil
+    /// The session ended by itself or after `finish()`: tidy up as `stop()` does, then
+    /// say so. A session already stopped has no end to report.
+    private func end() {
         guard isListening || task != nil else { return }
+        tearDown()
+        onEnd?()
+    }
+
+    private func tearDown() {
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         request?.endAudio()
@@ -209,11 +231,47 @@ final class Dictation {
         request = nil
         task = nil
         isListening = false
+        if let interruption {
+            NotificationCenter.default.removeObserver(interruption)
+            self.interruption = nil
+        }
         if playsAlongside {
             Self.playAlong()
         } else {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
+    }
+
+    /// Only for a caller that hears about ends (the walk): an interruption finishes the
+    /// session, so its last words and its end still arrive. Tell is untouched.
+    private func watchForInterruptions() {
+        guard onEnd != nil else { return }
+        interruption = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let type = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard type == AVAudioSession.InterruptionType.began.rawValue else { return }
+            MainActor.assumeIsolated { self?.finish() }
+        }
+    }
+    #endif
+
+    /// Letting go: the microphone stops, but the recognition is not cancelled, so its
+    /// last words still arrive through `onWords`, then `onEnd`. Does nothing when not listening.
+    func finish() {
+        #if os(iOS)
+        guard isListening, task != nil else { return }
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+        request?.endAudio()
+        #endif
+    }
+
+    func stop() {
+        #if os(iOS)
+        asking = nil
+        guard isListening || task != nil else { return }
+        tearDown()
         #endif
     }
 }

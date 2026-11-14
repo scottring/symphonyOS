@@ -27,7 +27,8 @@ struct WalkOrbTests {
     @Test func thePointsShowWhileHeldOrOpen() {
         var s = state(step: 1)
         for (orb, shows) in [(WalkState.Orb.idle, false), (.open, true), (.holding(hover: nil), true),
-                             (.holding(hover: .s), true), (.speaking(live: "x"), false)] {
+                             (.holding(hover: .s), true), (.speaking(live: "x"), false),
+                             (.finishing(live: "x"), false)] {
             s.orb = orb
             #expect(s.showsPoints == shows)
         }
@@ -90,7 +91,8 @@ struct WalkOrbTests {
         _ = s.apply(.orbDown, env); _ = s.apply(.orbHeld, env)
         _ = s.apply(.heard("feel strong again"), env)
         #expect(s.orb == .speaking(live: "feel strong again"))
-        let fx = s.apply(.orbUp(heldMs: 900), env)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let fx = s.apply(.listenEnded, env)
         #expect(fx.first == .listen(false))
         #expect(s.items.map(\.title) == ["Feel strong again"])
         #expect(s.orb == .idle)
@@ -99,7 +101,8 @@ struct WalkOrbTests {
     @Test func lettingGoWithNothingHeardPlantsNothing() {
         var s = state(step: 1)
         _ = s.apply(.orbDown, env); _ = s.apply(.orbHeld, env)
-        let fx = s.apply(.orbUp(heldMs: 900), env)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let fx = s.apply(.listenEnded, env)
         #expect(s.items.isEmpty)
         #expect(fx.first == .listen(false))
         #expect(s.orb == .idle)
@@ -226,5 +229,148 @@ struct WalkOrbTests {
         #expect(fx.contains(.listen(false)))
         #expect(fx.contains(.timer(.hold, ms: nil)))
         #expect(s.items.isEmpty)
+    }
+
+    // MARK: Letting go waits for the last words; a quiet hold is not "speech is off"
+
+    /// Press and hold until speaking, and optionally hear some words.
+    private func speak(_ s: inout WalkState, _ words: String? = nil) {
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbHeld, env)
+        if let words { _ = s.apply(.heard(words), env) }
+    }
+
+    @Test func lettingGoWaitsForTheLastWords() {
+        var s = state(step: 1)
+        speak(&s, "finish the")
+        let up = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.orb == .finishing(live: "finish the"))
+        #expect(up == [.timer(.hold, ms: nil), .timer(.finish, ms: WalkOrb.finishMs), .finishListening])
+        #expect(s.items.isEmpty)
+        #expect(!s.showsPoints)
+        _ = s.apply(.heard("finish the bathroom"), env)
+        #expect(s.orb == .finishing(live: "finish the bathroom"))
+        #expect(s.items.isEmpty)
+        let end = s.apply(.listenEnded, env)
+        #expect(s.items.map(\.title) == ["Finish the bathroom"])
+        #expect(s.orb == .idle)
+        #expect(end.contains(.timer(.finish, ms: nil)))
+        // Whichever of the end and the timer comes second changes nothing.
+        #expect(s.apply(.finishExpired, env) == [])
+        #expect(s.apply(.listenEnded, env) == [])
+        #expect(s.items.count == 1)
+    }
+
+    @Test func theFinishTimerPlantsWhatWasHeard() {
+        var s = state(step: 1)
+        speak(&s, "feel strong again")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let fx = s.apply(.finishExpired, env)
+        #expect(s.items.map(\.title) == ["Feel strong again"])
+        #expect(fx.first == .listen(false))                    // gave up waiting: the listener is cancelled
+        #expect(s.apply(.listenEnded, env) == [])
+        _ = s.apply(.heard("late"), env)
+        #expect(s.orb == .idle && s.items.count == 1)
+    }
+
+    @Test func aNewHoldWhileFinishingPlantsTheFirstFlagFirst() {
+        var s = state(step: 1)
+        speak(&s, "feel strong again")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let down = s.apply(.orbDown, env)
+        #expect(s.items.map(\.title) == ["Feel strong again"])
+        #expect(s.orb == .holding(hover: nil))
+        #expect(down.contains(.listen(false)))
+        #expect(down.contains(.timer(.hold, ms: WalkOrb.holdMs)))
+        _ = s.apply(.finishExpired, env)
+        #expect(s.items.count == 1)
+    }
+
+    @Test func slidingOutOrACancelNeverFinishes() {
+        var s = state(step: 1, planted: true)
+        speak(&s, "something")
+        let slide = s.apply(.orbMoved(WalkOrb.position(of: .n)), env)
+        #expect(slide.contains(.listen(false)) && !slide.contains(.finishListening))
+        var t = state(step: 1)
+        speak(&t, "something")
+        let cancel = t.apply(.orbCancelled, env)
+        #expect(cancel.contains(.listen(false)) && !cancel.contains(.finishListening))
+        #expect(t.items.isEmpty && t.orb == .idle)
+    }
+
+    @Test func aFirstEmptyHoldIsAQuietNoteTheSecondOpensTyping() {
+        var s = state(step: 1)
+        speak(&s)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let first = s.apply(.listenEnded, env)
+        #expect(s.note == WalkCopy.nothingToPlant && s.typing == nil && s.items.isEmpty)
+        #expect(first.filter { if case .timer(.note, _) = $0 { return true } else { return false } }.count == 1)
+        speak(&s)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let second = s.apply(.finishExpired, env)
+        #expect(s.typing == "" && s.note == WalkCopy.nothingHeard && s.items.isEmpty)
+        #expect(second.filter { if case .timer(.note, _) = $0 { return true } else { return false } }.count == 1)
+    }
+
+    @Test func aPlantBetweenEmptyHoldsStartsTheCountAgain() {
+        var s = state(step: 1)
+        speak(&s); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
+        speak(&s, "feel strong"); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
+        speak(&s); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
+        #expect(s.typing == nil && s.note == WalkCopy.nothingToPlant)
+        // A typed plant resets it too.
+        _ = s.act(.type, env); _ = s.apply(.typeChanged("run a 5K"), env); _ = s.apply(.typeSubmitted, env)
+        speak(&s); _ = s.apply(.orbUp(heldMs: 900), env); _ = s.apply(.listenEnded, env)
+        #expect(s.typing == nil && s.note == WalkCopy.nothingToPlant)
+        #expect(s.items.map(\.title) == ["Feel strong", "Run a 5K"])
+    }
+
+    @Test func onceSpeechIsOffAHoldOpensTypingStraightAway() {
+        var s = state(step: 1)
+        speak(&s)
+        _ = s.apply(.speechUnavailable, env)
+        #expect(s.speechIsOff)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        _ = s.apply(.typeDismissed, env); _ = s.apply(.noteExpired, env)
+        _ = s.apply(.orbDown, env)
+        let held = s.apply(.orbHeld, env)
+        #expect(!held.contains(.listen(true)))
+        #expect(!held.contains(.sound(.unfurl, afterMs: 280)))
+        #expect(s.orb == .idle && s.typing == "" && s.note == WalkCopy.speechOff)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.typing == "" && s.orb == .idle)
+    }
+
+    @Test func aSessionThatEndsMidHoldWithNothingOpensTyping() {
+        var s = state(step: 1)
+        speak(&s)
+        _ = s.apply(.listenEnded, env)
+        #expect(s.orb == .idle && s.typing == "" && s.note == WalkCopy.speechOff)
+        #expect(!s.speechIsOff)                                // an interruption is not a refusal: the next hold tries again
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.typing == "" && s.orb == .idle)
+    }
+
+    @Test func aSessionThatEndsMidHoldKeepsItsWordsAndPlantsOnRelease() {
+        var s = state(step: 1)
+        speak(&s, "feel strong again")
+        #expect(s.apply(.listenEnded, env) == [])
+        #expect(s.orb == .speaking(live: "feel strong again"))
+        let up = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.items.map(\.title) == ["Feel strong again"])
+        #expect(!up.contains(.finishListening))
+        #expect(!up.contains(.timer(.finish, ms: WalkOrb.finishMs)))
+        #expect(s.orb == .idle)
+    }
+
+    @Test func speechReadyIsAQuietNoteOnlyWhenNothingElseShows() {
+        var s = state(step: 1)
+        #expect(s.apply(.speechReady, env) == [.timer(.note, ms: WalkState.noteMs)])
+        #expect(s.note == WalkCopy.speakNow)
+        var noted = state(step: 1); noted.note = "Other"
+        _ = noted.apply(.speechReady, env); #expect(noted.note == "Other")
+        var typing = state(step: 1); typing.typing = ""
+        _ = typing.apply(.speechReady, env); #expect(typing.note == nil)
+        var held = state(step: 1); speak(&held)
+        _ = held.apply(.speechReady, env); #expect(held.note == nil)
     }
 }

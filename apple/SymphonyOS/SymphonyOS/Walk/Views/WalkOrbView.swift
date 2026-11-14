@@ -31,7 +31,7 @@ struct WalkOrbView: View {
                 .offset(x: Self.dial.minX, y: Self.dial.minY)
                 .allowsHitTesting(false)
 
-            if case .speaking(let live) = s.orb {
+            if let live = liveWords(s.orb) {
                 WalkLiveFlag(text: live, colour: WalkPalette.level(s.level ?? .year))
                     .offset(x: WalkOrb.centre.x, y: Self.dial.minY + 18)
                     .allowsHitTesting(false)
@@ -101,14 +101,21 @@ struct WalkOrbView: View {
 
     private func isActive(_ orb: WalkState.Orb) -> Bool {
         switch orb {
-        case .holding, .speaking: return true
+        case .holding, .speaking, .finishing: return true
         case .idle, .open: return false
         }
     }
 
+    /// Let go and waiting for the last words looks just like speaking: the flag stays up.
     private func isSpeaking(_ orb: WalkState.Orb) -> Bool {
-        if case .speaking = orb { return true }
-        return false
+        liveWords(orb) != nil
+    }
+
+    private func liveWords(_ orb: WalkState.Orb) -> String? {
+        switch orb {
+        case .speaking(let live), .finishing(let live): return live
+        case .idle, .holding, .open: return nil
+        }
     }
 
     // MARK: The dial

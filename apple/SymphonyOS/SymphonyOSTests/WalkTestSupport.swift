@@ -53,16 +53,22 @@ import SwiftData
     }
 }
 
-/// Speech for tests: nothing is heard until a test says so. `start` counts and
-/// reports `problemOnStart` as its problem; `hear` delivers words as the
-/// recogniser would. `whileStarting` runs inside `start`, before it answers,
-/// as a person's touch would arrive while the permission prompts are up.
+/// Speech for tests: nothing is heard and nothing ends until a test says so.
+/// A flow test "says X": `send(.orbDown)`, `advance(WalkOrb.holdMs)`, `settle()`,
+/// `hear("X")`, `send(.orbUp(heldMs: 900))`, then `end()` (or `advance(WalkOrb.finishMs)`).
+///
+/// `start` counts and reports `problemOnStart` as its problem; `whileStarting` runs
+/// inside `start`, before it answers, as a touch would arrive while the permission
+/// prompts are up. `hear` delivers words and `end` ends the session as the
+/// recogniser would. `finish` (letting go) and `stop` (a cancel) are only counted.
 @MainActor final class FakeWalkListener: WalkListening {
     var problem: String?
     var onWords: ((String) -> Void)?
+    var onEnd: (() -> Void)?
     var problemOnStart: String?
     var whileStarting: (() -> Void)?
     private(set) var starts = 0
+    private(set) var finishes = 0
     private(set) var stops = 0
 
     init() {}
@@ -73,12 +79,20 @@ import SwiftData
         problem = problemOnStart
     }
 
+    func finish() {
+        finishes += 1
+    }
+
     func stop() {
         stops += 1
     }
 
     func hear(_ words: String) {
         onWords?(words)
+    }
+
+    func end() {
+        onEnd?()
     }
 }
 

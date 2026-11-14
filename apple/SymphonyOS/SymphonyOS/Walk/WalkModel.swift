@@ -6,10 +6,16 @@ import Observation
 /// What the orb listens through: the app's `Dictation`, or a fake in tests.
 /// Words reach the model through `onWords`, on the main actor; `start()` asks
 /// for permission the first time and leaves `problem` set if it cannot listen.
+/// `finish()` is letting go: the microphone stops, the last words still arrive
+/// through `onWords`, then `onEnd`. `stop()` is a cancel: nothing more arrives.
+/// `onEnd` is called once per session that ends without `stop()`: after
+/// `finish()`, or by itself (an error, an interruption).
 @MainActor protocol WalkListening: AnyObject {
     var problem: String? { get }
     var onWords: ((String) -> Void)? { get set }
+    var onEnd: (() -> Void)? { get set }
     func start() async
+    func finish()
     func stop()
 }
 
@@ -38,15 +44,20 @@ extension Dictation: WalkListening {}
     /// Ids of rows this walk planted: what makes a flag "mine" after a reload.
     @ObservationIgnored private var planted: Set<UUID>
     @ObservationIgnored private let listener: WalkListening
-    /// Counts the holds that asked to listen, so work begun for an earlier hold knows it is stale.
+    /// Counts the holds that asked to listen; each session's callbacks carry their hold's number.
     @ObservationIgnored private var holdCount = 0
-    /// Between `.listen(true)` and `.listen(false)`: the current hold wants to listen.
-    @ObservationIgnored private var wantsWords = false
-    /// The listener's start has been called for the current hold and nothing has stopped
-    /// it: only then are its words this hold's, and only then is there anything to stop.
-    @ObservationIgnored private var hearing = false
-    /// The current hold's start has come back: permission was answered and it listened.
-    @ObservationIgnored private var listened = false
+    @ObservationIgnored private var session: Session = .none
+
+    /// Where the listener is for the latest hold. Words and an end are taken only
+    /// from the hold they belong to, and only while it is starting, live or finishing.
+    private enum Session: Equatable {
+        case none
+        case waiting(Int)                   // asked to listen; start() not called yet
+        case starting(Int)                  // start() called and not back: the permission prompts may be up
+        case cancelledWhileStarting(Int)    // cancelled before start() came back (the prompts took the touch)
+        case live(Int)
+        case finishing(Int)                 // let go: waiting for the last words and the end
+    }
 
     init(context: ModelContext, userId: UUID, entry: WalkEntry, position: WalkPosition?, edition: Edition,
          now: Date = .now, seasons: [SeasonBoundary]? = nil, store: WalkPositionStore? = WalkPositionStore(),
@@ -80,27 +91,15 @@ extension Dictation: WalkListening {}
             // Nothing is asked here: permission comes with the first hold.
             let dictation = Dictation()
             dictation.playsAlongside = true
+            dictation.onDeviceOnly = true
             return dictation
         }()
-        self.listener.onWords = { [weak self] words in
-            guard let self, self.hearing else { return }     // late words from a hold already let go
-            self.send(.heard(words))
-        }
     }
 
     private var env: WalkEnv { WalkEnv(periods: periods, now: now) }
 
     func send(_ event: WalkEvent) {
-        let heardNothing = isLettingGoHavingHeardNothing(event)
         carryOut(state.apply(event, env))
-        // Speech that listened and caught no words did not work: the field opens.
-        if heardNothing { send(.speechUnavailable) }
-    }
-
-    /// A release while speaking, after the listener started, with no words on the flag.
-    private func isLettingGoHavingHeardNothing(_ event: WalkEvent) -> Bool {
-        guard case .orbUp = event, case .speaking(let live) = state.orb, listened else { return false }
-        return live.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     func choose(_ action: WalkAction) {
@@ -120,40 +119,97 @@ extension Dictation: WalkListening {}
                 save(status)
                 onEnd?(status)
             case .listen(let on): listen(on)
+            case .finishListening: finishListening()
             case .sound, .askCalendar:
                 break                       // Tasks 19 and 20
             }
         }
     }
 
+    // MARK: Listening
+
     /// Starting goes through the scheduler and asks for permission the first time;
-    /// a start that cannot listen opens typing. Stopping is at once.
+    /// a start that cannot listen opens typing. A cancel is at once.
     private func listen(_ on: Bool) {
         guard on else {
-            if hearing { listener.stop() }
-            wantsWords = false
-            hearing = false
-            listened = false
+            cancelListening()
             return
         }
         holdCount += 1
-        let mine = holdCount
-        wantsWords = true
-        hearing = false
-        listened = false
-        scheduler.run { [weak self] in
-            // Let go before listening began: nothing to ask for.
-            guard let self, self.holdCount == mine, self.wantsWords else { return }
-            self.hearing = true
-            await self.listener.start()
-            guard self.holdCount == mine else { return }     // a newer hold has its own start
-            if self.listener.problem != nil {
-                // Refused, missing or failed, even if the touch went while the prompts were up.
-                self.hearing = false
-                self.send(.speechUnavailable)
-            } else if self.hearing {
-                self.listened = true
-            }
+        let hold = holdCount
+        session = .waiting(hold)
+        scheduler.run { [weak self] in await self?.begin(hold) }
+    }
+
+    private func begin(_ hold: Int) async {
+        guard session == .waiting(hold) else { return }      // let go or cancelled before listening began
+        session = .starting(hold)
+        listener.onWords = { [weak self] words in self?.heard(words, from: hold) }
+        listener.onEnd = { [weak self] in self?.ended(hold) }
+        await listener.start()
+        guard holdCount == hold else { return }               // a newer hold has its own start
+        if listener.problem != nil {
+            // Refused, missing or failed, even if the touch went while the prompts were up.
+            session = .none
+            send(.speechUnavailable)
+        } else if session == .starting(hold) {
+            session = .live(hold)
+        } else if session == .cancelledWhileStarting(hold) {
+            // Allowed, but the prompts took the touch: say to hold again.
+            session = .none
+            send(.speechReady)
+        }
+    }
+
+    private func heard(_ words: String, from hold: Int) {
+        switch session {
+        case .starting(hold), .live(hold), .finishing(hold): send(.heard(words))
+        default: break                                       // an earlier hold's, or after a cancel
+        }
+    }
+
+    private func ended(_ hold: Int) {
+        switch session {
+        case .live(hold), .finishing(hold):
+            session = .none
+            send(.listenEnded)
+        default: break
+        }
+    }
+
+    /// Letting go: the microphone stops and the last words are awaited. With no
+    /// session listening there is nothing to wait for, so the hold ends now.
+    private func finishListening() {
+        switch session {
+        case .live(let hold):
+            session = .finishing(hold)
+            listener.finish()
+        case .starting:
+            listener.stop()                                  // released while the prompts were up: not a cancel
+            session = .none
+            send(.listenEnded)
+        case .waiting:
+            session = .none
+            send(.listenEnded)
+        case .none, .cancelledWhileStarting:
+            send(.listenEnded)
+        case .finishing:
+            break                                            // already waiting for its end
+        }
+    }
+
+    private func cancelListening() {
+        switch session {
+        case .starting(let hold):
+            listener.stop()
+            session = .cancelledWhileStarting(hold)
+        case .live, .finishing:
+            listener.stop()
+            session = .none
+        case .waiting:
+            session = .none
+        case .none, .cancelledWhileStarting:
+            break
         }
     }
 
@@ -187,6 +243,7 @@ extension Dictation: WalkListening {}
         case .hold: (key, event) = ("hold", .orbHeld)
         case .undo: (key, event) = ("undo", .undoExpired)
         case .note: (key, event) = ("note", .noteExpired)
+        case .finish: (key, event) = ("finish", .finishExpired)
         }
         guard let ms else {
             scheduler.cancel(key: key)

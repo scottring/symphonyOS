@@ -5,6 +5,8 @@ import CoreGraphics
 /// is, how far a slide must go, and which compass point a touch is aimed at.
 enum WalkOrb {
     static let centre = CGPoint(x: 195, y: 678); static let radius: CGFloat = 48
+    /// The longest the walk waits, after letting go, for the recogniser's last words.
+    static let finishMs = 1000
     static let holdMs = 420; static let slideOut: CGFloat = 1.4; static let window: CGFloat = 32; static let pointDistance: CGFloat = 116
 
     /// Where a compass point stands, in stage coordinates.

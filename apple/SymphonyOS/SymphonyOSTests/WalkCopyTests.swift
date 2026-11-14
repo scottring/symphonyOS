@@ -113,6 +113,9 @@ struct WalkCopyTests {
         s.note = "A note"; #expect(WalkCopy.hint(s) == "")
         s.orb = .idle; #expect(WalkCopy.hint(s) == "A note"); s.note = nil
         s.orb = .speaking(live: "x"); #expect(WalkCopy.hint(s) == "Let go to plant it")
+        // Waiting for the last words after letting go: blank, a note included.
+        s.orb = .finishing(live: "x"); #expect(WalkCopy.hint(s) == "")
+        s.note = "A note"; #expect(WalkCopy.hint(s) == ""); s.note = nil
         var g = state(step: 1); g.ground = true
         #expect(WalkCopy.hint(g) == "Tap the peaks that matter")
         #expect(WalkCopy.hint(state(step: 2)) == "Hold the light and speak · slide to its edge for more")
@@ -180,6 +183,8 @@ struct WalkCopyTests {
         #expect(WalkCopy.welcomeSub == "Plant a flag for what matters, then follow it down.")
         #expect(WalkCopy.nothingToPlant == "Nothing to plant yet. Hold and speak, or slide left to type.")
         #expect(WalkCopy.speechOff == "Speaking isn’t available here, so type it.")
+        #expect(WalkCopy.nothingHeard == "Nothing came through. Type it here.")
+        #expect(WalkCopy.speakNow == "Now hold the light and speak.")
         #expect(WalkCopy.ridgeFull == "The ridge is full. Tap a peak to let one go first.")
         #expect(WalkCopy.calendarLine == "See your calendar on Today too")
         #expect(WalkCopy.undo == "Undo"); #expect(WalkCopy.moveTo == "Move to"); #expect(WalkCopy.pullUp == "Pull it up")
