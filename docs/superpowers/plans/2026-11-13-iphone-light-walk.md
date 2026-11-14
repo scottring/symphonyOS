@@ -1153,3 +1153,113 @@ Changes made after the pre-flight scan (`.superpowers/sdd/2026-11-13-iphone-ligh
 - **D5** Task 15 has `WalkStage` (device ↔ stage) and `WalkOrb.hits` with `WalkStageTests`; the picture test reads `cgImage.width`.
 - **D6** Tasks 8, 13, 17: the undo stack is in memory only; `aRestoredWalkHasNothingToUndo` and `leavingAndComingBack` pin it.
 - **Also** Task 14 writes out which `WalkWriter` method each `WalkWrite` case calls and sets `onEnd` in the demo path; Task 9 writes out `question` and `why`; Task 7's ending rows are personal tasks only; Task 18 cites `PlannerView.seasons`; Task 21 no longer quotes a test count.
+
+## As built (2026-11-13): what changed from the plan above
+
+All 21 tasks are built on branch `claude/ios-light-build`, each reviewed, then reviewed once more as a
+whole. Nothing is pushed, merged or deployed. On the iPhone 17 simulator the unit target passes (647 tests) and so do the two UI suites (`WalkUITests`, `LightEditionUITests`). Nobody has spoken or typed into the walk on a
+real iPhone, and nobody has heard the sounds: the hand walk under "Stops for the owner" is still the
+gate before any release.
+
+### Where the build departs from the plan's text
+
+These lines of "Calls made in this plan" are no longer true; the rulings below replaced them.
+
+- **Lost links.** A link is not cleared because its row is missing from the phone. The row is pushed as
+  it is; only if the server refuses it (a foreign-key error) are the links to rows that are not on the
+  phone cleared. A child stops waiting once its parent has failed ten times. A day's "first thing" also
+  waits for its task.
+- **The hint line is blank while the compass is open,** and the Undo pill is hidden then, as in the
+  mockup.
+- **Overlap.** Labels are protected only on the ground and the Year step, where they take taps. The
+  question line is a ceiling for every level. A stack folds under a focused flag risen from the level
+  above. On a crowded ridge the open post's flags narrow to stay clear of their neighbours.
+- **Examples.** At least one example always shows when asked for; on lower steps often one or two, not
+  three. Your own flag folds to one line to make room.
+- **The Year camera stop is −495,** not the mockup's −553, so the peaks' labels clear the light.
+- **Letting go does not plant at once.** The flag waits up to one second for the last words.
+- **Speech is on the phone only.** Where on-device recognition is not supported the walk opens typing.
+- **Sounds are silent while the walk is listening;** the haptic still plays.
+- **The calendar is asked for once;** the quiet line may show again until the Calendar point is chosen.
+- **In the light app** the Today row always returns to today, Week opens on this week, and the row of
+  the page you are on keeps reading what is on screen.
+- **Look back up** shows each post's newest flag with "+n" for the others.
+- **In a full household a walk left half-way is not resumed at launch.** Light households resume.
+- The Architecture line "the only sync change is three link columns and one new table" understates it:
+  see "Sync changes" in `apple/SymphonyOS/PLANNING.md`.
+
+### Rulings made during the build (each is a call made for the owner)
+
+In the order they were made. "If wrong" is what it costs to change.
+
+1. **W1** Links follow the web (`source_id` down the chain, `goal_id` copied), not the decisions file's `is_goal` columns, which the live database would refuse. If wrong: a web page that reads the other columns would not see the walk's links.
+2. **W2** The plan-writer's calls stand: Undo is a sixth compass point; "Go to Today" closes the ending; posts do not stagger; examples hang on a post; the UI test plants an example, not typed text; the picture is a 3120 px JPEG. If wrong: each is one small change.
+3. **W3** The 23 mismatches between tasks found before building were each settled (the plan's "Pre-flight amendments"). If wrong: the affected task's test names the rule.
+4. **W4, W5** A row re-linked while its push is in flight keeps its new links; the writer sets the "links changed" flag and queues the change in the same save. If wrong: nothing; these only prevent a lost link.
+5. **W6** A custom area's name does not match on small words (the, and, my…). If wrong: an area named only with such words never attracts a goal by its words.
+6. **W7** "Lost parent" is decided by the server, never by absence from the phone; a child gives up waiting after ten parent failures. If wrong: a link to a row deleted elsewhere costs one refused push before it clears.
+7. **W8, W9** The writer refuses to touch rows that are not the signed-in person's own, and only flags the walk planted can be moved or pulled up. If wrong: nothing; these only refuse.
+8. **W10** A goal whose area is not one of the kept peaks stands on the unlabeled post. If wrong: a goal filed under a ninth or a Work area shows without a peak, in the walk only.
+9. **W11, W13, W14** Whole-year tours remember their place across nudges, taps, back-ups and a relaunch. If wrong: a tour could skip or repeat a goal.
+10. **W12** The calendar is never offered again once answered. If wrong: none.
+11. **W15, W17** A resumed walk loads its rows before restoring its place; what the walk planted is remembered across a relaunch. If wrong: after a relaunch your own flags could not be moved.
+12. **W16** Undo of a move restores the old peak; an example already planted is not offered again; "first thing" puts a task's earlier day back when the mark leaves it. If wrong: one rule each.
+13. **W18 → W26, W27** Holding and letting go without speaking shows a quiet note the first time and opens typing the second; a refusal opens typing at once and for the rest of that walk; a session that dies mid-hold keeps what it heard. If wrong: a dead microphone takes two holds to reach typing.
+14. **W19, W20, W21, W22** The layout rules listed under "Overlap" above; the step's own newest flag is always shown with its words. If wrong: a look change in the layout only.
+15. **W23, W24** Blank hint while the compass is open; only the typing row rises with the keyboard, the question stays. If wrong: on a small phone the typing row hides a flag until the keyboard closes.
+16. **W25** Letting go waits up to one second for the recogniser's last words before planting. If wrong: every spoken flag lands up to a second late. **Needs a real iPhone to judge.**
+17. **W28** The walk never sends audio to Apple's servers. If wrong: people whose language has no on-device recognition type instead of speak. **Owner to confirm.**
+18. **W29, W32** Examples fold your own flag to make room; in the tightest spots the first example is cut to one line. If wrong: an example reads truncated.
+19. **W30, W33** Labels stay off the light; the Year view sits 24.5 points higher than the mockup. If wrong: one number. **Owner to look.**
+20. **W31** "Walk another one down" starts clean; a day's "first thing" waits in the sync queue for its task (every household). If wrong: a first-thing mark goes up slightly later after a failed task push.
+21. **W34** On a seven- or eight-peak ridge the open post's flags narrow to about 48–54 points. If wrong: their titles are cut hard there. **Owner to look.**
+22. **W35, W37** Only the automatic first start waits for the first sync; a resume opens at once; a replay request is forgotten at sign-out; the light switcher rules above. If wrong: a resumed walk could open over rows a pending sync would have changed.
+23. **W36, W38** No sound while the walk listens (speech mode ignores the silent switch); Tell Symphony's code is untouched. If wrong: the cloth sound is felt, not heard, when speaking. **Owner to decide with the recordings.**
+24. **W39** The ending's rows are your own personal tasks for today, read only on that screen; the next event comes from the same calendar feed Today uses. If wrong: cosmetic.
+25. **W40** The bundled picture's pale left and bottom edges were repaired in place (same size). The original in `~/Pictures` still has them. If wrong: re-export the picture.
+26. **W41** One final fix wave after the whole-branch review: the first pull is reported before the realtime channels join (so the walk does not arrive late over an empty Today); a first thing links to its month line; while a flag waits for its last words any other tap plants it first; typed words cannot be lost to event order; "the weekend" is a day only when clearly one; the keyboard and the dock's capture sheet give way when the walk opens. If wrong: three commits to revisit.
+27. **W42** A full household is not pulled back into a half-finished replay at launch; a "Leave for now" point was NOT added to the compass. **Owner to decide** whether the walk needs a way out between Welcome and the end.
+
+### Known and not fixed
+
+- Moving a year goal to another peak leaves the flags already under it on the old peak.
+- Undo and pull-up share the app's existing gap: a change made while its push is in flight can be lost.
+- An empty life area can be left behind after a pull-up.
+- A walk left open across midnight keeps yesterday's dates until the app next comes to the foreground.
+- `PeriodPlanView` and `WeekPlanView` read households unsorted (matters only with two households).
+- The sounds also ship in the Mac build (about 150 KB, unused there).
+
+### For the owner to look at (none block the build)
+
+- **Look back up:** the peaks' labels are too faint to read (the mockup's own fade).
+- **The compass on Year and the ground:** the top and upper-right points sit over the peak labels (the mockup's positions).
+- **The hint line** sits about 8 points from the bottom, inside the home-indicator zone (the mockup's position).
+- **"This year" in the Year question** in November and December, while the goal is filed into next year (the spec's wording); and in light the Year page then opens on next year.
+- **A second phone:** someone who chose "Not now" on one phone, and has no year goals, is offered the walk again on another.
+- **The Duo's inside screen:** the stage is letterboxed between navy bars with visible seams; the status column overlaps the raised sheet's corner. No Duo layout is designed.
+- **No password reset on the iPhone; email confirmation unchecked** (from the foundations stage).
+- **Outside this work:** the database's week and period triggers use a fixed US Eastern day, which will mis-date week tasks near midnight for people elsewhere. Worth fixing before a public launch.
+
+### Known gaps left after the final review (safe to merge with; recorded)
+
+- A Tell Symphony link, or the Duo's outside-screen sheets, can still open above the walk.
+- A Move or Pull-up chip tapped in the second after letting go is ignored.
+- When words arrive after an empty let-go, VoiceOver may announce the first partial words.
+- "By the weekend" and a bare "…weekend" are not read as days.
+- A full household's half-finished replay position stays stored on the phone, unused.
+
+### Before any release
+
+The foundations plan's release checklist still stands and comes first (database changes, functions,
+integration tests, opening signup last). The walk adds no database change: the columns and the
+`goal_areas` table it writes to are already live. For the walk itself:
+
+- [ ] **A hand walk on a real iPhone:** hold, speak, let go (the words appear and the flag plants with
+      its last word); type one flag through the compass; a quick start down to Today; "Walk the mountain
+      again" from Settings in a full household, then "Not now"; one pass with VoiceOver on.
+- [ ] **Decide** the four calls marked "Owner to confirm / decide / look" above (speech on the phone
+      only; the cloth sound while speaking; the one-second wait; a way out between Welcome and the end).
+- [ ] **Five recorded sounds** in place of the placeholders (`R/Resources/WalkSounds`).
+- [ ] **The tall painting**, if it is to replace the square overlook before launch.
+- [ ] Mockups and approval for Today, Week, the Duo layouts, tent view and the daily signposts: none of
+      those is designed or built.

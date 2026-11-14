@@ -467,6 +467,28 @@ Where this section and a task above disagree, this section is what the branch co
 - Apple Calendar has only run against a fake source; the real permission prompt needs a person.
 - iPhone Duo sizes were not screenshotted.
 
+### Rulings made during the build (each is a call made for the owner)
+
+1. SQL proofs run in a throwaway local Postgres, not the stale local database. If wrong: none; the same tests run anywhere.
+2. The AI-refusal test switches the allowance on inside its own transaction. If wrong: none.
+3. The calendar feed keeps one shape for Google and Apple, and Apple with no access shows no events, not endless loading. If wrong: none.
+4. Account deletion skips tables and columns that do not exist. If wrong: a renamed table is silently skipped; the dry run in the checklist catches it.
+5. "Look at it" steps a subagent could not do were collected and done by the controller. If wrong: none.
+6. **The membership hole was closed inside this plan** (a new migration), not left for later. If wrong: a legitimate direct write is refused; the database's own functions are unaffected.
+7. A direct write may only create a `pending` membership, and only the person themself may accept. If wrong: as above.
+8. Reviews ran while the next task was being built when their files did not overlap. If wrong: none.
+9. "The Mac target must still build" became "add no new Mac problems" (it was already failing on main). If wrong: a Mac-only error could slip in unnoticed.
+10. Tasks ran out of order where their files were disjoint. If wrong: none.
+11. The iPhone's edition defaults to full and remembers the last known edition. If wrong: a brand-new light person could see a full screen for a moment; the server still refuses.
+12. Deletion hands shared rows on before detaching, and deletes a household only when its owner leaves and nobody else is in it. If wrong: a shared row could go with the leaver.
+13. Deletion clears assignments first and falls back to row by row on a clash. If wrong: a clashing row stays with the leaver and is deleted.
+14. The More "Calendar" row stays in light (it becomes the Apple Calendar settings). If wrong: one row to hide.
+15. The calendar feed waits until the edition is known. If wrong: none.
+16. One fix wave after the whole-branch review: invited partners can delete; shared routine history stays; the kid phone and address search need a full household; the wall and kid routes get the light holding page. If wrong: see each commit.
+17. **Not fixed:** lists and pantry rows are not handed on (not shared on live); calendar and dinner caches survive a sign-out; a previous person's household row can be read briefly after a user switch on one phone. If wrong: small leaks of stale, own-device data.
+18. Two load-bearing findings from the re-review were fixed before the walk began: the phone wipes its data only when the server says the account is gone (not on any 401); see 19.
+19. The departing person's own family row is always demoted and handed on, never repointed or deleted. If wrong: a leftover adult row in the remaining member's family list.
+
 ### Release checklist (each line needs Scott's go-ahead)
 
 Before anything:
