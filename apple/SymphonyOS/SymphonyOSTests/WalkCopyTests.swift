@@ -58,7 +58,9 @@ struct WalkCopyTests {
         #expect(WalkCopy.eyebrow(state(step: 2), p) == "Winter · Dec 1 to Feb 28")
     }
 
-    @Test func aComingMonthAndACurrentSeason() {
+    /// 25 November plans the coming winter's first month, December (no "rest of"); on 1 October
+    /// fall is the current season, so its eyebrow reads "This season".
+    @Test func theComingSeasonsFirstMonthAndTheCurrentSeasonsEyebrow() {
         let late = WalkPeriods.pick(now: day(2026, 11, 25), weekStartsOn: 0)
         #expect(WalkCopy.question(state(step: 3), late) == "What’s one thing for December?")
         #expect(WalkCopy.why(state(step: 3), late) == "Small enough to finish by the 31st.")

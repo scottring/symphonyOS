@@ -28,8 +28,9 @@ extension WalkState {
         return (1...5).contains(step) && orb == .idle && typing == nil && !teaching
     }
 
-    /// "More" beside the Next line: the way to the other choices while the compass is closed, after Welcome.
-    var showsMore: Bool { step >= 1 && showsNextLine }
+    /// "More" beside the Next line: the way to the other choices while the compass is closed, after
+    /// Welcome; shown while the light is taught too, since the lesson points to it.
+    var showsMore: Bool { (1...5).contains(step) && orb == .idle && typing == nil }
 
     /// The quiet Undo pill beside the hint; it gives way while the points show,
     /// where Undo is the up-left point instead.

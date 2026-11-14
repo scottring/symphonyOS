@@ -50,7 +50,12 @@ struct WalkPeriodsTests {
         func check(_ y: Int, _ m: Int, _ d: Int, _ season: String, _ month: String) {
             let p = WalkPeriods.pick(now: day(y, m, d), weekStartsOn: 0)
             #expect(p.season.name == season && p.monthName == month, "\(y)-\(m)-\(d): \(p.season.name), \(p.monthName)")
-            #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay)
+            // Exactly: the coming season's first month, or (in the current season) a month inside it.
+            if p.seasonIsCurrent {
+                #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay)
+            } else {
+                #expect(p.monthStart == PlanCalendar.monthStart(p.season.start))
+            }
         }
         check(2026, 11, 10, "Fall", "November")          // three weeks of fall left: fall, this month
         check(2026, 11, 14, "Winter", "December")        // under three weeks: the coming winter, its first month
@@ -59,11 +64,25 @@ struct WalkPeriodsTests {
         // Inside winter with four days of December left: the month rule moves on to January
         // (fewer than seven days left), and January is inside winter.
         check(2026, 12, 28, "Winter", "January")
+        // Custom seasons that start mid-month (the 15th). On 1 December fall has 14 days left, so the
+        // walk plans the coming winter, which starts on 15 December; the month it plans is December,
+        // the month holding winter's first day (month goals are filed by whole month), so the month
+        // begins two weeks before the season and ends inside it.
+        let mid = [SeasonBoundary(name: "Winter", month: 12, day: 15), SeasonBoundary(name: "Spring", month: 3, day: 15),
+                   SeasonBoundary(name: "Summer", month: 6, day: 15), SeasonBoundary(name: "Fall", month: 9, day: 15)]
+        let custom = WalkPeriods.pick(now: day(2026, 12, 1), seasons: mid, weekStartsOn: 0)
+        #expect(custom.season.name == "Winter" && !custom.seasonIsCurrent)
+        #expect(custom.season.start == day(2026, 12, 15))
+        #expect(custom.monthName == "December" && custom.monthStart == day(2026, 12, 1))
         // Every day of two years: never a month outside the season.
         var date = day(2026, 1, 1)
         while date < day(2028, 1, 1) {
             let p = WalkPeriods.pick(now: date, weekStartsOn: 0)
-            #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay, "\(date)")
+            if p.seasonIsCurrent {
+                #expect(p.monthStart >= PlanCalendar.monthStart(p.season.start) && p.monthStart <= p.season.lastDay, "\(date)")
+            } else {
+                #expect(p.monthStart == PlanCalendar.monthStart(p.season.start), "\(date)")
+            }
             date = PlanCalendar.addDays(date, 1)
         }
     }

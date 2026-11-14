@@ -105,12 +105,10 @@ struct WalkState: Equatable {
             guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
             return respond(to: line.action, env)
         // "More": the compass opens, as a tap on the light opens it (with speech off too, where a tap types).
+        // While the light is taught, More (which the lesson points to) puts the lesson away and opens them too.
         case .moreTapped:
-            if teaching {                       // not shown then; a stray one only puts the lesson away
-                teaching = false
-                return []
-            }
             guard showsMore else { return [] }
+            teaching = false
             orb = .open
             return []
         // A tap on the veil around the open compass closes it; on Welcome the choices stay.

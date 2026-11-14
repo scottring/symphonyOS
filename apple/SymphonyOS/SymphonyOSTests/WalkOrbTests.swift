@@ -296,11 +296,20 @@ struct WalkOrbTests {
             let before = s
             #expect(s.apply(.moreTapped, env) == [] && s == before)
         }
-        // While the light is taught More is not shown; a stray one only puts the lesson away, as any touch does.
-        var taught = state(step: 2); taught.teaching = true
-        #expect(!taught.showsMore)
-        _ = taught.apply(.moreTapped, env)
-        #expect(!taught.teaching && taught.orb == .idle)
+        // While the light is taught More shows (the lesson points to it): a tap puts the lesson away and
+        // opens the choices, and nothing else changes; the lesson stays taught (it is not shown again).
+        for off in [false, true] {
+            var taught = onTheGround(); taught.speechIsOff = off
+            _ = taught.act(.next, env)
+            #expect(taught.teaching && taught.showsMore)
+            var expected = taught
+            expected.teaching = false
+            expected.orb = .open
+            #expect(taught.apply(.moreTapped, env) == [])
+            #expect(taught == expected && taught.taught)
+            _ = taught.apply(.veilTapped, env); _ = taught.act(.next, env)
+            #expect(!taught.teaching)
+        }
     }
 
     /// The Next line does exactly what the south point does, in every state where either shows.
