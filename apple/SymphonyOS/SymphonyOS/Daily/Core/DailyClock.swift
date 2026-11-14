@@ -10,6 +10,20 @@ enum DailyClock {
         return Date()
     }
 
+    /// The selected date (`AppState.selectedDate`, which Week and the spread's left page follow) once
+    /// the day has turned from `old` to `new`: if it was today it moves to the new today; if the person
+    /// had gone to another date on purpose (a sign's "tomorrow", a mountain page's period) it stays,
+    /// except that a "tomorrow" the day has now passed becomes today's. Unchanged if the day has not turned.
+    static func selected(_ selected: Date, turnedFrom old: Date, to new: Date) -> Date {
+        guard !PlanCalendar.sameDay(old, new) else { return selected }
+        if PlanCalendar.sameDay(selected, old) { return PlanCalendar.day(new) }
+        let tomorrow = PlanCalendar.addDays(PlanCalendar.day(old), 1)
+        if PlanCalendar.sameDay(selected, tomorrow) && PlanCalendar.day(selected) < PlanCalendar.day(new) {
+            return PlanCalendar.day(new)
+        }
+        return selected
+    }
+
     #if DEBUG
     private static let pinnedDay: Date? = pinned(in: ProcessInfo.processInfo.arguments)
 

@@ -379,6 +379,29 @@ final class LightEditionUITests: XCTestCase {
         for id in pageControls { assertThereButInert(page[id], id) }
     }
 
+    /// The inside screen opened flat (890 × 626) is the spread: set down like a book, the spread stays
+    /// underneath, kept but out of reach (ruling D14), with no dock: its bar's light, Inbox, More and its
+    /// last word are there and inert, and the display's light is the one that takes a touch.
+    @MainActor func testTheSpreadStaysUnderTheBookDisplay() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-HalfOpen", "book", "-TodaySize", "890x626"]
+        app.launch()
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(any["daily.halfOpen"].waitForExistence(timeout: 60), "no light half-open display")
+        let kept = any["daily.coveredPage"]
+        XCTAssertTrue(kept.waitForExistence(timeout: 15), "no light page kept under the display")
+        XCTAssertEqual(kept.value as? String, "today")
+        XCTAssertTrue(any["daily.spread"].exists, "the spread is not the page under the display")
+        XCTAssertTrue(any["daily.halfOpen"].descendants(matching: .any)["daily.bar.light"].isHittable,
+                      "the display's light cannot be touched")
+        let page = any["daily.spread"].descendants(matching: .any)
+        for id in ["daily.bar.light", "daily.bar.inbox", "daily.bar.more", "daily.nav.week"] {
+            assertThereButInert(page[id], id)
+        }
+        XCTAssertFalse(app.buttons["Planner"].exists, "the dock under the display")
+    }
+
     /// A full household set down half open keeps the old display, dinner and all.
     @MainActor func testAFullHouseholdKeepsTheOldHalfOpenDisplay() throws {
         let app = XCUIApplication()

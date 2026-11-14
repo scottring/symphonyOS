@@ -49,16 +49,25 @@ struct LightPlannerView<Full: View>: View {
         #endif
     }
 
-    private var showsLight: Bool { DailyGate.shows(appState.horizon, edition: appState.edition, layout: layout) }
+    /// The device is a phone (ruling D17: on an iPad the light pages are not built), read with the layout.
+    private var phone: Bool { DailyDevice.phone }
+
+    private var showsLight: Bool {
+        DailyGate.shows(appState.horizon, edition: appState.edition, layout: layout, phone: phone)
+    }
 
     /// The dock gives way to the bar on this window and this page (`DailyGate.hidesDock`).
-    private var hidesDock: Bool { DailyGate.hidesDock(on: appState.horizon, edition: appState.edition, layout: layout) }
+    private var hidesDock: Bool {
+        DailyGate.hidesDock(on: appState.horizon, edition: appState.edition, layout: layout, phone: phone)
+    }
 
     /// The light half-open display is up over this Planner (`DailyGate.coversPage`). A light page
     /// stays as it was under it, drawn but inert (no touch, hidden from VoiceOver, its model
     /// `covered`: its bar cannot start and it takes no Tell), so nothing open on it is lost; the old
     /// page is taken away (`DailyGate.dropsPage`), since its own Tell sheet cannot be held back.
-    private var covered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
+    private var covered: Bool {
+        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: phone)
+    }
 
     var body: some View {
         ZStack {
@@ -112,6 +121,12 @@ struct LightPlannerView<Full: View>: View {
             appState.dailyHidesDock = false
             model?.close()
             model = nil
+        }
+        // The day turned (the minute tick, the app coming back, opening flat: `refreshDay`): the selected
+        // date follows it when it was today (`DailyClock.selected`), so Week and the spread's left page do.
+        .onChange(of: model?.today) { old, new in
+            guard let old, let new else { return }
+            appState.selectedDate = DailyClock.selected(appState.selectedDate, turnedFrom: old, to: new)
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }

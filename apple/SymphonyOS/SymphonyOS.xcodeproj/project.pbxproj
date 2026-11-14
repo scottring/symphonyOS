@@ -255,6 +255,7 @@
 		F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */; };
 		F3E521D498496E982353B3BE /* WalkEnding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 399D0D1A5900BCD6EAF3F051 /* WalkEnding.swift */; };
 		F43839CC6571F712B5D5D175 /* WalkClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D349620293CBF9CE126ECA7D /* WalkClassifier.swift */; };
+		F61EE175C580B202FD47693A /* DailyDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627B03EF1DC14628305BB7EB /* DailyDevice.swift */; };
 		F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */; };
 		F6867823613D7C736CEE671D /* RoutineOccurrenceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1383EE5C83DE0489DE695E0 /* RoutineOccurrenceSheet.swift */; };
 		F886798113D26346BE9A08B3 /* AppleCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */; };
@@ -408,6 +409,7 @@
 		5EABBD682C44E45ACC12563E /* DailyCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyCopyTests.swift; sourceTree = "<group>"; };
 		5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSTests.swift; sourceTree = "<group>"; };
 		61E19EB4F8AFB3B2057038A2 /* HalfOpenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HalfOpenTests.swift; sourceTree = "<group>"; };
+		627B03EF1DC14628305BB7EB /* DailyDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDevice.swift; sourceTree = "<group>"; };
 		64C51DAF6700CC7943620DF5 /* WalkPlantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkPlantTests.swift; sourceTree = "<group>"; };
 		67A7372203050D025A28D396 /* CrimsonPro-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonPro-Regular.ttf"; sourceTree = "<group>"; };
 		681A9DD4788EEF1FCA8A3D32 /* PlanWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanWriter.swift; sourceTree = "<group>"; };
@@ -894,6 +896,7 @@
 			children = (
 				6DB13AFD951099CA1FB80FD2 /* DailyBand.swift */,
 				744676EA073E9F932BF2B720 /* DailyBarView.swift */,
+				627B03EF1DC14628305BB7EB /* DailyDevice.swift */,
 				0682017A511AD69FB19A969B /* DailyNavRow.swift */,
 				598430A0891D9F26C9AEE919 /* DailyPageParts.swift */,
 				721AEC455BE4ADC539A2F13C /* DailyPalette.swift */,
@@ -1472,6 +1475,7 @@
 				4781ED40A58BF18C0BE6847F /* DailyCopy.swift in Sources */,
 				FDDCF7DABEBF1BCA94649B26 /* DailyDay.swift in Sources */,
 				556A8CF9AE258CE2EABE69D5 /* DailyDemo.swift in Sources */,
+				F61EE175C580B202FD47693A /* DailyDevice.swift in Sources */,
 				1A8460DBC609E73C9821B013 /* DailyGate.swift in Sources */,
 				A77EE112A22F4E464F39730B /* DailyHandover.swift in Sources */,
 				FD5F9DB17E725D148CB374DF /* DailyLookBack.swift in Sources */,

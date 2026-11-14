@@ -278,11 +278,12 @@ extension DailyGateTests {
     @Test func theSpreadIsBuilt() {
         #expect(DailyGate.layouts.contains(.journal))
         #expect(!DailyGate.layouts.contains(.glanceWide))
+        #expect(!DailyGate.shows(.today, edition: .light, layout: .journal, phone: false))     // an iPad sideways (D17)
         for h in Horizon.allCases {
-            #expect(DailyGate.shows(h, edition: .light, layout: .journal), "\(h)")
-            #expect(DailyGate.hidesDock(on: h, edition: .light, layout: .journal), "\(h)")
-            #expect(!DailyGate.shows(h, edition: .full, layout: .journal), "\(h)")
-            #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: .journal), "\(h)")
+            #expect(DailyGate.shows(h, edition: .light, layout: .journal, phone: true), "\(h)")
+            #expect(DailyGate.hidesDock(on: h, edition: .light, layout: .journal, phone: true), "\(h)")
+            #expect(!DailyGate.shows(h, edition: .full, layout: .journal, phone: true), "\(h)")
+            #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: .journal, phone: true), "\(h)")
         }
         #expect(DailyGate.page(.today, layout: .journal) == .spread)
         #expect(DailyGate.page(.week, layout: .journal) == .spread)
@@ -312,6 +313,85 @@ extension DailyGateTests {
     }
 }
 
+extension DailyGateTests {
+    /// Ruling D17: the light pages are for the phone only (an iPhone, the Duo among them). An iPad's
+    /// windows take the phone's shapes (held sideways `.journal`, upright `.dayPage`, a narrow window
+    /// `.oneColumn`), but on an iPad nothing light is built: no page, no hidden dock, no light
+    /// half-open display, no handover; a light household keeps the old pages with the dock, as before.
+    @Test func anIPadKeepsTheOldPages() {
+        let all: [TodayLayout] = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
+        for e in [Edition.light, .full] {
+            for h in Horizon.allCases {
+                for l in all {
+                    #expect(!DailyGate.shows(h, edition: e, layout: l, phone: false), "\(e) \(h) \(l)")
+                    #expect(!DailyGate.hidesDock(on: h, edition: e, layout: l, phone: false), "\(e) \(h) \(l)")
+                    #expect(!DailyHandover.plays(.walk, status: .finished, edition: e,
+                                                 lightToday: DailyGate.hidesDock(on: h, edition: e, layout: l, phone: false)))
+                }
+            }
+            #expect(!DailyGate.halfOpen(edition: e, phone: false), "\(e)")
+            #expect(!DailyGate.coversPage(edition: e, halfOpen: true, phone: false), "\(e)")
+            #expect(!DailyGate.dropsPage(covered: DailyGate.coversPage(edition: e, halfOpen: true, phone: false),
+                                         lightPage: false))
+        }
+        // The same windows on a phone are light.
+        for l in [TodayLayout.oneColumn, .dayPage, .journal] {
+            #expect(DailyGate.shows(.today, edition: .light, layout: l, phone: true), "\(l)")
+        }
+        // An iPad's windows are the phone's shapes, which is why the idiom must decide.
+        #expect(TodayLayout.decide(width: 1194, height: 834, sideBars: false) == .journal)
+        #expect(TodayLayout.decide(width: 834, height: 1194, sideBars: false) == .dayPage)
+        #expect(TodayLayout.decide(width: 320, height: 1194, sideBars: false) == .oneColumn)
+    }
+}
+
+/// When the day turns (`DailyModel.refreshDay` finds a new today), the selected date the light pages
+/// follow moves with it if it was today; a date the person went to on purpose stays, except that the
+/// sign's "tomorrow", once the day has turned past it, becomes today.
+struct DailyDayTurnTests {
+    private func day(_ m: Int, _ d: Int) -> Date {
+        PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: m, day: d))!
+    }
+
+    private func left(selected: Date, today: Date) -> DailySpread.Left {
+        let week = DailyWeek.make(tasks: [], goals: [], commitments: [], focus: [], events: { _ in [] },
+                                  weekStart: DailySpread.weekStart(selected: selected), today: today, me: UUID())
+        return DailySpread.left(week, today: today)
+    }
+
+    @Test func theSelectedDateFollowsTheDayWhenItWasToday() {
+        let saturday = day(11, 14), sunday = day(11, 15)
+        let moved = DailyClock.selected(saturday, turnedFrom: saturday, to: sunday)
+        #expect(PlanCalendar.sameDay(moved, sunday))
+        // The left page becomes the week of the 15th, read as this week.
+        #expect(DailySpread.weekStart(selected: moved) == PlanCalendar.weekStart(sunday))
+        #expect(left(selected: moved, today: sunday).eyebrow == DailyCopy.restOfWeek)
+    }
+
+    @Test func aDateGoneToOnPurposeStays() {
+        let saturday = day(11, 14), sunday = day(11, 15)
+        // The sign's "tomorrow" (the 15th): unchanged, and now it reads as this week.
+        let fromTheSign = DailyClock.selected(sunday, turnedFrom: saturday, to: sunday)
+        #expect(fromTheSign == sunday)
+        #expect(left(selected: fromTheSign, today: sunday).eyebrow == DailyCopy.restOfWeek)
+        // A month page's date: unchanged.
+        let month = day(11, 1)
+        #expect(DailyClock.selected(month, turnedFrom: saturday, to: sunday) == month)
+        // The day not turning changes nothing.
+        #expect(DailyClock.selected(month, turnedFrom: saturday, to: saturday) == month)
+        #expect(DailyClock.selected(saturday, turnedFrom: saturday, to: saturday) == saturday)
+    }
+
+    @Test func aTomorrowTheDayHasPassedBecomesToday() {
+        let saturday = day(11, 14), sunday = day(11, 15), wednesday = day(11, 18)
+        // Reopened days later: the sign's "tomorrow" is now in the past, so it is today's.
+        #expect(PlanCalendar.sameDay(DailyClock.selected(sunday, turnedFrom: saturday, to: wednesday), wednesday))
+        // A date further ahead than tomorrow is left alone.
+        let friday = day(11, 20)
+        #expect(DailyClock.selected(friday, turnedFrom: saturday, to: wednesday) == friday)
+    }
+}
+
 extension DailyHandoverTests {
     /// Opened flat the walk's light does not travel: the walk stands letterboxed across the fold on
     /// this window and the spread's sheet does not rise, so the bar's light simply wears the halo,
@@ -324,8 +404,8 @@ extension DailyHandoverTests {
         #expect(DailyHandover.play(lowered: false, sheetOver: true, reduceMotion: false, travels: false) == .skip)
         #expect(DailyHandover.play(lowered: false, sheetOver: false, reduceMotion: false) == .travel)
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
-                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .journal)))
+                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .journal, phone: true)))
         #expect(!DailyHandover.plays(.walk, status: .finished, edition: .full,
-                                     lightToday: DailyGate.hidesDock(on: .today, edition: .full, layout: .journal)))
+                                     lightToday: DailyGate.hidesDock(on: .today, edition: .full, layout: .journal, phone: true)))
     }
 }

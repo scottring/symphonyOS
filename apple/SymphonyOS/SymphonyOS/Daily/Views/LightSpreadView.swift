@@ -117,6 +117,11 @@ struct LightSpreadView: View {
                                   tellTaken: { opened = nil }, appeared: startHandover))
         // An ordinary walk just finished onto this page (`DailyHandover.plays`): the bar's light takes the halo.
         .onChange(of: appState.handover) { _, _ in startHandover() }
+        // Set down half open (the display covers this page, which stays, inert): a row's Details closes, so
+        // the display and its bar are seen, not a sheet over them (`DailyGate.keepsDetails`), as on Today.
+        .onChange(of: covered) { _, covered in
+            if !DailyGate.keepsDetails(covered: covered) { opened = nil }
+        }
         // Another week on the left page: nothing chosen or unfolded carries over from the last one.
         .onChange(of: weekStart) { _, _ in
             chosen = nil
@@ -228,6 +233,11 @@ struct LightSpreadView: View {
         case .still, .travel:
             withAnimation(.easeIn(duration: 0.25)) { model.handoverArrived() }
         }
+    }
+
+    /// The light half-open display covers this page (`DailyGate.coversPage`).
+    private var covered: Bool {
+        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: DailyDevice.phone)
     }
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.

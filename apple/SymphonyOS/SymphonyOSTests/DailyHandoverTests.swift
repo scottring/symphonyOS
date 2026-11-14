@@ -99,15 +99,15 @@ struct DailyHandoverTests {
     // MARK: Which endings hand over
 
     @Test func aFullHouseholdEndsAsItDoesNow() {
-        #expect(DailyGate.shows(.today, edition: .full, layout: .oneColumn) == false)
+        #expect(DailyGate.shows(.today, edition: .full, layout: .oneColumn, phone: true) == false)
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .full, lightToday: true) == false)
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .full,
-                                    lightToday: DailyGate.hidesDock(on: .today, edition: .full, layout: .oneColumn)) == false)
+                                    lightToday: DailyGate.hidesDock(on: .today, edition: .full, layout: .oneColumn, phone: true)) == false)
     }
 
     @Test func aFinishedWalkOnLightTodayHandsOver() {
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
-                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn)))
+                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, phone: true)))
     }
 
     /// Not now (`left`) and Leave for now (`paused`) do not hand over; nor does anything not finished.
@@ -127,7 +127,7 @@ struct DailyHandoverTests {
     /// A phone on its side keeps the old Today: no light page, no bar, no handover.
     @Test func aPhoneOnItsSideDoesNotHandOver() {
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
-                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide)) == false)
+                                    lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide, phone: true)) == false)
     }
 
     // MARK: Behind the half-open display
@@ -135,10 +135,10 @@ struct DailyHandoverTests {
     /// A walk that finishes while the light half-open display covers the page asks for no
     /// handover: nothing is left pending to play when the phone is opened flat.
     @Test func aWalkFinishedBehindTheHalfOpenDisplayDoesNotHandOver() {
-        let covered = DailyGate.coversPage(edition: .light, halfOpen: true)
+        let covered = DailyGate.coversPage(edition: .light, halfOpen: true, phone: true)
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .light, lightToday: true, covered: covered) == false)
         #expect(DailyHandover.plays(.walk, status: .finished, edition: .light, lightToday: true,
-                                    covered: DailyGate.coversPage(edition: .light, halfOpen: false)))
+                                    covered: DailyGate.coversPage(edition: .light, halfOpen: false, phone: true)))
     }
 
     /// Set down half open with a handover asked for and not yet played (the page under the display
@@ -159,7 +159,7 @@ struct DailyHandoverTests {
     /// A covered page still drawn (inert) under the display: the handover is skipped as for any
     /// sheet over the page, and so is an arrival there.
     @Test func aCoveredPageSkipsTheHandover() {
-        let covered = DailyGate.coversPage(edition: .light, halfOpen: true)
+        let covered = DailyGate.coversPage(edition: .light, halfOpen: true, phone: true)
         for reduceMotion in [false, true] {
             #expect(DailyHandover.play(lowered: false, sheetOver: covered, reduceMotion: reduceMotion) == .skip)
         }
@@ -284,7 +284,7 @@ struct DailyHandoverTests {
     @Test func theOutsideAndUprightInsideScreensHandOver() {
         for l in [TodayLayout.glance, .dayPage, .journal] {
             #expect(DailyHandover.plays(.walk, status: .finished, edition: .light,
-                                        lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: l)), "\(l)")
+                                        lightToday: DailyGate.hidesDock(on: .today, edition: .light, layout: l, phone: true)), "\(l)")
         }
         let windows: [(size: CGSize, sideBars: Bool, travels: Bool)] = [
             (CGSize(width: 390, height: 844), false, true),

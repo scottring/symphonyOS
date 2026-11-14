@@ -14,27 +14,32 @@ enum DailyGate {
     /// The light half-open display is built (Task 19).
     static let halfOpenBuilt = true
 
-    static func shows(_ horizon: Horizon, edition: Edition, layout: TodayLayout,
+    /// `phone`: the device is a phone (an iPhone, the Duo among them: `DailyDevice.phone`). Ruling
+    /// D17: the light pages are built for the phone only; on an iPad (sideways `.journal`, upright
+    /// `.dayPage`, narrow `.oneColumn`) none is, and a light household keeps the old pages and the dock.
+    static func shows(_ horizon: Horizon, edition: Edition, layout: TodayLayout, phone: Bool,
                       horizons: Set<Horizon> = horizons, layouts: Set<TodayLayout> = layouts) -> Bool {
-        edition == .light && horizons.contains(horizon) && layouts.contains(layout)
+        phone && edition == .light && horizons.contains(horizon) && layouts.contains(layout)
     }
 
     /// The dock gives way to the bar, only where the bar is built and the page on screen
     /// (`horizon`) is a light page on this window; any other page keeps the dock.
-    static func hidesDock(on horizon: Horizon, edition: Edition, layout: TodayLayout, barBuilt: Bool = barBuilt,
+    static func hidesDock(on horizon: Horizon, edition: Edition, layout: TodayLayout, phone: Bool,
+                          barBuilt: Bool = barBuilt,
                           horizons: Set<Horizon> = horizons, layouts: Set<TodayLayout> = layouts) -> Bool {
-        barBuilt && shows(horizon, edition: edition, layout: layout, horizons: horizons, layouts: layouts)
+        barBuilt && shows(horizon, edition: edition, layout: layout, phone: phone, horizons: horizons, layouts: layouts)
     }
 
-    static func halfOpen(edition: Edition, built: Bool = halfOpenBuilt) -> Bool {
-        edition == .light && built
+    /// The light half-open display (and not the old one) for this household, on a phone only (D17).
+    static func halfOpen(edition: Edition, phone: Bool, built: Bool = halfOpenBuilt) -> Bool {
+        phone && edition == .light && built
     }
 
     /// The light half-open display is up over the Planner (`halfOpen`: the phone is set down
     /// partly open): a light page under it stays drawn but inert (`dropsPage`), so only the
     /// display's own bar can listen, write or answer a Tell. A full household's page is never touched.
-    static func coversPage(edition: Edition, halfOpen: Bool, built: Bool = halfOpenBuilt) -> Bool {
-        halfOpen && self.halfOpen(edition: edition, built: built)
+    static func coversPage(edition: Edition, halfOpen: Bool, phone: Bool, built: Bool = halfOpenBuilt) -> Bool {
+        halfOpen && self.halfOpen(edition: edition, phone: phone, built: built)
     }
 
     /// A row's Details, open over a light page, stays open only while the page is not covered: under

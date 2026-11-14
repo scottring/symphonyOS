@@ -52,7 +52,7 @@ struct LightTodayView: View {
         // Read again each minute, so an event that has started gives way to the next.
         TimelineView(.everyMinute) { _ in
             let page = read(now: DailyClock.now())
-            let line = walkLine
+            let line = DailyTodayHooks.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
             let m = metrics(waiting: line != nil)
             let low = lookBack.sheet(on: m, safeBottom: safeBottom)
             ZStack(alignment: .topLeading) {
@@ -99,12 +99,16 @@ struct LightTodayView: View {
         .accessibilityIdentifier("daily.today")
         .sheet(item: $opened) { item in OpenedItemSheet(item: item, date: model.today, userId: userId) }
         .task(id: calendar.readKey(for: model.today)) { await calendar.refresh(model.today, maxAge: 60) }
-        .onAppear {
-            model.page = .today         // the bar adds to today (Week sets its own)
-            readWalk()
-            answerTell()
-            startHandover()
-        }
+        // The bar adds to today; the stored walk is read; a Tell from the Lock Screen's control or a
+        // `symphony://tell` link makes the bar listen, no sheet (asked while the walk shows, it is answered
+        // as the walk closes), the whole plan rising first so the bar that answers is there; then the
+        // handover, if a walk just ended here. Shared with the spread (`DailyTodayHooks`).
+        .modifier(DailyTodayHooks(model: model, userId: userId, walkPosition: $walkPosition, goalCount: goals.count,
+                                  beforeTell: {
+                                      lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing,
+                                                           covered: model.covered)
+                                  },
+                                  tellTaken: { opened = nil }, appeared: startHandover))
         // An ordinary walk just finished onto this page (`DailyHandover.plays`): the light comes down to the bar.
         .onChange(of: appState.handover) { _, _ in startHandover() }
         // Listening, a note or Undo taking the line slot ends the travel at once.
@@ -115,14 +119,6 @@ struct LightTodayView: View {
             if covered { interrupt(.covered) }
             if !DailyGate.keepsDetails(covered: covered) { opened = nil }
         }
-        // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet;
-        // asked for while the walk shows, it is answered as the walk closes.
-        .onChange(of: appState.tellRequested) { _, _ in answerTell() }
-        .onChange(of: appState.walkShowing) { _, _ in answerTell() }
-        // A walk that ends lands on Today (`goToToday`) and says whether one is left waiting.
-        .onChange(of: appState.walkPaused) { _, _ in readWalk() }
-        .onChange(of: appState.selectedDate) { _, _ in readWalk() }
-        .onChange(of: goals.count) { _, _ in readWalk() }
     }
 
     // MARK: Reading
@@ -133,23 +129,6 @@ struct LightTodayView: View {
                             today: model.today, now: now, me: userId, seasons: seasons,
                             pulledUp: model.pulledUp, dismissed: model.dismissed)
     }
-
-    private var walkLine: DailyGate.WalkLine? {
-        #if DEBUG
-        if DemoMode.isOn, DemoMode.dailyStates.contains("waiting") { return .waiting }
-        #endif
-        return DailyGate.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
-    }
-
-    /// Where the walk is saved, as the main view reads it (the demo keeps its own store).
-    private var walkStore: WalkPositionStore {
-        #if DEBUG
-        if DemoMode.isOn { return DemoMode.walkStore }
-        #endif
-        return WalkPositionStore()
-    }
-
-    private func readWalk() { walkPosition = walkStore.load(for: userId) }
 
     private func metrics(waiting: Bool) -> DailyMetrics {
         let shape = DailyMetrics.shape(for: layout, height: size.height, safeTop: safeTop, safeBottom: safeBottom,
@@ -238,10 +217,12 @@ struct LightTodayView: View {
     }
 
     /// Anything over the page that hides the bar: Inbox, More, a row's details, the half-open display.
-    private var sheetOver: Bool { opened != nil || appState.dailyPanel != nil || appState.posture.isHalfOpen }
+    private var sheetOver: Bool { DailyTodayHooks.sheetOver(detailsOpen: opened != nil, appState) }
 
     /// The light half-open display covers this page (`DailyGate.coversPage`).
-    private var covered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
+    private var covered: Bool {
+        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: DailyDevice.phone)
+    }
 
     /// Whether the bar is still on screen as the light lands (asked again: a sheet may have opened).
     private var barShown: Bool {
@@ -272,13 +253,6 @@ struct LightTodayView: View {
         DispatchQueue.main.async { model.handoverArrived(barShown: barShown) }
     }
 
-    /// Tell asked for from outside, as the model answers it (`DailyGate.tell`); once taken, a
-    /// row's Details over the page closes too, so the listening bar is seen.
-    private func answerTell() {
-        // With the whole plan showing, the sheet rises first, so the bar that answers is there.
-        lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing, covered: model.covered)
-        if model.answerTell(appState) { opened = nil }
-    }
 
     #if DEBUG
     /// `-SymphonyDailyState point`: the sign's row lit, as a tap on "First, today" lights it;

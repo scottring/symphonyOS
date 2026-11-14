@@ -18,24 +18,24 @@ struct DailyGateTests {
     @Test func fullIsNeverReplaced() {
         let all = Set(Horizon.allCases), shapes: Set<TodayLayout> = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
         for h in all { for l in shapes {
-            #expect(!DailyGate.shows(h, edition: .full, layout: l, horizons: all, layouts: shapes))
-            #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l, barBuilt: true, horizons: all, layouts: shapes))
+            #expect(!DailyGate.shows(h, edition: .full, layout: l, phone: true, horizons: all, layouts: shapes))
+            #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l, phone: true, barBuilt: true, horizons: all, layouts: shapes))
         } }
-        #expect(!DailyGate.halfOpen(edition: .full, built: true))
+        #expect(!DailyGate.halfOpen(edition: .full, phone: true, built: true))
     }
 
     @Test func mixedOrUnknownEditionsAreFull() {     // the gate is the household edition
         for rows: [String?] in [["light", "full"], [nil], ["light", nil], ["plus"]] {
-            #expect(!DailyGate.shows(.today, edition: Edition.resolve(rows), layout: .oneColumn, horizons: [.today]))
+            #expect(!DailyGate.shows(.today, edition: Edition.resolve(rows), layout: .oneColumn, phone: true, horizons: [.today]))
         }
     }
 
     @Test func lightGetsOnlyWhatIsBuilt() {
-        #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn, horizons: [.today], layouts: [.oneColumn]))
-        #expect(!DailyGate.shows(.week, edition: .light, layout: .oneColumn, horizons: [.today], layouts: [.oneColumn]))
-        #expect(!DailyGate.shows(.today, edition: .light, layout: .journal, horizons: [.today], layouts: [.oneColumn]))
-        #expect(DailyGate.halfOpen(edition: .light, built: true))
-        #expect(!DailyGate.halfOpen(edition: .light, built: false))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn, phone: true, horizons: [.today], layouts: [.oneColumn]))
+        #expect(!DailyGate.shows(.week, edition: .light, layout: .oneColumn, phone: true, horizons: [.today], layouts: [.oneColumn]))
+        #expect(!DailyGate.shows(.today, edition: .light, layout: .journal, phone: true, horizons: [.today], layouts: [.oneColumn]))
+        #expect(DailyGate.halfOpen(edition: .light, phone: true, built: true))
+        #expect(!DailyGate.halfOpen(edition: .light, phone: true, built: false))
     }
 
     @Test func sidewaysKeepsTheOldScreens() { #expect(!DailyGate.layouts.contains(.glanceWide)) }
@@ -90,19 +90,19 @@ struct DailyGateTests {
 
     @Test func todayAndWeekAreLightPagesBuilt() {
         #expect(DailyGate.horizons == [.today, .week, .month, .season, .year])
-        #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn))
-        #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn))
-        #expect(DailyGate.shows(.week, edition: .light, layout: .oneColumn))
-        #expect(!DailyGate.shows(.week, edition: .full, layout: .oneColumn))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn, phone: true))
+        #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn, phone: true))
+        #expect(DailyGate.shows(.week, edition: .light, layout: .oneColumn, phone: true))
+        #expect(!DailyGate.shows(.week, edition: .full, layout: .oneColumn, phone: true))
     }
 
     /// Month, Season and Year are the mountain at their own level, in a light household only;
     /// Week and Today are not mountain pages.
     @Test func theMountainPagesAreBuiltForLightOnly() {
         for h in [Horizon.month, .season, .year] {
-            #expect(DailyGate.shows(h, edition: .light, layout: .oneColumn))
-            #expect(!DailyGate.shows(h, edition: .full, layout: .oneColumn))
-            #expect(!DailyGate.shows(h, edition: .light, layout: .glanceWide))
+            #expect(DailyGate.shows(h, edition: .light, layout: .oneColumn, phone: true))
+            #expect(!DailyGate.shows(h, edition: .full, layout: .oneColumn, phone: true))
+            #expect(!DailyGate.shows(h, edition: .light, layout: .glanceWide, phone: true))
         }
         #expect(DailyGate.mountain(.year) == .year)
         #expect(DailyGate.mountain(.season) == .season)
@@ -114,9 +114,9 @@ struct DailyGateTests {
     /// The bar is built: a light household's phone, upright, has the bar and no dock.
     @Test func theDockGivesWayNow() {
         #expect(DailyGate.barBuilt)
-        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn))
-        #expect(!DailyGate.hidesDock(on: .today, edition: .full, layout: .oneColumn))
-        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide))
+        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, phone: true))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .full, layout: .oneColumn, phone: true))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide, phone: true))
     }
 
     /// Review Focus 1: a light household whose phone cannot recognise speech on its own never
@@ -145,9 +145,9 @@ struct DailyGateTests {
     }
 
     @Test func theDockGivesWayOnlyWithTheBarAndToday() {
-        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
-        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))
-        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: true, horizons: [.today]))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, phone: true, barBuilt: false, horizons: [.today]))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, phone: true, barBuilt: true, horizons: []))
+        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, phone: true, barBuilt: true, horizons: [.today]))
     }
 
     /// The dock is judged by the page on screen, not by Today being built: with all five pages
@@ -158,36 +158,37 @@ struct DailyGateTests {
     @Test func theDockGivesWayOnEveryLightPageAndOnNoOther() {
         let shapes: [TodayLayout] = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
         for h in Horizon.allCases {
-            #expect(DailyGate.hidesDock(on: h, edition: .light, layout: .oneColumn), "\(h)")
+            #expect(DailyGate.hidesDock(on: h, edition: .light, layout: .oneColumn, phone: true), "\(h)")
             for l in shapes {
-                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l)
-                        == DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
-                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
+                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l, phone: true)
+                        == DailyGate.shows(h, edition: .light, layout: l, phone: true), "\(h) \(l)")
+                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l, phone: true), "\(h) \(l)")
             }
             for l in [TodayLayout.glanceWide] {
-                #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
+                #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l, phone: true), "\(h) \(l)")
             }
         }
-        #expect(!DailyGate.hidesDock(on: .month, edition: .light, layout: .oneColumn, horizons: [.today, .week]))
-        #expect(DailyGate.hidesDock(on: .week, edition: .light, layout: .oneColumn, horizons: [.today, .week]))
+        #expect(!DailyGate.hidesDock(on: .month, edition: .light, layout: .oneColumn, phone: true, horizons: [.today, .week]))
+        #expect(DailyGate.hidesDock(on: .week, edition: .light, layout: .oneColumn, phone: true, horizons: [.today, .week]))
     }
 
     @Test func halfOpenIsLightOnly() {
         #expect(DailyGate.halfOpenBuilt)
-        #expect(DailyGate.halfOpen(edition: .light))
-        #expect(!DailyGate.halfOpen(edition: .full))
+        #expect(!DailyGate.halfOpen(edition: .light, phone: false))       // an iPad (D17)
+        #expect(DailyGate.halfOpen(edition: .light, phone: true))
+        #expect(!DailyGate.halfOpen(edition: .full, phone: true))
         for rows: [String?] in [["light", "full"], [nil], ["plus"]] {
-            #expect(!DailyGate.halfOpen(edition: Edition.resolve(rows)))
+            #expect(!DailyGate.halfOpen(edition: Edition.resolve(rows), phone: true))
         }
     }
 
     /// While the light half-open display is up the page under it is inert (drawn, out of reach), so
     /// nothing there can listen, write or answer a Tell. A full household's page is never touched.
     @Test func theLightHalfOpenDisplayCoversThePage() {
-        #expect(DailyGate.coversPage(edition: .light, halfOpen: true))
-        #expect(!DailyGate.coversPage(edition: .light, halfOpen: false))
-        #expect(!DailyGate.coversPage(edition: .full, halfOpen: true))
-        #expect(!DailyGate.coversPage(edition: .light, halfOpen: true, built: false))
+        #expect(DailyGate.coversPage(edition: .light, halfOpen: true, phone: true))
+        #expect(!DailyGate.coversPage(edition: .light, halfOpen: false, phone: true))
+        #expect(!DailyGate.coversPage(edition: .full, halfOpen: true, phone: true))
+        #expect(!DailyGate.coversPage(edition: .light, halfOpen: true, phone: true, built: false))
     }
 
     /// Ruling D14: a page covered by the light half-open display never takes a Tell, whatever its
@@ -218,12 +219,15 @@ struct DailyGateTests {
     /// pages; the spread (`.journal`, Task 18) and a short wide window (`.glanceWide`) do not yet,
     /// and a full household never does.
     @Test func theOutsideAndUprightInsideAreBuilt() {
-        #expect(DailyGate.shows(.today, edition: .light, layout: .glance))
-        #expect(DailyGate.shows(.today, edition: .light, layout: .dayPage))
-        #expect(DailyGate.shows(.today, edition: .light, layout: .journal))     // the spread, Task 18
-        #expect(!DailyGate.shows(.today, edition: .light, layout: .glanceWide))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .glance, phone: true))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .dayPage, phone: true))
+        #expect(DailyGate.shows(.today, edition: .light, layout: .journal, phone: true))     // the spread, Task 18
+        for l in [TodayLayout.glance, .dayPage, .journal] {         // an iPad keeps the old pages (D17)
+            #expect(!DailyGate.shows(.today, edition: .light, layout: l, phone: false), "\(l)")
+        }
+        #expect(!DailyGate.shows(.today, edition: .light, layout: .glanceWide, phone: true))
         for l in [TodayLayout.oneColumn, .glance, .glanceWide, .dayPage, .journal] {
-            #expect(!DailyGate.shows(.today, edition: .full, layout: l), "\(l)")
+            #expect(!DailyGate.shows(.today, edition: .full, layout: l, phone: true), "\(l)")
         }
     }
 
@@ -248,10 +252,12 @@ struct DailyGateTests {
                 continue
             }
             for h in DailyGate.horizons {
-                #expect(DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
-                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
-                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
-                #expect(!DailyGate.dropsPage(covered: true, lightPage: DailyGate.shows(h, edition: .light, layout: l)))
+                #expect(DailyGate.shows(h, edition: .light, layout: l, phone: true), "\(h) \(l)")
+                #expect(!DailyGate.shows(h, edition: .light, layout: l, phone: false), "\(h) \(l) on an iPad")
+                #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l, phone: false), "\(h) \(l) on an iPad")
+                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l, phone: true), "\(h) \(l)")
+                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l, phone: true), "\(h) \(l)")
+                #expect(!DailyGate.dropsPage(covered: true, lightPage: DailyGate.shows(h, edition: .light, layout: l, phone: true)))
 
                 let page = DailyGate.page(h, layout: l)
                 let shape = DailyMetrics.shape(for: l, height: w.size.height, safeTop: w.top, safeBottom: w.bottom,
@@ -310,8 +316,8 @@ struct DailyGateTests {
     @Test func coveringThePageClosesItsDetails() {
         #expect(!DailyGate.keepsDetails(covered: true))
         #expect(DailyGate.keepsDetails(covered: false))
-        #expect(!DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .light, halfOpen: true)))
-        #expect(DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .full, halfOpen: true)))
+        #expect(!DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .light, halfOpen: true, phone: true)))
+        #expect(DailyGate.keepsDetails(covered: DailyGate.coversPage(edition: .full, halfOpen: true, phone: true)))
     }
 
     /// Leftover (c): the half-open display keeps the screen on only while half open and signed in.

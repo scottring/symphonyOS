@@ -155,7 +155,7 @@ struct iOSMainView: View {
         .overlay {
             if appState.posture.isHalfOpen {
                 // A light household gets its own half-open display; every other household the old one.
-                if DailyGate.halfOpen(edition: appState.edition) {
+                if DailyGate.halfOpen(edition: appState.edition, phone: DailyDevice.phone) {
                     LightHalfOpenView(posture: appState.posture)
                         .transition(.opacity)
                 } else {
@@ -357,7 +357,9 @@ extension iOSMainView {
     }
 
     /// The light half-open display covers the page (`DailyGate.coversPage`).
-    private var pageCovered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
+    private var pageCovered: Bool {
+        DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen, phone: DailyDevice.phone)
+    }
 
     private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }
 
