@@ -26,8 +26,9 @@ struct iOSMainView: View {
     @Query private var households: [Household]
     @State private var showCapture = false
     @State private var hinge: HingeReader.Reading?
-    /// The walk, while it is open. For now only a Debug demo opens it (`-SymphonyWalk`).
+    /// The walk, while it is open (`considerWalk()`).
     @State private var walk: WalkModel?
+    /// The Debug demo's walk (`-SymphonyWalk`) opens once per launch.
     @State private var demoWalkOpened = false
 
     private var dock: some View {
@@ -136,6 +137,7 @@ struct iOSMainView: View {
             DockLayoutReader { layout in appState.dockLayout = layout }
             HingeReader { reading in hinge = reading }
         }
+        .accessibilityHidden(walk != nil)
         // The walk covers the dock; the half-open display still covers the walk.
         .overlay {
             if let walk {
@@ -152,10 +154,19 @@ struct iOSMainView: View {
         }
         .onChange(of: hinge) { _, _ in updatePosture() }
         .onChange(of: appState.dockLayout) { _, _ in updatePosture() }
-        .onAppear { updatePosture(); applyEdition(); openDemoWalk() }
-        // MainView is mounted only while signed in; forget the edition when it goes.
-        .onDisappear { CalendarFeed.shared.edition = nil }
+        .onAppear { updatePosture(); applyEdition(); considerWalk() }
+        // MainView is mounted only while signed in; forget the edition, and take
+        // the walk down, when it goes.
+        .onDisappear { CalendarFeed.shared.edition = nil; closeWalk() }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
+        .onChange(of: appState.initialSyncFinished) { _, _ in considerWalk() }
+        .onChange(of: appState.edition) { _, _ in considerWalk() }
+        .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
+        // Someone else signed in (or nobody is): the walk up is not theirs.
+        .onChange(of: auth.currentUser?.id) { _, _ in
+            closeWalk()
+            considerWalk()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             appState.keyboardVisible = true
         }
@@ -172,30 +183,85 @@ struct iOSMainView: View {
             // Opening the phone flat after the last step leaves nothing to come back to.
             if posture == .flat, let cook = appState.cook, cook.isLast, cook.timer == nil { appState.cook = nil }
         }
-        // Re-drive photo captures that never finished (offline snap, killed app).
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, appState.edition.allows(.photoCapture) else { return }
+            guard phase == .active else { return }
+            // A walk left up overnight reopens on today's periods.
+            if let walk, WalkEntry.dayHasTurned(walkDay: walk.periods.today, now: .now) {
+                closeWalk()
+                considerWalk()
+            }
+            // Re-drive photo captures that never finished (offline snap, killed app).
+            guard appState.edition.allows(.photoCapture) else { return }
             Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }
     }
 }
 
 extension iOSMainView {
-    /// Debug demo only: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]` opens
-    /// the walk over an empty in-memory store, or over the mockup's preview at step N, then
-    /// drives it into a state for a screenshot.
-    private func openDemoWalk() {
+    /// Opens the walk when `WalkEntry.decide` says so: by itself for a new person in a
+    /// light household, resumed where it was left, or replayed from Settings. Called on
+    /// appear and whenever the first pull finishes, the edition changes, a replay is asked
+    /// for or someone else signs in; it does nothing while a walk is up. The households and
+    /// goals are counted from the store as it is now, not from a `@Query` that may lag.
+    ///
+    /// Debug demo: `-SymphonyDemo -SymphonyWalk [-SymphonyWalkStep N] [-SymphonyWalkOrb …]`
+    /// opens it once, over an empty in-memory store or over the mockup's preview at step N,
+    /// then drives it into a state for a screenshot. A demo never reads or saves a position.
+    private func considerWalk() {
+        let userId = auth.currentUser?.id
+        guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
+                                  initialSyncFinished: appState.initialSyncFinished),
+              let userId else { return }
+        let replay = appState.walkReplayRequested
+        if replay { appState.walkReplayRequested = false }
         #if DEBUG
-        guard DemoMode.isOn, DemoMode.isWalk, !demoWalkOpened else { return }
-        demoWalkOpened = true
-        let position = DemoMode.walkStep.flatMap { DemoMode.walkPreview(step: $0, context: modelContext) }
-        let model = WalkModel(context: modelContext, userId: DemoMode.userId, entry: position == nil ? .start : .resume,
-                              position: position, edition: appState.edition, store: nil,
-                              listener: DemoMode.walkListener)
-        model.onEnd = { _ in withAnimation(.easeInOut(duration: 0.4)) { walk = nil } }
-        DemoMode.showWalk(model, DemoMode.walkOrb)
-        walk = model
+        let demo = DemoMode.isOn
+        let demoWalk = demo && DemoMode.isWalk && !demoWalkOpened
+        #else
+        let demo = false
+        let demoWalk = false
         #endif
+        let store: WalkPositionStore? = demo ? nil : WalkPositionStore()
+        let position = store?.load(for: userId)
+        let householdRows = (try? modelContext.fetch(FetchDescriptor<Household>())) ?? []
+        let goalCount = (try? modelContext.fetchCount(FetchDescriptor<Goal>())) ?? 0
+        let entry = WalkEntry.decide(replay: replay, demoWalk: demoWalk, position: position,
+                                     householdEditions: householdRows.map(\.edition),
+                                     initialSyncFinished: appState.initialSyncFinished, goalCount: goalCount)
+        guard entry != .none else { return }
+        let opening: (entry: WalkEntry, position: WalkPosition?, listener: WalkListening?)
+        #if DEBUG
+        if demoWalk {
+            demoWalkOpened = true
+            let preview = DemoMode.walkStep.flatMap { DemoMode.walkPreview(step: $0, context: modelContext) }
+            opening = (preview == nil ? .start : .resume, preview, DemoMode.walkListener)
+        } else {
+            opening = (entry, position, nil)
+        }
+        #else
+        opening = (entry, position, nil)
+        #endif
+        let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
+                              edition: appState.edition, seasons: householdRows.first?.seasons,
+                              store: store, listener: opening.listener)
+        model.onEnd = { _ in
+            closeWalk()
+            appState.activeTab = .planner
+            appState.horizon = .today
+            appState.goToToday()
+        }
+        #if DEBUG
+        if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
+        #endif
+        walk = model
+    }
+
+    /// Takes the walk down: listening is cancelled and its timers stop. What it planted
+    /// is already saved, rows and position both.
+    private func closeWalk() {
+        guard let walk else { return }
+        walk.close()
+        withAnimation(.easeInOut(duration: 0.4)) { self.walk = nil }
     }
 
     private func updatePosture() {

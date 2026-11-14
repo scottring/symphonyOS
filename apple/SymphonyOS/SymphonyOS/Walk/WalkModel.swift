@@ -47,6 +47,8 @@ extension Dictation: WalkListening {}
     /// Counts the holds that asked to listen; each session's callbacks carry their hold's number.
     @ObservationIgnored private var holdCount = 0
     @ObservationIgnored private var session: Session = .none
+    /// Set by `close()`: nothing more reaches the state.
+    @ObservationIgnored private var closed = false
 
     /// Where the listener is for the latest hold. Words and an end are taken only
     /// from the hold they belong to, and only while it is starting, live or finishing.
@@ -99,11 +101,23 @@ extension Dictation: WalkListening {}
     private var env: WalkEnv { WalkEnv(periods: periods, now: now) }
 
     func send(_ event: WalkEvent) {
+        guard !closed else { return }
         carryOut(state.apply(event, env))
     }
 
     func choose(_ action: WalkAction) {
+        guard !closed else { return }
         carryOut(state.act(action, env))
+    }
+
+    /// The walk taken down from outside (it ended, a sign-out, another person, a new
+    /// day): listening is cancelled, nothing waiting runs, and no later event reaches
+    /// the state. `onEnd` is not called and the saved place stays as the last save left
+    /// it (every plant has already saved), so the walk can be resumed from there.
+    func close() {
+        cancelListening()
+        for timer in [WalkTimer.hold, .undo, .note, .finish] { scheduler.cancel(key: Self.key(timer)) }
+        closed = true
     }
 
     // MARK: Effects
@@ -236,14 +250,23 @@ extension Dictation: WalkListening {}
         store?.save(WalkPosition(state, status: status, planted: planted, periods: periods, now: now), for: userId)
     }
 
+    private static func key(_ timer: WalkTimer) -> String {
+        switch timer {
+        case .hold: "hold"
+        case .undo: "undo"
+        case .note: "note"
+        case .finish: "finish"
+        }
+    }
+
     private func wait(_ timer: WalkTimer, _ ms: Int?) {
-        let key: String
+        let key = Self.key(timer)
         let event: WalkEvent
         switch timer {
-        case .hold: (key, event) = ("hold", .orbHeld)
-        case .undo: (key, event) = ("undo", .undoExpired)
-        case .note: (key, event) = ("note", .noteExpired)
-        case .finish: (key, event) = ("finish", .finishExpired)
+        case .hold: event = .orbHeld
+        case .undo: event = .undoExpired
+        case .note: event = .noteExpired
+        case .finish: event = .finishExpired
         }
         guard let ms else {
             scheduler.cancel(key: key)

@@ -65,16 +65,27 @@ struct PlannerView: View {
     private func openSwitcher() { showHorizons = true }
     private func close() { showHorizons = false }
 
+    /// In the light edition, Month, Season and Year open on the period the walk
+    /// files into (the walk's own `WalkPeriods`), so they show what it filed; the
+    /// steppers move on from there. Nil where the page keeps `selectedDate`.
+    private func walkPageDate(_ h: Horizon) -> Date? {
+        guard appState.edition == .light, [.month, .season, .year].contains(h) else { return nil }
+        return WalkPeriods.pick(now: .now, seasons: seasons).pageDate(for: h)
+    }
+
     private var switcher: some View {
         let date = appState.selectedDate
         let week = PlanCalendar.weekStart(date)
-        let season = PlanCalendar.season(containing: date, boundaries: seasons)
+        // Each row names the period it opens on.
+        let month = walkPageDate(.month) ?? date
+        let season = PlanCalendar.season(containing: walkPageDate(.season) ?? date, boundaries: seasons)
+        let year = walkPageDate(.year) ?? date
         return VStack(spacing: 2) {
             option(.today, "Today", Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
             option(.week, WeekPlanView.title(for: week), WeekPlanView.range(week))
-            option(.month, date.formatted(.dateTime.month(.wide)), date.formatted(.dateTime.month(.wide).year()))
+            option(.month, month.formatted(.dateTime.month(.wide)), month.formatted(.dateTime.month(.wide).year()))
             option(.season, season.name, "\(season.start.formatted(.dateTime.month(.abbreviated).day())) – \(season.lastDay.formatted(.dateTime.month(.abbreviated).day()))")
-            option(.year, String(PlanCalendar.year(of: date)), "Goals for the year")
+            option(.year, String(PlanCalendar.year(of: year)), "Goals for the year")
         }
         .padding(8)
         .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 18))
@@ -89,6 +100,7 @@ struct PlannerView: View {
         let selected = appState.horizon == h
         return Button {
             if h == .today { appState.goToToday() }
+            if let opensOn = walkPageDate(h) { appState.selectedDate = opensOn }
             appState.horizon = h
             close()
         } label: {

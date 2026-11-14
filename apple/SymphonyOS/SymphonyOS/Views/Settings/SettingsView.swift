@@ -65,6 +65,19 @@ struct SettingsView: View {
             }
             }
 
+            // The walk (iPhone only): the one place a replay is asked for.
+            #if os(iOS)
+            Section {
+                Button(WalkCopy.replayButton) {
+                    appState.walkReplayRequested = true
+                    // Leave More (and Settings with it) for the Planner, under the walk.
+                    appState.activeTab = .planner
+                }
+            } footer: {
+                Text(WalkCopy.replayFooter)
+            }
+            #endif
+
             // About
             Section("About") {
                 HStack {

@@ -121,6 +121,10 @@ final class AppState {
     /// `ContentView`; false again on sign-out. Demo mode sets it at once: its
     /// seeded store is all there is.
     var initialSyncFinished = false
+    /// "Walk the mountain again" was tapped in Settings (the only place that
+    /// asks). The main view starts the walk once the first pull has finished,
+    /// and sets this back to false.
+    var walkReplayRequested = false
 
     // MARK: - Date Navigation
 

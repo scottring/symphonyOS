@@ -176,4 +176,16 @@ enum WalkEntry: Equatable {
         let onlyLight = !householdEditions.isEmpty && householdEditions.allSatisfy { $0 == "light" }
         return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
     }
+
+    /// Whether `decide` is asked at all: never while a walk is up, never with nobody signed
+    /// in, and never before the first pull has finished (a replay asked for meanwhile waits).
+    static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool) -> Bool {
+        !walkUp && signedIn && initialSyncFinished
+    }
+
+    /// A walk still up on a later day than the one it opened on is taken down and decided
+    /// again, so it resumes from its saved place with that day's periods.
+    static func dayHasTurned(walkDay: Date, now: Date) -> Bool {
+        !PlanCalendar.calendar.isDate(walkDay, inSameDayAs: now)
+    }
 }

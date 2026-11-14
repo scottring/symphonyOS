@@ -504,6 +504,58 @@ struct WalkModelTests {
         #expect(saved.load(for: me)?.status == .left)
     }
 
+    // MARK: Appearing, replaying and being taken down
+
+    @Test func aFreshAppHasNotAskedForAReplay() {
+        #expect(AppState().walkReplayRequested == false)
+    }
+
+    @Test func aLeftWalkIsRememberedAndAReplayStartsFresh() throws {
+        let saved = store()
+        let ctx = try walkTestContext()
+        model(ctx, store: saved).choose(.notNow)
+        let left = try #require(saved.load(for: me))
+        #expect(left.status == .left)
+        #expect(WalkEntry.decide(replay: false, demoWalk: false, position: left, householdEditions: ["light"],
+                                 initialSyncFinished: true, goalCount: 0) == .none)
+        #expect(WalkEntry.decide(replay: true, demoWalk: false, position: left, householdEditions: ["light"],
+                                 initialSyncFinished: true, goalCount: 0) == .start)
+
+        let replay = model(ctx, entry: .start, position: left, store: saved)
+        #expect(saved.load(for: me)?.status == .left)
+        replay.choose(.quick)
+        let fresh = try #require(saved.load(for: me))
+        #expect(fresh.status == .inProgress)
+        #expect(fresh.step == 1)
+        #expect(fresh.planted.isEmpty)
+    }
+
+    /// A walk taken down from outside (a sign-out, another person, a new day) stops
+    /// listening, runs none of its timers, takes no more events, never calls `onEnd`
+    /// and leaves the saved place as the last save left it.
+    @Test func closingStopsListeningAndEveryTimer() async throws {
+        let saved = store()
+        let m = model(try walkTestContext(), store: saved)
+        var ended = false
+        m.onEnd = { _ in ended = true }
+        plantAGoal(m)
+        await hold(m)
+        listener.hear("lift twice")
+        #expect(m.state.undoShowing)
+        #expect(m.state.orb == .speaking(live: "lift twice"))
+        let before = saved.load(for: me)
+
+        m.close()
+        #expect(listener.stops == 1)
+        scheduler.advance(WalkState.undoMs + WalkOrb.finishMs)
+        #expect(m.state.undoShowing)                           // the Undo timer never ran
+        m.send(.orbUp(heldMs: 900))
+        listener.end()
+        #expect(m.state.orb == .speaking(live: "lift twice"))  // nothing more reaches the state
+        #expect(!ended)
+        #expect(saved.load(for: me) == before)
+    }
+
     // MARK: The picture
 
     @Test func theBundledPictureResolves() {

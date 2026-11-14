@@ -255,6 +255,25 @@ private struct Saved {
         #expect(decide(false, false, nil, ["light", "full"], true, 0) == .none)
     }
 
+    /// `decide` is asked only with nobody's walk up, someone signed in and the first pull finished.
+    @Test func nothingIsDecidedOverAWalkTheSignInOrAnUnfinishedSync() {
+        #expect(WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: true))
+        #expect(!WalkEntry.mayDecide(walkUp: true, signedIn: true, initialSyncFinished: true))
+        #expect(!WalkEntry.mayDecide(walkUp: false, signedIn: false, initialSyncFinished: true))
+        #expect(!WalkEntry.mayDecide(walkUp: false, signedIn: true, initialSyncFinished: false))
+    }
+
+    /// A walk still up after midnight is taken down and decided again with the new day's periods.
+    @Test func aNewDayTakesTheWalkDown() {
+        let cal = PlanCalendar.calendar
+        let walkDay = day(2026, 11, 13)
+        let lateThatNight = cal.date(bySettingHour: 23, minute: 59, second: 0, of: walkDay)!
+        let justAfterMidnight = cal.date(byAdding: .minute, value: 2, to: lateThatNight)!
+        #expect(!WalkEntry.dayHasTurned(walkDay: walkDay, now: lateThatNight))
+        #expect(WalkEntry.dayHasTurned(walkDay: walkDay, now: justAfterMidnight))
+        #expect(WalkEntry.dayHasTurned(walkDay: walkDay, now: day(2026, 12, 13)))
+    }
+
     // MARK: Fix round 1
 
     private func goals(_ ids: [UUID], area: UUID) -> [WalkItem] {
