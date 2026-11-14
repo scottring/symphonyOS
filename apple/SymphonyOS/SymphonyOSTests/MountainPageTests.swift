@@ -867,6 +867,18 @@ struct MountainPageTests {
         #expect(look.sheet(on: tall, safeBottom: 34) == nil)              // the bar is drawn again
     }
 
+    /// Covered by the half-open display, the page keeps its plan down: a Tell is the display's.
+    @Test func aCoveredPageKeepsItsPlanDownThroughATell() {
+        var look = DailyLookBack()
+        _ = look.handleTapped(areas: ridge, kept: [])
+        let underTheDisplay = look.tellArrives(asked: true, walkShowing: false, covered: true)
+        #expect(!underTheDisplay)
+        #expect(look.lowered)
+        let openedFlat = look.tellArrives(asked: true, walkShowing: false, covered: false)
+        #expect(openedFlat)
+        #expect(!look.lowered)
+    }
+
     /// The way back from the plan: a tap anywhere on the lowered strip, or a drag mostly up of
     /// 30 points or more, raises the sheet; a sideways or downward drag, or a short one, does not.
     @Test func aTapOrADragUpRaisesTheLoweredSheet() {

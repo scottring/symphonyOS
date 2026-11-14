@@ -727,29 +727,45 @@ struct DailyModelTests {
         #expect(task(ctx, titled: "Buy milk")?.completed == true)
     }
 
-    // MARK: Covered by the half-open display
+    // MARK: Covered by the half-open display (ruling D14)
 
-    /// The phone set down half open: the light display draws its own bar, so the page's model
-    /// stops listening and its Undo goes (nothing on the page under it can hear or take back).
-    @Test func beingCoveredStopsListeningAndEndsTheUndo() async throws {
+    /// The phone set down half open over a light page: the page stays as it was, drawn but inert.
+    /// Its bar stops and cannot start, and it never takes a Tell (the display's bar does); a pending
+    /// pull-up is written; an add's Undo is kept for after.
+    @Test func aCoveredPageNeitherListensNorTakesATell() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
-        type(m, "Buy milk")
-        #expect(m.bar.undoShowing)
-        m.cover()
-        #expect(!m.bar.undoShowing)
-        m.send(.undoTapped)
-        #expect(task(ctx, titled: "Buy milk") != nil)
-
         m.send(.micTapped)
         await scheduler.settle()
         #expect(listener.starts == 1)
         m.cover()
+        #expect(m.covered)
         #expect(listener.stops == 1)
         #expect(m.bar.mic == .idle)
+
+        m.send(.micTapped)                              // nothing can start it while covered
+        await scheduler.settle()
+        #expect(listener.starts == 1)
+        #expect(m.bar.mic == .idle)
+        let app = asked()
+        #expect(!m.answerTell(app))                     // the display's bar owns the Tell
+        await scheduler.settle()
+        #expect(app.tellRequested)
+        #expect(listener.starts == 1)
+        m.send(.typed("Buy milk"))
+        m.send(.submitted)
+        #expect(tasks(ctx).isEmpty)                     // nothing is added from under the display
+
+        m.uncover()                                     // opened flat: the rule is as before
+        #expect(!m.covered)
+        #expect(m.bar.draft == "Buy milk")              // the words wait in the field
+        #expect(m.answerTell(app))
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.starts == 2)
     }
 
-    @Test func beingCoveredWritesAPendingPullUp() throws {
+    @Test func aCoveredPageWritesItsPendingPullUp() throws {
         let ctx = try walkTestContext()
         let t = try seededTask(ctx)
         let m = model(ctx)
@@ -759,6 +775,90 @@ struct DailyModelTests {
         #expect(deletes(ctx, t.id) == 1)
         #expect(m.pulledUp == nil)
         #expect(!m.bar.undoShowing)
+    }
+
+    /// An add's Undo is kept while covered and can be used once the phone is open flat again,
+    /// if its time has not run out.
+    @Test func anAddsUndoOutlastsTheDisplay() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Buy milk")
+        m.cover()
+        #expect(m.bar.undoShowing)
+        scheduler.advance(WalkState.undoMs / 2)
+        m.uncover()
+        m.send(.undoTapped)
+        #expect(task(ctx, titled: "Buy milk") == nil)
+
+        type(m, "Call the vet")
+        m.cover()
+        scheduler.advance(WalkState.undoMs)             // its time runs out under the display
+        m.uncover()
+        #expect(!m.bar.undoShowing)
+        m.send(.undoTapped)
+        #expect(task(ctx, titled: "Call the vet") != nil)
+    }
+
+    @Test func openingFlatOnANewDayReadsIt() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.cover()
+        clock.now = day(2026, 11, 11, 0)
+        m.uncover()
+        #expect(m.today == day(2026, 11, 11))
+    }
+
+    // MARK: A tick on the half-open display (ruling D15)
+
+    /// There a ticked row goes into a count, so a stray tap at arm's length can be undone: Undo
+    /// un-ticks exactly that task. Today and Week keep their own tick (no Undo; the row stays).
+    @Test func aTickOnTheDisplayCanBeUndone() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Buy milk")
+        m.send(.undoExpired)
+        let t = try #require(task(ctx, titled: "Buy milk"))
+        m.tickWithUndo(row(t))
+        #expect(t.completed)
+        #expect(m.bar.undoShowing)
+        m.send(.undoTapped)
+        #expect(!t.completed)
+        #expect(!m.bar.undoShowing)
+    }
+
+    @Test func aSecondTickTakesTheUndoOver() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        type(m, "Buy milk")
+        type(m, "Call the vet")
+        let milk = try #require(task(ctx, titled: "Buy milk"))
+        let vet = try #require(task(ctx, titled: "Call the vet"))
+        m.tickWithUndo(row(milk))
+        m.tickWithUndo(row(vet))
+        m.send(.undoTapped)
+        #expect(!vet.completed)                         // the last tick, and only it
+        #expect(milk.completed)
+        #expect(task(ctx, titled: "Call the vet") != nil)   // the add before it is no longer the last thing
+        scheduler.advance(WalkState.undoMs)
+        m.send(.undoTapped)
+        #expect(milk.completed)
+    }
+
+    // MARK: The app coming and going
+
+    @Test func theSceneComingBackReadsTheDayAndGoingAwayLetsTheBarGo() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        m.sceneChanged(.inactive)
+        #expect(m.bar.mic == .listening)
+        m.sceneChanged(.background)
+        #expect(m.bar.mic == .idle)
+        #expect(listener.stops == 1)
+        clock.now = day(2026, 11, 11, 8)
+        m.sceneChanged(.active)
+        #expect(m.today == day(2026, 11, 11))
     }
 }
 #endif

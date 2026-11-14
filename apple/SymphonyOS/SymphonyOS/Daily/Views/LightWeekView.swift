@@ -109,7 +109,7 @@ struct LightWeekView: View {
         // A Tell taken while the whole plan shows: the sheet rises first, so the bar that answers is
         // there (a Tell from outside also opens Today, which answers it).
         .onChange(of: appState.tellRequested) { _, asked in
-            lookBack.tellArrives(asked: asked, walkShowing: appState.walkShowing)
+            lookBack.tellArrives(asked: asked, walkShowing: appState.walkShowing, covered: model.covered)
         }
         // The page went away: a pending pull-up is written and its Undo goes (the planner sends the same
         // when the app goes to the background).

@@ -950,6 +950,7 @@ Each line is a decision the spec and boards do not settle, with what it costs if
 ## Known gaps
 
 - A regular iPhone held sideways, and the Duo's outside screen held sideways, keep the existing wide glance and the old dock.
+- On the Duo's inside screen, until the light pages are built for it, setting the phone down half open closes an open sheet and its unsent words.
 - Dynamic Type beyond wrapping: the signpost, the row of words, the bar and everything on the mountain stage do not grow past extra-large.
 - The doorstep art, and the tall painting: the pages stand on the square overlook, as the walk does.
 - Month, Season and Year, and the walk, are letterboxed on the Duo's screens.

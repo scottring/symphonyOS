@@ -50,7 +50,8 @@ struct LightHalfOpenView: View {
         GeometryReader { proxy in
             let frame = proxy.frame(in: .global)
             let size = TodayView.pinnedSize ?? proxy.size
-            let split = HalfOpen.split(fold: appState.dockLayout.fold, origin: frame.origin, size: size, across: across)
+            let split = Self.pinnedSplit ?? HalfOpen.split(fold: appState.dockLayout.fold, origin: frame.origin,
+                                                            size: size, across: across)
             let tent = DailyMetrics.tent(size: size, split: split, across: across)
             Group {
                 if let model, let userId = auth.currentUser?.id {
@@ -73,45 +74,45 @@ struct LightHalfOpenView: View {
         }
         // A display on the table: it stays on while Symphony is open.
         .onAppear {
-            UIApplication.shared.isIdleTimerDisabled = true
+            keepAwake()
+            appState.dailyPanel = nil               // Inbox or More left open would stand over the display
             if model == nil { makeModel() }
             answerTell()
             applyDemoStates()
         }
+        // Once more after appearing: when the old display gives way to this one, its own clearing may
+        // come after this view's appear.
+        .task { keepAwake() }
         .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = false
+            // Cleared only when the phone is no longer half open: when the household's edition swaps
+            // this display for the old one, the old one keeps the screen on.
+            if !appState.posture.isHalfOpen { UIApplication.shared.isIdleTimerDisabled = false }
             model?.close()
             model = nil
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active: model?.refreshDay()
-            case .background: model?.send(.left)
-            default: break
-            }
-        }
-        // A new day at midnight.
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                model?.refreshDay()
-            }
-        }
+        .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
         // The Lock Screen's Tell Symphony control or a `symphony://tell` link: this bar listens, in
         // sight; asked for while the walk shows, it waits and is answered as the walk closes.
         .onChange(of: appState.tellRequested) { _, _ in answerTell() }
         .onChange(of: appState.walkShowing) { _, showing in
-            if showing { model?.send(.left) }       // never a live microphone under the walk
+            model?.walkShowingChanged(showing)      // never a live microphone under the walk
             answerTell()
         }
+    }
+
+    /// The screen stays on while the phone is set down half open.
+    private func keepAwake() {
+        if appState.posture.isHalfOpen { UIApplication.shared.isIdleTimerDisabled = true }
     }
 
     // MARK: The display
 
     private func display(_ model: DailyModel, userId: UUID, tent: DailyTent) -> some View {
         // Read again each minute, so the time moves on and an event that has started gives way.
-        TimelineView(.everyMinute) { _ in
+        // The one clock: the same minute tick reads the day again (past midnight the date, the rows
+        // and the time turn together) and keeps the screen on.
+        TimelineView(.everyMinute) { context in
             let now = DailyClock.now()
             let page = DailyTentPage(read(model, userId: userId, now: now))
             ZStack(alignment: .topLeading) {
@@ -121,6 +122,10 @@ struct LightHalfOpenView: View {
                     .accessibilitySortPriority(1)
             }
             .coordinateSpace(.named(DailyRowFrames.space))
+            .onChange(of: context.date) { _, _ in
+                model.refreshDay()
+                keepAwake()
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
@@ -311,7 +316,8 @@ struct LightHalfOpenView: View {
     // MARK: Touches
 
     private func tick(_ row: DailyDay.Row, model: DailyModel) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { model.toggle(row) }
+        // Here a done row goes into a count, so a tick offers Undo (ruling D15).
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { model.tickWithUndo(row) }
     }
 
     /// Tell asked for from outside, as the model answers it (`DailyGate.tell`): this bar listens,
@@ -347,11 +353,17 @@ struct LightHalfOpenView: View {
     }
 
     #if DEBUG
+    /// `-HalfOpenSplit 400` (demo only): the fold at that point, as a real Duo may report it.
+    private static let pinnedSplit: CGFloat? = DemoMode.isOn ? ProcessInfo.processInfo.arguments
+        .split(separator: "-HalfOpenSplit", maxSplits: 1).dropFirst().first?.first.flatMap { Double($0) }.map { CGFloat($0) } : nil
+
     /// The pinned size scaled down to the room there is (1 with nothing pinned, or room enough).
     private static func fit(_ size: CGSize, in room: CGSize) -> CGFloat {
         guard TodayView.pinnedSize != nil, size.width > 0, size.height > 0, room.width > 0, room.height > 0 else { return 1 }
         return min(1, room.width / size.width, room.height / size.height)
     }
+    #else
+    private static let pinnedSplit: CGFloat? = nil
     #endif
 }
 

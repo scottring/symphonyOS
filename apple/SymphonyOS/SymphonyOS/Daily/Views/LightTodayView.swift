@@ -270,7 +270,7 @@ struct LightTodayView: View {
     /// row's Details over the page closes too, so the listening bar is seen.
     private func answerTell() {
         // With the whole plan showing, the sheet rises first, so the bar that answers is there.
-        lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing)
+        lookBack.tellArrives(asked: appState.tellRequested, walkShowing: appState.walkShowing, covered: model.covered)
         if model.answerTell(appState) { opened = nil }
     }
 

@@ -273,17 +273,18 @@ final class LightEditionUITests: XCTestCase {
         return app
     }
 
-    /// A light household set down half open gets its own display, with no page drawn under it. The
-    /// half you look at takes no touch: on the 28th the `quiet` seed's sign ("November ends on
-    /// Monday") would open Month on Today, but here a drag and a tap leave it and the display as
-    /// they were. A tick on the half you touch counts one more done.
+    /// A light household set down half open gets its own display; the page under it stays but is
+    /// out of reach (ruling D14). The half you look at takes no touch: on the 28th the `quiet`
+    /// seed's sign ("November ends on Monday") would open Month on Today, but here a drag and a tap
+    /// leave it and the display as they were. A tick on the half you touch counts one more done and
+    /// offers Undo, which puts it back (ruling D15).
     @MainActor func testHalfOpenSignTakesNoTouchAndATickCounts() throws {
         let app = launchHalfOpen(["-SymphonyDailyNow", "2026-11-28", "-SymphonyDailySeed", "quiet"])
         let any = app.descendants(matching: .any)
         let sign = any["daily.halfOpen.sign"]
         XCTAssertTrue(sign.waitForExistence(timeout: 15), "no sign on the 28th")
         XCTAssertTrue(sign.label.contains("November"), "not the month's sign: \(sign.label)")
-        XCTAssertFalse(any["daily.today"].exists, "the page is drawn under the display")
+        XCTAssertFalse(any["daily.today"].exists, "the page under the display can be reached")
         XCTAssertEqual(any.matching(identifier: "daily.bar.light").count, 1, "a second bar under the display")
 
         let start = sign.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
@@ -299,6 +300,12 @@ final class LightEditionUITests: XCTestCase {
         let two = NSPredicate(format: "label == %@", "2 done")
         XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: two, evaluatedWith: done)], timeout: 5), .completed,
                        "a tick did not count")
+        let undo = any["daily.undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "a tick on the display offers no Undo")
+        undo.tap()
+        let one = NSPredicate(format: "label == %@", "1 done")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: one, evaluatedWith: done)], timeout: 5), .completed,
+                       "Undo did not put the tick back")
     }
 
     /// The Lock Screen's Tell Symphony (`symphony://tell`) while the display is up: this display's

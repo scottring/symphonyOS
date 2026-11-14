@@ -549,7 +549,7 @@ struct DailyMetricsTests {
     @Test func aShortLookHalfDropsTheSignRatherThanCoverTheNextLine() {
         let t = DailyMetrics.tent(size: laptop, split: 300, across: true)
         #expect(t.sign == .none)
-        #expect(t.next.origin == CGPoint(x: 40, y: 200))
+        #expect(t.next.minX == 40 && t.next.maxY + clearance <= t.look.maxY)
         #expect(t.touch.minY == 300)
     }
 
@@ -573,5 +573,34 @@ struct DailyMetricsTests {
             #expect(t.veil.solid >= t.next.maxY)
             #expect(t.veil.length == t.veil.solid + DailyMetrics.shadeFade)
         }
+    }
+
+    /// A real fold is not always at 445. Across the supported splits the look half fits its
+    /// height (the time, the next line and the sign all show, apart, and nothing crosses the fold;
+    /// the time and the gaps shrink first), and the touch half shows three whole rows over the bar.
+    @Test func theLookHalfFitsAnyFoldInRange() {
+        func check(_ t: DailyTent, _ label: String) {
+            let turn = (t.sign.plank.width + t.sign.point) * CGFloat(sin(largestTurn * .pi / 180))
+            #expect(t.sign != .none, "\(label): the sign dropped")
+            #expect(t.timeBlock.maxY <= t.next.minY, "\(label): the time meets the next line")
+            #expect(t.next.maxY + clearance <= t.sign.plank.minY - turn, "\(label): the next line meets the sign")
+            #expect(t.look.contains(t.timeBlock) && t.look.contains(t.next), "\(label)")
+            #expect(t.timeBlock.minX + 2.4 * t.timeSize <= t.look.maxX, "\(label): the time is wider than its half")
+            #expect(t.sign.plank.maxY + turn <= t.look.maxY && t.sign.plank.maxX + t.sign.point <= t.look.maxX, "\(label)")
+            #expect(t.header.minY >= t.touch.minY && t.rows.minY >= t.header.maxY, "\(label)")
+            #expect(t.rows.height >= 3 * t.row + 2 * t.rowGap, "\(label): three rows do not fit")
+            #expect(t.rows.maxY < t.bar.field.minY && t.touch.contains(t.bar.field), "\(label)")
+            #expect(t.veil.solid >= t.next.maxY, "\(label)")
+        }
+        for split in stride(from: CGFloat(380), through: 480, by: 5) {
+            check(DailyMetrics.tent(size: laptop, split: split, across: true), "laptop \(split)")
+        }
+        for split in stride(from: CGFloat(400), through: 490, by: 5) {
+            check(DailyMetrics.tent(size: book, split: split, across: false), "book \(split)")
+        }
+        // The time shrinks before anything goes; at 445 the boards stand exactly.
+        #expect(DailyMetrics.tent(size: laptop, split: 380, across: true).timeSize < 124)
+        #expect(DailyMetrics.tent(size: book, split: 400, across: false).timeSize < 112)
+        #expect(DailyMetrics.tent(size: laptop, split: 480, across: true).header.minY > 480)
     }
 }

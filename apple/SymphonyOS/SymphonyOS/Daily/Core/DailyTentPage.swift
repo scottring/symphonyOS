@@ -26,15 +26,3 @@ struct DailyTentPage: Equatable {
     /// No task today at all: the touch half says so (`WalkCopy.nothingToday`).
     var nothing: Bool { open.isEmpty && done == 0 }
 }
-
-extension Signpost.Sign {
-    /// VoiceOver, where the sign cannot be touched (the half-open display): its eyebrow and its
-    /// title, and not what a tap would do.
-    var stillLabel: String {
-        [eyebrow, title]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-            .map { $0.last.map { ".!?".contains($0) } == true ? $0 : $0 + "." }
-            .joined(separator: " ")
-    }
-}

@@ -40,10 +40,11 @@ struct DailyLookBack: Equatable {
 
     /// A Tell asked for from outside (`DailyGate.tell`) while the plan shows: the sheet rises
     /// first, so the bar that answers it, its light and its listening line, are on screen. While
-    /// the walk shows the Tell waits, and so does this. True when it raised the sheet.
+    /// the walk shows the Tell waits, and so does this; under the half-open display (`covered`) the
+    /// Tell is the display's and the plan stays down. True when it raised the sheet.
     @discardableResult
-    mutating func tellArrives(asked: Bool, walkShowing: Bool) -> Bool {
-        guard asked, !walkShowing, lowered else { return false }
+    mutating func tellArrives(asked: Bool, walkShowing: Bool, covered: Bool = false) -> Bool {
+        guard asked, !walkShowing, !covered, lowered else { return false }
         raise()
         return true
     }

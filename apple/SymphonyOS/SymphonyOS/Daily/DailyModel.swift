@@ -29,6 +29,9 @@ import Observation
     /// pull-up (its row is hidden) and for a change with no row on the page.
     private(set) var reveal: Reveal?
     var page: DailyAdd.Page = .today
+    /// The light half-open display is over the page (`cover()`): the page stays as it was, but its
+    /// bar cannot start or add and it takes no Tell.
+    private(set) var covered = false
 
     struct Reveal: Equatable {
         let id: UUID
@@ -60,6 +63,7 @@ import Observation
     @ObservationIgnored var onPullUpWritten: ((UUID, WalkPeriods) -> Void)?
 
     private enum Change {
+        case ticked(DailyDay.Row)
         case added(DailyWriter.Added)
         case moved(PlanWriter.Snapshot)
         case pulledUp(UUID, WalkLevel)
@@ -123,6 +127,8 @@ import Observation
         defer { draining = false }
         while !queue.isEmpty {
             let next = queue.removeFirst()
+            // Covered by the half-open display: nothing on the page can start listening or add.
+            if covered && (next == .micTapped || next == .submitted) { continue }
             switch next {
             case .undoExpired:
                 commitPullUp()
@@ -144,23 +150,44 @@ import Observation
     @discardableResult
     func answerTell(_ app: AppState) -> Bool {
         let answer = DailyGate.tell(asked: app.tellRequested, walkShowing: app.walkShowing, barShown: true,
-                                    speechOff: bar.speechOff, listening: bar.isListening)
+                                    speechOff: bar.speechOff, listening: bar.isListening, covered: covered)
         guard answer.takesRequest else { return false }
         app.tellRequested = false
         app.dailyPanel = nil
         switch answer {
         case .listen, .focusField: send(.micTapped)       // with speech off the reducer asks for the field
-        case .none, .wait, .leaveAlone, .oldSheet: break
+        case .none, .wait, .leaveAlone, .oldSheet, .covered: break
         }
         return true
     }
 
-    /// Covered by the half-open display, which draws its own bar (`DailyGate.coversPage`): the
-    /// page under it stops listening, a pending pull-up is written and its Undo goes, so nothing
-    /// there can hear, or take back a change, while the display is up.
+    /// Covered by the light half-open display, which draws its own bar (`DailyGate.coversPage`;
+    /// ruling D14): the page stays as it was, drawn but inert. Its bar stops listening and cannot
+    /// start or add, it takes no Tell, and a pending pull-up is written (as `.left` does); an add's
+    /// or a move's Undo is kept, and can be used after `uncover()` if its time has not run out.
     func cover() {
+        covered = true
         send(.left)
-        endUndo()
+    }
+
+    /// The display went away (opened flat): the page is as it was, on today's day.
+    func uncover() {
+        guard covered else { return }
+        covered = false
+        refreshDay()
+    }
+
+    /// Where the app is, as the scene reports it.
+    enum Scene { case active, inactive, background }
+
+    /// Back in front: the day is read again. Gone to the background: the bar lets go (`.left`),
+    /// so a pending pull-up is written and nothing listens.
+    func sceneChanged(_ scene: Scene) {
+        switch scene {
+        case .active: refreshDay()
+        case .background: send(.left)
+        case .inactive: break
+        }
     }
 
     /// The walk shows over the page (`AppState.walkShowing`; the page does not go away under
@@ -215,6 +242,14 @@ import Observation
             return
         }
         offerUndo(.area(id, level, back: back), note: nil)
+    }
+
+    /// A tick on the half-open display (ruling D15), where a done row goes into a count: it offers
+    /// Undo, which puts exactly that task back as it was; a second tick takes the Undo over.
+    func tickWithUndo(_ row: DailyDay.Row) {
+        writer.setDone(row, !row.done, today: today)
+        lit = nil
+        offerUndo(.ticked(row), note: nil)
     }
 
     /// Moves the first-thing mark. Not undone by Undo, so it ends the Undo before it.
@@ -302,6 +337,7 @@ import Observation
         guard let change = last else { return }
         last = nil
         switch change {
+        case .ticked(let row): writer.setDone(row, row.done, today: today)
         case .added(let added): writer.takeBack(added)
         case .moved(let snapshot): writer.undoMove(snapshot)
         case .pulledUp: pulledUp = nil                      // nothing was written

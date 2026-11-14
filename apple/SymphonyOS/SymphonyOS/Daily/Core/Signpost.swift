@@ -49,6 +49,16 @@ enum Signpost {
                 .joined(separator: " ")
         }
 
+        /// VoiceOver, where the sign cannot be touched (the half-open display): its eyebrow and
+        /// its title, and not what a tap would do.
+        var stillLabel: String {
+            [eyebrow, title]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .map { $0.last.map { ".!?".contains($0) } == true ? $0 : $0 + "." }
+                .joined(separator: " ")
+        }
+
         /// Following a sign that takes you somewhere puts its kind away for the day, so
         /// the next true kind shows on coming back (ruling 22). "First, today" stays: it
         /// only lights its row, and goes when that task is done.

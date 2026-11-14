@@ -189,4 +189,26 @@ struct DailyGateTests {
         #expect(!DailyGate.coversPage(edition: .full, halfOpen: true))
         #expect(!DailyGate.coversPage(edition: .light, halfOpen: true, built: false))
     }
+
+    /// Ruling D14: a page covered by the light half-open display never takes a Tell, whatever its
+    /// bar is doing; the display's own bar is the one owner.
+    @Test func aCoveredPageNeverTakesATell() {
+        for walk in [false, true] { for bar in [false, true] { for off in [false, true] { for on in [false, true] {
+            #expect(DailyGate.tell(asked: true, walkShowing: walk, barShown: bar, speechOff: off, listening: on,
+                                   covered: true) == .covered)
+            #expect(DailyGate.tell(asked: false, walkShowing: walk, barShown: bar, speechOff: off, listening: on,
+                                   covered: true) == .none)
+        } } } }
+        #expect(!DailyGate.Tell.covered.takesRequest)
+        #expect(DailyGate.tell(asked: true, walkShowing: false, barShown: true, speechOff: false, listening: false,
+                               covered: false) == .listen)
+    }
+
+    /// Under the light display a light page stays (drawn, inert); only the old page is taken away.
+    @Test func onlyTheOldPageIsTakenAwayUnderTheDisplay() {
+        #expect(DailyGate.dropsPage(covered: true, lightPage: false))
+        #expect(!DailyGate.dropsPage(covered: true, lightPage: true))
+        #expect(!DailyGate.dropsPage(covered: false, lightPage: false))
+        #expect(!DailyGate.dropsPage(covered: false, lightPage: true))
+    }
 }

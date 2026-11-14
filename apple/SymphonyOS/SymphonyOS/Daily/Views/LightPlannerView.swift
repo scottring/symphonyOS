@@ -42,14 +42,15 @@ struct LightPlannerView<Full: View>: View {
     /// The dock gives way to the bar on this window and this page (`DailyGate.hidesDock`).
     private var hidesDock: Bool { DailyGate.hidesDock(on: appState.horizon, edition: appState.edition, layout: layout) }
 
-    /// The light half-open display is up over this Planner (`DailyGate.coversPage`): no page is
-    /// drawn under it, so nothing here can listen, write or answer a Tell (light's or the old
-    /// Today's sheet) while only the display's own bar can be seen.
+    /// The light half-open display is up over this Planner (`DailyGate.coversPage`). A light page
+    /// stays as it was under it, drawn but inert (no touch, hidden from VoiceOver, its model
+    /// `covered`: its bar cannot start and it takes no Tell), so nothing open on it is lost; the old
+    /// page is taken away (`DailyGate.dropsPage`), since its own Tell sheet cannot be held back.
     private var covered: Bool { DailyGate.coversPage(edition: appState.edition, halfOpen: appState.posture.isHalfOpen) }
 
     var body: some View {
         ZStack {
-            if covered {
+            if DailyGate.dropsPage(covered: covered, lightPage: showsLight) {
                 DailyPalette.sky.ignoresSafeArea()
             } else if showsLight, let level = DailyGate.mountain(appState.horizon) {
                 mountain(level)
@@ -59,6 +60,8 @@ struct LightPlannerView<Full: View>: View {
                 full()
             }
         }
+        .allowsHitTesting(!covered)
+        .accessibilityHidden(covered)
         .background {
             Color.clear
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size = TodayView.pinnedSize ?? $0 }
@@ -67,13 +70,21 @@ struct LightPlannerView<Full: View>: View {
         .onAppear {
             // Appearing again (a sheet or a pushed page going away) keeps the model, its Undo and its lit row.
             if model == nil { makeModel() }
+            if covered { model?.cover() }        // set down half open before the Planner appeared
             appState.dailyHidesDock = hidesDock
             openDemoPage()
         }
         .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
-        // Set down half open: the page's bar stops listening and its Undo goes before the display's
-        // own bar takes over (the page itself is no longer drawn).
-        .onChange(of: covered) { _, covered in if covered { model?.cover() } }
+        // Set down half open: the page stays, inert, and lets go of the keyboard; its bar stops and
+        // the display's own bar takes over. Opened flat: the page is as it was, on today's day.
+        .onChange(of: covered) { _, covered in
+            if covered {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                model?.cover()
+            } else {
+                model?.uncover()
+            }
+        }
         // A walk shows over whatever light page is up: its bar never listens under it.
         .onChange(of: appState.walkShowing) { _, showing in model?.walkShowingChanged(showing) }
         // Gone (another tab, signed out, the household become full): the dock comes back, and the
@@ -84,13 +95,7 @@ struct LightPlannerView<Full: View>: View {
             model = nil
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active: model?.refreshDay()
-            case .background: model?.send(.left)
-            default: break
-            }
-        }
+        .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
@@ -159,6 +164,7 @@ struct LightPlannerView<Full: View>: View {
         let memory = SignpostMemory()
         #endif
         model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory)
+        if covered { model?.cover() }
     }
 
     /// A word in the row of words: the date the walk's period for it opens on, then the page.
@@ -182,6 +188,17 @@ struct LightPlannerView<Full: View>: View {
         demoPageOpened = true
         go(page)
         #endif
+    }
+}
+
+extension DailyModel.Scene {
+    /// The scene's phase, as the model reads it (`DailyModel.sceneChanged`).
+    init(_ phase: ScenePhase) {
+        switch phase {
+        case .active: self = .active
+        case .background: self = .background
+        default: self = .inactive
+        }
     }
 }
 

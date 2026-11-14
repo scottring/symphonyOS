@@ -37,6 +37,13 @@ enum DailyGate {
         halfOpen && self.halfOpen(edition: edition, built: built)
     }
 
+    /// Under the light half-open display (ruling D14) a light page stays as it was, drawn but inert,
+    /// so nothing open on it is lost; only the old page (`lightPage` false) is taken away, since its
+    /// own Tell sheet cannot be held back without changing it.
+    static func dropsPage(covered: Bool, lightPage: Bool) -> Bool {
+        covered && !lightPage
+    }
+
     /// What a Tell Symphony asked for from outside the app (the Lock Screen control, a
     /// `symphony://tell` link: `AppState.tellRequested`) does on a light page.
     enum Tell: Equatable {
@@ -53,13 +60,17 @@ enum DailyGate {
         case leaveAlone
         /// No bar on this page: the old Tell sheet, as the old Today opens it.
         case oldSheet
+        /// The light half-open display covers this page: its own bar takes the request, never this one.
+        case covered
 
         /// The request is taken now (cleared, and any sheet over the page closes).
-        var takesRequest: Bool { self != .none && self != .wait }
+        var takesRequest: Bool { self != .none && self != .wait && self != .covered }
     }
 
-    static func tell(asked: Bool, walkShowing: Bool, barShown: Bool, speechOff: Bool, listening: Bool) -> Tell {
+    static func tell(asked: Bool, walkShowing: Bool, barShown: Bool, speechOff: Bool, listening: Bool,
+                     covered: Bool = false) -> Tell {
         guard asked else { return .none }
+        if covered { return .covered }
         if walkShowing { return .wait }
         guard barShown else { return .oldSheet }
         if listening { return .leaveAlone }
