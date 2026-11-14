@@ -41,6 +41,25 @@ struct DailyMetricsTests {
         #expect(o.sign.titleSize == 20); #expect(o.navGap == 22); #expect(o.ring == 52)
     }
 
+    /// "See my whole plan" lowers the sheet until only its grabber, the handle's words and the
+    /// header show: its top 128 above the window's foot (the walk's own peek, 716 of 844), the
+    /// header where the board puts it on the sheet, with no waiting line; short windows never lower.
+    @Test func lookingBackLowersTheSheetToItsHeader() throws {
+        let m = DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34)
+        let low = try #require(m.lowered)
+        #expect(low.sheetTop == 716)
+        #expect(low.lookBack == CGRect(x: 115, y: 716 + 40 - touch, width: 160, height: touch))
+        #expect(low.header == CGRect(x: 22, y: 716 + 46, width: 346, height: 56))
+        #expect(low.header.maxY <= phone.height)
+
+        let waiting = try #require(DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34, waiting: true).lowered)
+        #expect(waiting == low)
+        let big = try #require(DailyMetrics.today(size: bigger, safeTop: 62, safeBottom: 34).lowered)
+        #expect(big.sheetTop == 874 - 128 && big.header.minY == 874 - 128 + 46)
+        #expect(DailyMetrics.week(size: phone, safeTop: 44, safeBottom: 34).lowered?.header.minY == CGFloat(716 + 44))
+        #expect(DailyMetrics.today(size: outside, safeTop: 22, safeBottom: 0, shape: .short).lowered == nil)
+    }
+
     @Test func theWeekBoard() {
         let m = DailyMetrics.week(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
         #expect(m.band.height == 250); #expect(m.picture == CGRect(x: -150, y: -330, width: 700, height: 700))
@@ -361,8 +380,16 @@ struct DailyMetricsTests {
                 #expect(m.grabber.size == CGSize(width: 44, height: 5))
                 #expect(m.grabber.midX == size.width / 2)
                 #expect(m.grabber.minY == m.sheetTop + 9)
+                // Lowered over the whole plan, the grabber is centred the same way on the lowered top.
+                if let low = m.lowered {
+                    #expect(low.grabber.size == m.grabber.size)
+                    #expect(low.grabber.midX == size.width / 2)
+                    #expect(low.grabber.minY == low.sheetTop + 9)
+                }
             }
         }
+        #expect(DailyMetrics.week(size: phone, safeTop: 44, safeBottom: 34).lowered?.grabber
+                == CGRect(x: 173, y: 844 - 128 + 9, width: 44, height: 5))
         #expect(DailyMetrics.week(size: phone, safeTop: 44, safeBottom: 34).grabber == CGRect(x: 173, y: 213, width: 44, height: 5))
     }
 

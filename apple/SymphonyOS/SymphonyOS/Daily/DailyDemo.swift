@@ -22,7 +22,8 @@ extension DemoMode {
     /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
     /// `speak` and `undo`: the bar, see `showDaily`; `hear`: the bar's stand-in listener, untapped; `more` and `inbox`: that sheet, `dailyPanel`;
     /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open;
-    /// `select`, `move` and `zoom` on a mountain page, see `showMountain`).
+    /// `select`, `move` and `zoom` on a mountain page, see `showMountain`; `walkdown` with `select`: Walk it
+    /// down tapped on that flag; `lookback`: Today's handle tapped, the sheet lowered over the whole plan).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
     static func dailySeed(in arguments: [String]) -> String {

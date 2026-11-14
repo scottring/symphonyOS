@@ -2,9 +2,10 @@
 import SwiftUI
 
 /// The paper sheet the day is written on: from `top` to the page's foot, rounded at its
-/// top corners, with a grabber and (on a tall window) the handle's words, the walk's "see
-/// my whole plan" (`WalkCopy.lookBackHandle`). `content` is laid out in page points over
-/// the whole page, so the page places everything on the sheet by `DailyMetrics`.
+/// top corners, with a grabber and (on a tall window) the handle's words: the walk's "see
+/// my whole plan" (`WalkCopy.lookBackHandle`), or, lowered, what raising it shows
+/// (`DailyLookBack.label`). `content` is laid out in page points over the whole page, so the
+/// page places everything on the sheet by `DailyMetrics`.
 struct DailySheet<Content: View>: View {
     let top: CGFloat
     let radius: CGFloat
@@ -13,6 +14,8 @@ struct DailySheet<Content: View>: View {
     /// The handle's touch shape; nil draws no words (short windows).
     let lookBack: CGRect?
     let onLookBack: () -> Void
+    /// The handle's words.
+    var label: String = WalkCopy.lookBackHandle
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -36,7 +39,7 @@ struct DailySheet<Content: View>: View {
     /// The words sit at +16…+40 on the sheet, the bottom 24 points of the touch shape.
     private func handle(_ frame: CGRect) -> some View {
         Button(action: onLookBack) {
-            Text(WalkCopy.lookBackHandle)
+            Text(label)
                 .font(DailyPalette.sansMedium(12))
                 .foregroundStyle(DailyPalette.muted)
                 .lineLimit(1)

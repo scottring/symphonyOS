@@ -108,6 +108,9 @@ final class AppState {
     /// The walk is showing over everything (set by the main view as it opens and closes it):
     /// a Tell asked for meanwhile waits until it closes (`DailyGate.tell`).
     var walkShowing = false
+    /// A walk down from a light page or sign (`DailyWalkDown`), asked for: the main view opens
+    /// it ahead of any other walk, never stored, and sets this back to nil.
+    var walkDown: DailyWalkDown?
 
     /// Off the light pages (the Planner went away, or the household is no longer light):
     /// the dock comes back and nothing light is left open on top.
@@ -163,6 +166,7 @@ final class AppState {
         walkReplayRequested = false
         walkPaused = false
         walkResumeRequested = false
+        walkDown = nil
     }
 
     // MARK: - Date Navigation

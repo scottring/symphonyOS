@@ -653,4 +653,169 @@ struct MountainPageTests {
         let layout = WalkLayout.make(page.walkState, today: today, footing: .natural)
         #expect(layout.posts.contains { $0.key == WalkPostKey(level: .month, column: area("Health").id) })
     }
+
+    // MARK: Walking a goal down, from a sign or a page
+
+    /// The two signs that walk open the walk one level below the goal they name, about it,
+    /// with no lesson, and come back to Today.
+    @Test func aSignsWalkDownOpensWhereTheSignPoints() throws {
+        let today = day(2026, 11, 10)                   // the demo's day: fall
+        let periods = WalkPeriods.pick(now: today)
+        func sign(_ goals: [Goal], _ tasks: [SymphonyTask]) -> Signpost.Sign? {
+            Signpost.pick(Signpost.facts(tasks: tasks, goals: goals, focus: [], commitments: [], today: today,
+                                         me: me, seasons: nil))
+        }
+        func down(_ target: Signpost.Target, _ goals: [Goal], _ tasks: [SymphonyTask]) -> DailyWalkDown? {
+            DailyWalkDown.sign(target, goals: goals, tasks: tasks, areaRows: [], saved: nil, periods: periods,
+                               now: today, date: today, seasons: nil, me: me)
+        }
+
+        // No piece this fall: a year goal with nothing under it opens Season, about it.
+        let lone = goal("Feel strong again", year: periods.year, in: "Health")
+        let noPiece = try #require(sign([lone], []))
+        #expect(noPiece.kind == .noPiece)
+        #expect(noPiece.target == .walkDown(lone.id, .year))
+        let fromYear = try #require(down(noPiece.target, [lone], []))
+        #expect(fromYear.position.step == 2)
+        #expect(fromYear.position.focus["2"] == lone.id)
+        #expect(fromYear.position.taught)
+        #expect(fromYear.position.status == .inProgress)
+        #expect(fromYear.userId == me)
+        #expect(fromYear.returnsTo.horizon == .today && PlanCalendar.sameDay(fromYear.returnsTo.date, today))
+
+        // A new week: a month goal of the walk's month and nothing on this week opens Week, about it.
+        let piece = row("Strength twice a week", .season, start: periods.season.start, in: "Health", goal: lone.id)
+        let month = row("Find a gym that fits", .month, start: periods.monthStart, in: "Health", source: piece.id)
+        let newWeek = try #require(sign([lone], [piece, month]))
+        #expect(newWeek.kind == .newWeek)
+        #expect(newWeek.target == .walkDown(month.id, .month))
+        let fromMonth = try #require(down(newWeek.target, [lone], [piece, month]))
+        #expect(fromMonth.position.step == 4)
+        #expect(fromMonth.position.focus["4"] == month.id)
+
+        // A sign that does not walk, a goal that has gone, or the wrong level: no walk.
+        #expect(down(.week(today), [lone], []) == nil)
+        #expect(down(.walkDown(UUID(), .year), [lone], []) == nil)
+        #expect(down(.walkDown(lone.id, .month), [lone], []) == nil)
+        // Another person's goal, or one off the walk's year, is never walked down.
+        let theirs = goal("Their goal", year: periods.year, in: "Health", user: UUID())
+        #expect(down(.walkDown(theirs.id, .year), [theirs], []) == nil)
+        let lastYear = goal("Last year's goal", year: periods.year - 1, in: "Health")
+        #expect(down(.walkDown(lastYear.id, .year), [lastYear], []) == nil)
+    }
+
+    /// "Walk it down" on a page: the chosen flag, one level down, in the walk's own periods,
+    /// with the page's ridge and the saved walk's kept areas; it comes back to that page.
+    @Test func aPagesWalkDownIsItsChosenFlagAndComesBackToThePage() throws {
+        let today = day(2026, 11, 10)
+        let periods = WalkPeriods.pick(now: today)
+        let opened = day(periods.year, 1, 1)            // the walk's year: 2027, as the row of words opens it
+        let strong = goal("Feel strong again", year: periods.year, in: "Health")
+        let bathroom = goal("Finish the bathroom", year: periods.year, in: "Home")
+        let flags = MountainPage.flags(level: .year, goals: [strong, bathroom], tasks: [], selected: opened,
+                                       today: today, seasons: nil, me: me, areas: ridge)
+        var page = MountainPage(level: .year, flags: flags, areas: ridge, saved: [area("People").id])
+        _ = page.apply(.flag(strong.id))
+        #expect(page.apply(.walkDown) == [.walkDown(strong.id)])
+        let down = try #require(DailyWalkDown.page(page, flag: strong.id, from: .year, date: opened, periods: periods,
+                                                   now: today, seasons: nil, userId: me))
+        #expect(down.position.step == 2)
+        #expect(down.position.focus["2"] == strong.id)
+        #expect(down.position.taught)
+        #expect(Set(down.position.kept) == [area("Health").id, area("Home").id, area("People").id])
+        #expect(Set(down.position.planted) == [strong.id, bathroom.id])
+        #expect(down.position.areas == ridge)
+        #expect(down.returnsTo.horizon == .year && PlanCalendar.sameDay(down.returnsTo.date, opened))
+
+        // A flag the page does not offer it on (another year's page) opens nothing.
+        let thisYear = day(periods.year - 1, 6, 1)
+        let old = goal("An old goal", year: periods.year - 1, in: "Fun")
+        var earlier = MountainPage(level: .year,
+                                   flags: MountainPage.flags(level: .year, goals: [old], tasks: [], selected: thisYear,
+                                                             today: today, seasons: nil, me: me, areas: ridge),
+                                   areas: ridge, saved: [])
+        _ = earlier.apply(.flag(old.id))
+        #expect(earlier.panel?.canWalkDown == false)
+        #expect(DailyWalkDown.page(earlier, flag: old.id, from: .year, date: thisYear, periods: periods, now: today,
+                                   seasons: nil, userId: me) == nil)
+        #expect(DailyWalkDown.page(page, flag: UUID(), from: .year, date: opened, periods: periods, now: today,
+                                   seasons: nil, userId: me) == nil)
+    }
+
+    /// Asked for, a walk-down opens ahead of any other walk only in a light household, for the
+    /// person who asked, with no walk up; anything else drops it, so it never opens later by itself.
+    @Test func aWalkDownOpensOnlyInLightForWhoAskedAndNeverWaits() throws {
+        let today = day(2026, 11, 10)
+        let periods = WalkPeriods.pick(now: today)
+        let strong = goal("Feel strong again", year: periods.year, in: "Health")
+        let down = try #require(DailyWalkDown.sign(.walkDown(strong.id, .year), goals: [strong], tasks: [],
+                                                   areaRows: [], saved: nil, periods: periods, now: today,
+                                                   date: today, seasons: nil, me: me))
+        #expect(DailyWalkDown.decide(nil, walkUp: false, userId: me, edition: .light) == .none)
+        #expect(DailyWalkDown.decide(down, walkUp: false, userId: me, edition: .light) == .open(down))
+        #expect(DailyWalkDown.decide(down, walkUp: true, userId: me, edition: .light) == .drop)
+        #expect(DailyWalkDown.decide(down, walkUp: false, userId: me, edition: .full) == .drop)
+        #expect(DailyWalkDown.decide(down, walkUp: false, userId: UUID(), edition: .light) == .drop)
+        #expect(DailyWalkDown.decide(down, walkUp: false, userId: nil, edition: .light) == .drop)
+    }
+
+    // MARK: See my whole plan
+
+    /// The handle lowers Today's sheet over the walk's own top-to-bottom plan and raises it
+    /// again. Lowered, the bar lets go, the handle says "Show my day" (Week: "Show my week"),
+    /// and only a post's "+n" answers a tap. Nothing is written and no walk opens.
+    @Test func theWholePlanLowersTheSheetAndIsOnlyRead() {
+        let today = day(2026, 11, 10)
+        let periods = WalkPeriods.pick(now: today)
+        let strong = goal("Feel strong again", year: periods.year, in: "Health")
+        let piece = row("Strength twice a week", .season, start: periods.season.start, in: "Health", goal: strong.id)
+        let month = row("Find a gym that fits", .month, start: periods.monthStart, in: "Health", source: piece.id)
+        let week = row("Tour the gym", .week, start: periods.weekStart, in: "Health", source: month.id)
+        let theirs = row("Their task", .week, start: periods.weekStart, in: "Health", user: UUID())
+        let tasks = [piece, month, week, theirs]
+
+        var look = DailyLookBack()
+        #expect(!look.lowered)
+        #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
+        #expect(look.handleTapped(areas: ridge, kept: [area("People").id]) == [.left])   // the bar stops listening
+        #expect(look.lowered)
+        #expect(look.label(on: .today) == WalkCopy.showMyDay)
+        #expect(look.label(on: .week) == DailyCopy.showMyWeek)
+
+        let plan = look.plan(goals: [strong], tasks: tasks, periods: periods, me: me)
+        #expect(plan.step == 6)
+        #expect(plan.taught && !plan.teaching)
+        #expect(plan.items.map(\.id) == [strong.id, piece.id, month.id, week.id])
+        #expect(plan.kept == [area("Health").id, area("People").id])
+
+        // "+n" opens its post and closes it again; a flag is read, not tapped.
+        let post = WalkPostKey(level: .month, column: area("Health").id)
+        look.tap(.stubTapped(post))
+        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == post)
+        look.tap(.bannerTapped(strong.id))
+        look.tap(.areaTapped(area("Health").id))
+        look.tap(nil)
+        let read = look.plan(goals: [strong], tasks: tasks, periods: periods, me: me)
+        #expect(read.expanded == post && read.selected == nil && read.focusArea == nil)
+        look.tap(.stubTapped(post))
+        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
+
+        // Raised again: nothing open, nothing for the bar.
+        look.tap(.stubTapped(post))
+        #expect(look.handleTapped(areas: ridge, kept: []) == [])
+        #expect(!look.lowered)
+        #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
+        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
+        look.tap(.stubTapped(post))                     // raised, the plan is not there to tap
+        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
+
+        // Only where the window has a handle: a short window never lowers.
+        var short = DailyLookBack()
+        _ = short.handleTapped(areas: ridge, kept: [])
+        let tall = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
+        let outside = DailyMetrics.today(size: CGSize(width: 466, height: 678), safeTop: 22, safeBottom: 0, shape: .short)
+        #expect(short.sheet(on: tall) == tall.lowered)
+        #expect(short.sheet(on: outside) == nil)
+        #expect(DailyLookBack().sheet(on: tall) == nil)
+    }
 }

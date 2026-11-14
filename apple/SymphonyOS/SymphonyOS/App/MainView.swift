@@ -182,6 +182,7 @@ struct iOSMainView: View {
         .onChange(of: appState.edition) { _, _ in considerWalk() }
         .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
         .onChange(of: appState.walkResumeRequested) { _, _ in considerWalk() }
+        .onChange(of: appState.walkDown) { _, _ in considerWalk() }
         // Someone else signed in (or nobody is): the walk up, and a replay still
         // waiting, are not theirs.
         .onChange(of: auth.currentUser?.id) { _, _ in
@@ -248,6 +249,25 @@ extension iOSMainView {
     /// `DemoMode.walkStore`, emptied at launch, so Leave for now can be picked back up within one run.
     private func considerWalk(animated: Bool = true) {
         let userId = auth.currentUser?.id
+        // A walk down from a light page or sign, ahead of any other: never stored, and over,
+        // however it ends, on the page it was started from (`DailyWalkDown`).
+        switch DailyWalkDown.decide(appState.walkDown, walkUp: walk != nil, userId: userId, edition: appState.edition) {
+        case .open(let down):
+            appState.walkDown = nil
+            let model = down.model(context: modelContext)
+            model.onEnd = { _ in
+                closeWalk()
+                appState.activeTab = .planner
+                appState.horizon = down.returnsTo.horizon
+                appState.selectedDate = down.returnsTo.date
+            }
+            show(model, animated: animated)
+            return
+        case .drop:
+            appState.walkDown = nil
+        case .none:
+            break
+        }
         #if DEBUG
         let demo = DemoMode.isOn
         let demoWalk = demo && DemoMode.isWalk && !demoWalkOpened
@@ -308,19 +328,23 @@ extension iOSMainView {
             appState.horizon = .today
             appState.goToToday()
         }
-        // Never under a sheet or behind a keyboard: whatever field has the keyboard lets it
-        // go, and the dock's capture sheet, or light's Inbox or More, closes. (Today's own Tell
-        // and Add sheets, and the half-open display's Tell sheet, are kept by those views and
-        // can still sit above it.)
+        show(model, animated: animated)
+        #if DEBUG
+        // Driven once it is up, so a step that ends the walk (`leave`) takes it down as a person's would.
+        if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
+        #endif
+    }
+
+    /// Puts a walk up. Never under a sheet or behind a keyboard: whatever field has the keyboard
+    /// lets it go, and the dock's capture sheet, or light's Inbox or More, closes. (Today's own
+    /// Tell and Add sheets, and the half-open display's Tell sheet, are kept by those views and
+    /// can still sit above it.)
+    private func show(_ model: WalkModel, animated: Bool) {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         showCapture = false
         appState.dailyPanel = nil
         appState.walkShowing = true             // a Tell asked for now waits until it closes
         withAnimation(animated ? walkFade : nil) { walk = model }
-        #if DEBUG
-        // Driven once it is up, so a step that ends the walk (`leave`) takes it down as a person's would.
-        if demoWalk { DemoMode.showWalk(model, DemoMode.walkOrb) }
-        #endif
     }
 
     private var walkFade: Animation { .easeInOut(duration: reduceMotion ? 0.15 : 0.4) }

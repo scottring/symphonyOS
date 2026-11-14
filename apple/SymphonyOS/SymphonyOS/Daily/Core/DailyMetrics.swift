@@ -285,6 +285,33 @@ struct DailyMetrics: Equatable {
         return min(1, max(0, (bottom - row.height - scroll.minY) / room))
     }
 
+    // MARK: Looking back up
+
+    /// The sheet lowered by its handle (`DailyLookBack`): only its grabber, the handle's words
+    /// and the header show.
+    struct Lowered: Equatable {
+        let sheetTop: CGFloat
+        /// The grabber on the lowered top, centred on the window as `grabber` is.
+        let grabber: CGRect
+        let lookBack: CGRect
+        let header: CGRect
+    }
+
+    /// The lowered sheet's top stands this far above the window's foot (the walk's own peek, 716 of 844).
+    static let lookBackPeek: CGFloat = 128
+
+    /// Today's or Week's sheet lowered: its top `lookBackPeek` above the window's foot, the
+    /// handle and the header where they stand on the sheet, with no waiting line between them.
+    /// Nil where the window has no handle (short windows).
+    var lowered: Lowered? {
+        guard let lookBack else { return nil }
+        let top = size.height - Self.lookBackPeek
+        let headerAt = header.minY - sheetTop - (waiting == nil ? 0 : Self.minTouch)
+        return Lowered(sheetTop: top, grabber: grabber.offsetBy(dx: 0, dy: top - sheetTop),
+                       lookBack: lookBack.offsetBy(dx: 0, dy: top - sheetTop),
+                       header: header.offsetBy(dx: 0, dy: top + headerAt - header.minY))
+    }
+
     // MARK: Touch
 
     /// Every control's touch shape: the field's typing part, the light, More, Inbox, the

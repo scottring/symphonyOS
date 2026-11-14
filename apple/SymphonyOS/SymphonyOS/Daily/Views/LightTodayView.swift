@@ -26,6 +26,7 @@ struct LightTodayView: View {
     @Query private var focus: [TaskFocus]
     @Query private var commitments: [TaskCommitment]
     @Query private var instances: [ActionableInstance]
+    @Query private var goalAreas: [GoalArea]
     @State private var calendar = CalendarFeed.shared
     /// This person's stored walk, read whenever the page appears and whenever a walk closes.
     @State private var walkPosition: WalkPosition?
@@ -34,6 +35,8 @@ struct LightTodayView: View {
     /// Where the rows stand, so the row an Undo would change is kept clear of it.
     @State private var frames = DailyRowFrames()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The sheet lowered by its handle over the whole plan, or not.
+    @State private var lookBack = DailyLookBack()
     #if DEBUG
     @State private var demoStatesApplied = false
     #endif
@@ -44,23 +47,26 @@ struct LightTodayView: View {
             let page = read(now: DailyClock.now())
             let line = walkLine
             let m = metrics(waiting: line != nil)
+            let low = lookBack.sheet(on: m)
             ZStack(alignment: .topLeading) {
-                DailyBand(picture: m.picture, height: m.band.height)
+                if low != nil { plan } else { DailyBand(picture: m.picture, height: m.band.height) }
                 DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 DailyNavRow(current: .today, gap: m.navGap, go: go)
                     .frame(width: size.width)
                     .offset(y: m.navTop)
-                if let sign = page.sign, m.sign != .none {
+                if let sign = page.sign, m.sign != .none, low == nil {
                     SignpostView(sign: sign, metrics: m.sign, tap: { follow(sign) },
                                  putAway: { model.dismiss(sign.kind) })
                 }
-                DailySheet(top: m.sheetTop, radius: m.sheetRadius, grabber: m.grabber, lookBack: m.lookBack,
-                           onLookBack: {}) {    // Task 15 wires the whole plan
-                    sheet(page, m, line: line)
+                DailySheet(top: low?.sheetTop ?? m.sheetTop, radius: m.sheetRadius, grabber: low?.grabber ?? m.grabber,
+                           lookBack: low?.lookBack ?? m.lookBack, onLookBack: handleTapped, label: lookBack.label(on: .today)) {
+                    if let low { header(page, m, at: low.header) } else { sheet(page, m, line: line) }
                 }
-                DailyPaperFade(fade: m.bar.fade, size: size)
-                DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
-                             listening: DailyCopy.listening(.today))
+                if low == nil {
+                    DailyPaperFade(fade: m.bar.fade, size: size)
+                    DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
+                                 listening: DailyCopy.listening(.today))
+                }
                 #if DEBUG
                 Color.clear.frame(width: 0, height: 0)
                     .onAppear { applyDemoStates(page) }
@@ -126,7 +132,7 @@ struct LightTodayView: View {
     @ViewBuilder
     private func sheet(_ page: DailyTodayPage, _ m: DailyMetrics, line: DailyGate.WalkLine?) -> some View {
         if let line, let frame = m.waiting { walkButton(line, frame) }
-        header(page, m)
+        header(page, m, at: m.header)
         if let next = page.next {
             DailyNextCard(next: next)
                 .frame(width: m.card.width, height: m.card.height)
@@ -144,7 +150,7 @@ struct LightTodayView: View {
         }
     }
 
-    private func header(_ page: DailyTodayPage, _ m: DailyMetrics) -> some View {
+    private func header(_ page: DailyTodayPage, _ m: DailyMetrics, at frame: CGRect) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(DailyCopy.today.uppercased())
@@ -162,8 +168,8 @@ struct LightTodayView: View {
             Spacer(minLength: 0)
             if let ring = page.ring { DailyRing(done: ring.done, total: ring.total, diameter: m.ring) }
         }
-        .frame(width: m.header.width, height: m.header.height)
-        .offset(x: m.header.minX, y: m.header.minY)
+        .frame(width: frame.width, height: frame.height)
+        .offset(x: frame.minX, y: frame.minY)
     }
 
     /// The rows scroll in their own space from their top to the page's foot, and can be
@@ -222,6 +228,16 @@ struct LightTodayView: View {
         .accessibilityIdentifier("daily.walkWaiting")
     }
 
+    /// Behind the lowered sheet: the walk's own top-to-bottom plan, read only; a post's "+n" opens it.
+    private var plan: some View {
+        MountainStage(state: lookBack.plan(goals: goals, tasks: tasks, periods: model.periods, me: userId),
+                      today: model.today, onLabel: { _ in },
+                      onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) }) {
+            EmptyView()
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
     // MARK: Touches
 
     /// A tap follows the sign. A sign that takes you somewhere is put away for the day
@@ -235,9 +251,20 @@ struct LightTodayView: View {
         case .page(let horizon, let day):
             open(horizon, day)
         case .walkDown:
-            return      // Task 15 walks the goal down, and puts the sign away then.
+            // The walk opens one level below the goal the sign names, and comes back to Today.
+            guard let down = DailyWalkDown.sign(sign.target, goals: goals, tasks: tasks, areaRows: goalAreas,
+                                                saved: walkPosition, periods: model.periods, now: model.today,
+                                                date: appState.selectedDate, seasons: seasons, me: userId)
+            else { return }
+            appState.walkDown = down
         }
         if sign.putAwayWhenFollowed { model.dismiss(sign.kind) }
+    }
+
+    /// The handle lowers the sheet over the whole plan, reading the ridge as it goes, or raises it.
+    private func handleTapped() {
+        let ridge = DailyLookBack.ridge(goalAreas, me: userId, saved: walkPosition)
+        for event in lookBack.handleTapped(areas: ridge.areas, kept: ridge.kept) { model.send(event) }
     }
 
     /// Tell asked for from outside, as the model answers it (`DailyGate.tell`); once taken, a
@@ -254,13 +281,14 @@ struct LightTodayView: View {
     #if DEBUG
     /// `-SymphonyDailyState point`: the sign's row lit, as a tap on "First, today" lights it;
     /// `speak` and `undo`: the bar listening, or one task added with Undo showing (`DemoMode.showDaily`);
-    /// `more` or `inbox`: that sheet open over the page.
+    /// `more` or `inbox`: that sheet open over the page; `lookback`: the handle tapped, the whole plan behind.
     private func applyDemoStates(_ page: DailyTodayPage) {
         guard DemoMode.isOn, !demoStatesApplied else { return }
         demoStatesApplied = true
         if DemoMode.dailyStates.contains("point"), let sign = page.sign, case .light = sign.target { follow(sign) }
         DemoMode.showDaily(model, DemoMode.dailyStates)
         if let panel = DemoMode.dailyPanel { appState.dailyPanel = panel }
+        if DemoMode.dailyStates.contains("lookback") { handleTapped() }
     }
     #endif
 }

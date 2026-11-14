@@ -73,6 +73,89 @@ final class LightEditionUITests: XCTestCase {
         return (app, sign)
     }
 
+    /// "Walk it down" on a Year flag opens the walk on Season, asking about that flag, with no
+    /// lesson; Leave for now closes it and Year is there again, with no walk left waiting.
+    @MainActor func testWalkItDownOpensSeasonAndComesBackToYear() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailyPage", "year", "-SymphonyDailyState", "select"]
+        app.launch()
+        let any = app.descendants(matching: .any)
+        let year = any["daily.mountain.year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 60), "never reached Year")
+        let walkItDown = any["daily.panel"].buttons["Walk it down"]
+        XCTAssertTrue(walkItDown.waitForExistence(timeout: 15), "the chosen flag offers no Walk it down")
+        walkItDown.tap()
+
+        let orb = app.buttons["walk.orb"]
+        XCTAssertTrue(orb.waitForExistence(timeout: 30), "the walk did not open")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
+            .waitForExistence(timeout: 15), "not the Season question about the flag")
+        XCTAssertFalse(app.staticTexts["Press and hold the light, and say it out loud."].exists, "taught again")
+
+        orb.tap()
+        let leave = app.buttons["Leave for now"]
+        XCTAssertTrue(leave.waitForExistence(timeout: 15), "no Leave for now")
+        leave.tap()
+        XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not close it")
+        XCTAssertTrue(year.waitForExistence(timeout: 15), "Year is not there again")
+        any["daily.nav.today"].tap()
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 15), "Today did not open")
+        XCTAssertFalse(app.buttons["Your walk is waiting. Pick it back up."].waitForExistence(timeout: 3),
+                       "the walk-down was stored as a waiting walk")
+    }
+
+    /// The handle on Today's sheet lowers it over the whole plan, with no bar, and raises it again.
+    @MainActor func testTheHandleShowsTheWholePlanAndComesBack() throws {
+        let app = launch(light: true)
+        let any = app.descendants(matching: .any)
+        let handle = any["daily.lookBack"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 15), "no handle")
+        XCTAssertEqual(handle.label, "See my whole plan")
+        handle.tap()
+        XCTAssertTrue(app.buttons["Show my day"].waitForExistence(timeout: 15), "the sheet did not lower")
+        XCTAssertFalse(any["daily.bar.field"].exists, "the bar is still up over the plan")
+        attach(app, "whole plan")
+        app.buttons["Show my day"].tap()
+        XCTAssertTrue(app.buttons["See my whole plan"].waitForExistence(timeout: 15), "the sheet did not rise")
+        XCTAssertTrue(any["daily.bar.field"].waitForExistence(timeout: 15), "the bar did not come back")
+        XCTAssertFalse(app.buttons["walk.orb"].exists, "a walk opened")
+        attach(app, "Today again")
+    }
+
+    /// The "No piece this <season> yet" sign walks its goal down; left for now, the walk closes
+    /// on Today, the sign is put away for the day, and no walk is left waiting.
+    @MainActor func testTheNoPieceSignWalksItsGoalDownAndComesBackToToday() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailySeed", "nopiece"]
+        app.launch()
+        let any = app.descendants(matching: .any)
+        let sign = any["daily.signpost"]
+        XCTAssertTrue(sign.waitForExistence(timeout: 60), "no sign")
+        XCTAssertTrue(sign.label.hasPrefix("No piece"), "not the No piece sign: \(sign.label)")
+        sign.tap()
+
+        let orb = app.buttons["walk.orb"]
+        XCTAssertTrue(orb.waitForExistence(timeout: 30), "the sign did not open the walk")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
+            .waitForExistence(timeout: 15), "not the Season question about the goal")
+        orb.tap()
+        app.buttons["Leave for now"].tap()
+        XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not close it")
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 15), "not back on Today")
+        XCTAssertFalse(sign.waitForExistence(timeout: 3), "the followed sign was not put away")
+        XCTAssertFalse(app.buttons["Your walk is waiting. Pick it back up."].exists, "the walk-down was stored")
+        attach(app, "Today after the walk-down")
+    }
+
+    private func attach(_ app: XCUIApplication, _ name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     @MainActor func testFullDockStillHasRoutines() throws {
         let app = launch(light: false)
         XCTAssertTrue(app.buttons["Routines"].exists)

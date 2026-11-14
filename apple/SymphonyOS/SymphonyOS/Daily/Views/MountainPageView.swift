@@ -205,14 +205,19 @@ struct MountainPageView: View {
         var made = MountainPage(level: level, flags: readFlags(), areas: areas, saved: position?.kept ?? [],
                                 savedAreas: position?.areas ?? [])
         #if DEBUG
+        var walkDownNow = false
         if DemoMode.isOn, !demoStatesApplied {
             demoStatesApplied = true
             DemoMode.showMountain(&made, DemoMode.dailyStates)
+            walkDownNow = DemoMode.dailyStates.contains("walkdown")     // with `select`: Walk it down tapped
         }
         #endif
         page = made
         model.page = .goal(level)
         hang()
+        #if DEBUG
+        if walkDownNow { apply(.walkDown) }
+        #endif
     }
 
     /// Where a goal added from the bar hangs: the page's kept areas, zoomed peak, focused flag and periods.
@@ -254,8 +259,12 @@ struct MountainPageView: View {
                 model.setArea(id, level: level, to: area, from: from)
             case .pullUp(let id, let level):
                 model.pullUp(id, level: level)
-            case .walkDown:
-                break       // Task 15 opens the walk one level down, about this flag.
+            case .walkDown(let id):
+                // The walk opens one level down, about this flag, and comes back to this page.
+                guard let page else { continue }
+                appState.walkDown = DailyWalkDown.page(page, flag: id, from: horizon, date: appState.selectedDate,
+                                                       periods: model.periods, now: model.today, seasons: seasons,
+                                                       userId: userId)
             case .open(let horizon):
                 appState.horizon = horizon
             }
