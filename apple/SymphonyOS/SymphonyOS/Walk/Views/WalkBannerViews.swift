@@ -187,7 +187,7 @@ struct WalkBannerView: View {
                 .lineLimit(banner.lines)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(WalkCopy.exampleTag(forWidth: banner.frame.width))
+            Text(WalkLayout.exampleTag(forWidth: banner.frame.width))
                 .font(.custom("DMSans-SemiBold", size: 8.5))
                 .tracking(0.3)
                 .foregroundStyle(WalkPalette.ink)

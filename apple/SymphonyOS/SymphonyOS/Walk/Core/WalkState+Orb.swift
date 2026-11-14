@@ -19,10 +19,10 @@ extension WalkState {
 
     /// The veil behind the open compass (and Welcome's choices): the scene steps back. Not during a
     /// press, so a hold on its way to speaking does not darken the mountain.
-    var showsVeil: Bool { step == 0 || orb == .open }
+    var showsVeil: Bool { step == 0 || orb == .open || teaching }
 
     /// The Next line under the light shows on steps 1 to 5 while the light is at rest and nothing is being typed.
-    var showsNextLine: Bool { (1...5).contains(step) && orb == .idle && typing == nil }
+    var showsNextLine: Bool { (1...5).contains(step) && orb == .idle && typing == nil && !teaching }
 
     /// The quiet Undo pill beside the hint; it gives way while the points show,
     /// where Undo is the up-left point instead.
@@ -38,6 +38,7 @@ extension WalkState {
             // A cancel while waiting for the last words lets them go: the finish wait is taken back.
             orb = .idle
             orbWasOpen = false
+            orbWasTeaching = false
             return [.listen(false), .timer(.hold, ms: nil), .timer(.finish, ms: nil)]
         case .heard(let text):
             switch orb {
@@ -101,6 +102,9 @@ extension WalkState {
         // Still waiting for the last flag's words: plant what there is first.
         var planted: [WalkEffect] = []
         if case .finishing(let live) = orb { planted = plantHeard(live, env) }
+        // Pressing the light puts the lesson away in the same gesture: held, it listens; a tap types.
+        orbWasTeaching = teaching
+        teaching = false
         if typing != nil { return planted }
         if case .speaking = orb { return [] }
         orbWasOpen = orb == .open
@@ -139,8 +143,9 @@ extension WalkState {
 
     private mutating func orbUp(heldMs: Int, _ env: WalkEnv) -> [WalkEffect] {
         let release: [WalkEffect] = [.timer(.hold, ms: nil)]
-        let wasOpen = orbWasOpen
+        let wasOpen = orbWasOpen, wasTeaching = orbWasTeaching
         orbWasOpen = false
+        orbWasTeaching = false
         switch orb {
         case .holding(let hover?):
             guard let chosen = WalkCopy.points(self, env.periods).first(where: { $0.at == hover }) else {
@@ -157,8 +162,9 @@ extension WalkState {
             return release + [.timer(.finish, ms: WalkOrb.finishMs), .finishListening]
         case .holding(nil):
             if heldMs < WalkOrb.holdMs {
-                // With speech off a tap types straight away (the light shows a keyboard).
-                if speechIsOff, !wasOpen, (1...5).contains(step) {
+                // With speech off a tap types straight away (the light shows a keyboard), and so
+                // does the one tap that puts the lesson away (its second line says so).
+                if (speechIsOff || wasTeaching), !wasOpen, (1...5).contains(step) {
                     startTyping()
                     return release
                 }

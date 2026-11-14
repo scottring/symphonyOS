@@ -525,7 +525,7 @@ struct WalkModelTests {
         var ended: WalkStatus?
         m.onEnd = { ended = $0 }
         m.send(.orbDown); m.send(.orbUp(heldMs: 0))           // the compass
-        m.send(.point(.se))                                    // Leave for now
+        m.send(.point(.nw))                                    // Leave for now
         #expect(ended == .paused)
         let position = try #require(saved.load(for: me))
         #expect(position.status == .paused && position.step == 2)

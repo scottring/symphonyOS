@@ -59,6 +59,7 @@ struct WalkLayout: Equatable {
     var nextLine: CGRect? = nil
     var hintLine: CGRect? = nil
     var undoPill: CGRect? = nil
+    var lesson: CGRect? = nil
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
 
@@ -81,6 +82,7 @@ struct WalkLayout: Equatable {
         made.nextLine = nextFrame(state)
         made.hintLine = hintFrame(state)
         made.undoPill = undoFrame(state)
+        made.lesson = teachFrame(state)
         return made
     }
 
@@ -342,8 +344,9 @@ private struct Builder {
             guard let area = column.area, let slot = slots[i] else { return nil }
             let kept = s.kept.contains(area.id)
             let focused = !s.ground && s.focusArea == area.id
-            // On the ground every area is a choice at full contrast, kept or not.
-            let opacity = s.ground ? 1 : max(0.5, 1 - 0.1 * d)
+            // On the ground every area is a choice at full contrast, kept or not; on Look back up
+            // the plan is there to be read, so nothing is faded.
+            let opacity = s.ground || s.step >= 6 ? 1 : max(0.5, 1 - 0.1 * d)
             // A label stands under its peak's Year post and moves with it.
             let footing = feet[i].value * sigma(WalkPostKey(level: .year, column: area.id))
             return L.Label(id: area.id, name: area.name, frame: footing == 0 ? slot.frame : slot.frame.offsetBy(dx: 0, dy: footing),
@@ -813,8 +816,9 @@ private struct Builder {
             let key = WalkPostKey(level: lvl, column: post.column)
             return L.Post(id: postId(key), key: key, base: post.base,
                           top: post.banners.map(\.frame.minY).min() ?? post.base.y - L.pole,
-                          opacity: Double(max(0.6, 1 - 0.09 * CGFloat(d))),
-                          saturation: Double(max(0.55, 1 - 0.1 * CGFloat(d))),
+                          // Looking back up, the whole plan is read: every flag at full strength.
+                          opacity: s.step >= 6 ? 1 : Double(max(0.6, 1 - 0.09 * CGFloat(d))),
+                          saturation: s.step >= 6 ? 1 : Double(max(0.55, 1 - 0.1 * CGFloat(d))),
                           pale: post.pale, banners: post.banners)
         }
         return (posts, risen)
@@ -1115,14 +1119,15 @@ private struct Builder {
 
 // MARK: - The controls under the light
 
-/// The Next line and the hint line, in stage points. They are placed from the light alone,
-/// never from the flags: the flags already keep clear of the light's ring and labels of the
-/// ring and its ticks (`orbRoom`), so what sits under the ring meets neither.
+/// The Next line, the hint line, the compass points' words and the lines that teach the light,
+/// in stage points. They are placed from the light alone, never from the flags: the flags already
+/// keep clear of the light's ring and labels of the ring and its ticks (`orbRoom`), so what sits
+/// under the ring meets neither.
 extension WalkLayout {
     /// The dial's ring around the light (contract §7: 132 across).
     static let ring: CGFloat = 66
     /// The home-indicator zone at the foot of the stage: the bottom safe-area inset of a phone
-    /// with a home indicator, kept clear of the Next line and the hint line.
+    /// with a home indicator, kept clear of every control and every point's words.
     static let homeIndicator: CGFloat = 34
     /// The Next line: a 44-point tap target directly under the ring.
     static let nextHeight: CGFloat = 44
@@ -1131,7 +1136,7 @@ extension WalkLayout {
     /// The hint's width (the stage less 10 on each side) and, by estimate, the characters that fit on one line.
     static let hintWidth: CGFloat = 370
     static let hintCharsPerLine = 48
-    /// The line under the open compass's top point: room for that point's label and second line above its disc.
+    /// Between the open compass's top point's words and the hint above them.
     static let openHintGap: CGFloat = 6
 
     /// How many lines the hint takes: an estimate, so the core needs no fonts (the view allows the same).
@@ -1154,17 +1159,128 @@ extension WalkLayout {
     }
 
     /// Closed: under the Next line's place (taken or not), so it never moves when the line comes and goes.
-    /// Open: above the compass's top point and its words, on the veil.
+    /// Open: above the compass's top point and its words (two lines, as Welcome's has), on the veil.
     static func hintFrame(_ s: WalkState) -> CGRect? {
         let text = WalkCopy.hint(s)
         guard !text.isEmpty else { return nil }
         let height = CGFloat(hintLines(text)) * hintLineHeight
         let x = WalkOrb.centre.x - hintWidth / 2
         if s.showsPoints {
-            let top = WalkOrb.position(of: .n).y - WalkOrb.pointDisc / 2 - WalkOrb.pointWords - openHintGap
+            let top = WalkOrb.position(of: .n).y - WalkOrb.pointDisc / 2 - wordsGap - labelLine - detailGap - detailLine - openHintGap
             return CGRect(x: x, y: top - height, width: hintWidth, height: height)
         }
         let y = WalkOrb.centre.y + ring + 2 + nextHeight + 0.5
         return CGRect(x: x, y: y, width: hintWidth, height: height)
+    }
+
+    // MARK: The lines that teach the light
+
+    /// Where the lines that teach the light stand: above the ring, across the stage, on the veil.
+    static let teachHeight: CGFloat = 104
+    static func teachFrame(_ s: WalkState) -> CGRect? {
+        guard s.teaching else { return nil }
+        return CGRect(x: 10, y: WalkOrb.centre.y - ring - 8 - teachHeight, width: 370, height: teachHeight)
+    }
+
+    // MARK: Example tags
+
+    /// The banner width the long example tag needs (8.5 pt, by estimate, inside the cloth's padding).
+    static let exampleTagRoom: CGFloat = 116
+    static func exampleTag(forWidth width: CGFloat) -> String {
+        width >= exampleTagRoom ? WalkCopy.exampleTag : WalkCopy.exampleTagShort
+    }
+
+    // MARK: The compass points' words
+
+    /// One line of a point's words: its label (12 pt) or its second line (13 pt), and where it stands.
+    struct PointLine: Equatable { let text: String; let detail: Bool; let frame: CGRect }
+
+    /// Character widths by estimate (measured near 6.1 for both faces, with room to spare), line
+    /// heights, the gaps (disc to words, label to second line), the widest a label or second line
+    /// wraps at, and the stage margin the words keep.
+    static let labelChar: CGFloat = 6.4, detailChar: CGFloat = 6.4
+    static let labelLine: CGFloat = 16, detailLine: CGFloat = 17
+    static let wordsGap: CGFloat = 4, detailGap: CGFloat = 2
+    static let labelWidth: CGFloat = 132, detailWidth: CGFloat = 152, wordsMargin: CGFloat = 12
+    /// The bottom point's label stands alone between the ring and its disc: one line, at most this wide.
+    static let southLabelWidth: CGFloat = 112
+
+    /// Greedy wrapping by words at `width`, by the character estimate.
+    static func wrap(_ text: String, width: CGFloat, char: CGFloat) -> [String] {
+        var lines: [String] = []
+        var line = ""
+        for word in text.split(separator: " ").map(String.init) {
+            let candidate = line.isEmpty ? word : line + " " + word
+            if line.isEmpty || CGFloat(candidate.count) * char + 4 <= width {
+                line = candidate
+            } else {
+                lines.append(line)
+                line = word
+            }
+        }
+        if !line.isEmpty { lines.append(line) }
+        return lines
+    }
+
+    /// Where a point's words stand, line by line. Above its disc for the top, upper-right,
+    /// upper-left and bottom points (under them they would meet the ring, the next point or, for
+    /// the bottom one, the home-indicator zone), under it for the rest. The words are centred on
+    /// their disc, inside the stage's margin, and move outward, away from the light, until no
+    /// line meets the ring or another offered point's disc (`among`); pressed against the margin,
+    /// the lines read from it. Each line is as wide as its words by estimate; the view draws exactly these lines.
+    static func pointWords(_ p: WalkCopy.Point, among offered: [CompassPoint]) -> [PointLine] {
+        let disc = WalkOrb.position(of: p.at)
+        // The right point's words sit beside the ring's widest part: they wrap narrower.
+        let labels = p.at == .s ? [p.label] : wrap(p.label, width: p.at == .e ? 120 : labelWidth, char: labelChar)
+        let details = p.detail.map { wrap($0, width: detailWidth, char: detailChar) } ?? []
+        let rows: [(text: String, detail: Bool, width: CGFloat)] =
+            labels.map { ($0, false, min(CGFloat($0.count) * labelChar + 4, p.at == .s ? southLabelWidth : .infinity)) }
+            + details.map { ($0, true, CGFloat($0.count) * detailChar + 4) }
+        let height = CGFloat(labels.count) * labelLine + (details.isEmpty ? 0 : detailGap + CGFloat(details.count) * detailLine)
+        let top = WalkOrb.wordsAbove(p.at) ? disc.y - WalkOrb.pointDisc / 2 - wordsGap - height
+                                           : disc.y + WalkOrb.pointDisc / 2 + wordsGap
+        let blockWidth = rows.map(\.width).max() ?? 0
+        let stage = WalkArt.overlookSquare.stage.width
+        let lowest = wordsMargin, highest = stage - wordsMargin - blockWidth
+        let outward: CGFloat = disc.x < WalkOrb.centre.x - 1 ? -1 : (disc.x > WalkOrb.centre.x + 1 ? 1 : 0)
+        var discs = offered.filter { $0 != p.at }.map { at -> CGRect in
+            let c = WalkOrb.position(of: at)
+            return CGRect(x: c.x - WalkOrb.pointDisc / 2, y: c.y - WalkOrb.pointDisc / 2, width: WalkOrb.pointDisc, height: WalkOrb.pointDisc)
+        }
+        // The top point's words (up to two lines, above its disc) are kept clear the same way.
+        if p.at != .n, offered.contains(.n) {
+            let n = WalkOrb.position(of: .n), words = labelLine + detailGap + detailLine
+            discs.append(CGRect(x: n.x - 70, y: n.y - WalkOrb.pointDisc / 2 - wordsGap - words, width: 140, height: words))
+        }
+        func lines(at x: CGFloat, pressed: Bool) -> [PointLine] {
+            var y = top
+            var out: [PointLine] = []
+            for (i, row) in rows.enumerated() {
+                if i == labels.count, !details.isEmpty { y += detailGap }
+                let lineX = pressed ? (outward < 0 ? x : x + blockWidth - row.width) : x + (blockWidth - row.width) / 2
+                let h = row.detail ? detailLine : labelLine
+                out.append(PointLine(text: row.text, detail: row.detail, frame: CGRect(x: lineX, y: y, width: row.width, height: h)))
+                y += h
+            }
+            return out
+        }
+        func clashes(_ ls: [PointLine]) -> Bool {
+            ls.contains { line in
+                let f = line.frame
+                let c = WalkOrb.centre
+                let onRing = hypot(c.x - min(max(c.x, f.minX), f.maxX), c.y - min(max(c.y, f.minY), f.maxY)) <= WalkLayout.ring + 2
+                return onRing || discs.contains { $0.intersects(f) }
+            }
+        }
+        var x = min(max(disc.x - blockWidth / 2, lowest), highest)
+        var placed = lines(at: x, pressed: false)
+        guard outward != 0 else { return placed }
+        while clashes(placed) {
+            let next = x + outward
+            guard next >= lowest, next <= highest else { return lines(at: x, pressed: true) }
+            x = next
+            placed = lines(at: x, pressed: false)
+        }
+        return placed
     }
 }

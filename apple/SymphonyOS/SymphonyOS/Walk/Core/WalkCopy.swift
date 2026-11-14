@@ -74,13 +74,14 @@ enum WalkCopy {
     /// (hold the light to speak, tap it for other choices), or what to do now.
     static func hint(_ s: WalkState) -> String {
         if s.step == 0 { return hintChoose }                // Welcome: the choices are always open
+        if s.teaching { return "" }                         // the light is being taught, in its own two lines
         if s.orb == .open { return hintOpen }
         if case .holding = s.orb { return "" }              // a press on its way to speaking, or a slide
         if case .finishing = s.orb { return "" }            // waiting for the last words after letting go
         if let note = s.note { return note }
         if s.typing != nil { return "" }                    // the field carries its own placeholder
         if case .speaking = s.orb { return hintSpeaking }
-        if s.ground { return hintGround }
+        if s.ground { return s.kept.isEmpty ? hintGroundNone : hintGround }
         guard let level = s.level else { return "" }
         if level == .today {
             if let focused = s.focus[.today], focused != s.firstThing { return hintStartHere }
@@ -93,14 +94,25 @@ enum WalkCopy {
 
     static let hintChoose = "Choose how to start"
     static let hintOpen = "Tap one, or tap the light to close"
-    static let hintFirst = "Hold the light and say it. Tap the light for other choices."
-    static let hintAnother = "Hold to add another. Tap Next when you’re done."
-    static let hintGround = "Tap the ones that matter, then tap Next."
-    static let hintStartHere = "Tap Next to start with this one, or hold and say something else."
+    static let hintFirst = "Hold the light to speak. Tap it for more."
+    static let hintAnother = "Hold to add another, or tap Next."
+    static let hintGround = "Tap the ones that matter, then Next."
+    /// The ground with nothing kept yet: the Next line says "Skip this step", so the hint does not say Next.
+    static let hintGroundNone = "Tap the ones that matter."
+    static let hintStartHere = "Tap Next to start here, or hold to speak."
     static let hintFirstThing = "That’s your first thing. Tap Finish."
     static let hintSpeaking = "Let go when you’ve said it"
     /// Speech is off for this walk: a tap types, a hold opens the other choices.
-    static let hintSpeechOff = "Tap the light to type it. Hold it for other choices."
+    static let hintSpeechOff = "Tap the light to type. Hold it for more."
+    /// The longest a hint or note may be: every one fits on one line at 15 pt.
+    static let hintMaxLength = 44
+
+    /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`).
+    static let teachHold = "Press and hold the light, and say it out loud."
+    static let teachLetGo = "Let go when you’re done. Or tap the light to type."
+    static let teachSpeechOff = "Tap the light and type it."
+    /// The lines that teach the light: the 20-point line, then the 15-point line if there is one.
+    static func teaching(_ s: WalkState) -> [String] { s.speechIsOff ? [teachSpeechOff] : [teachHold, teachLetGo] }
 
     /// The line under the light that moves the walk on: the south point's words and action,
     /// shown whenever the light is at rest and nothing is being typed. `skip` when nothing has
@@ -114,6 +126,11 @@ enum WalkCopy {
 
     static let skipStep = "Skip this step"; static let finish = "Finish"; static let startWithThis = "Start with this one"
     static func next(_ place: String) -> String { "Next: \(place)" }
+    static let nextGoal = "Next goal"
+    /// A name cut to `length` characters, the last an ellipsis, when it is longer.
+    static func cut(_ name: String, _ length: Int) -> String {
+        name.count <= length ? name : String(name.prefix(length - 1)).trimmingCharacters(in: .whitespaces) + "…"
+    }
 
     /// Where moving on goes, in words, and the action that does it (the south point).
     private static func forward(_ s: WalkState, _ p: WalkPeriods) -> (label: String, action: WalkAction)? {
@@ -124,8 +141,8 @@ enum WalkCopy {
         guard added else { return (skipStep, .next) }
         // A whole-year walk goes area by area on Year, and goal by goal on Season, before it moves down.
         if let stop = s.tour.first {
-            if level == .year, let area = s.area(stop) { return (next(area.name), .next) }
-            if s.item(stop) != nil { return (next("your next goal"), .next) }
+            if level == .year, let area = s.area(stop) { return (next(cut(area.name, 14)), .next) }
+            if s.item(stop) != nil { return (nextGoal, .next) }
         }
         switch level {
         case .year: return (next("this \(p.seasonWord)"), .next)
@@ -194,9 +211,9 @@ enum WalkCopy {
             out.append(Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"))
         }
         if !s.undo.isEmpty {
-            out.append(Point(at: .nw, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
+            out.append(Point(at: .se, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
         }
-        out.append(Point(at: .se, label: leaveForNow, action: .leave, symbol: "pause", detail: leaveDetail))
+        out.append(Point(at: .nw, label: leaveForNow, action: .leave, symbol: "pause", detail: leaveDetail))
         return out.sorted { order($0.at) < order($1.at) }
     }
 
@@ -232,16 +249,18 @@ enum WalkCopy {
 
     // MARK: Notes
 
+    /// A long area name is cut (and then takes no full stop after its ellipsis), so the note is one line.
     static func placed(_ areaName: String) -> String {
-        "That sounded like \(phrase(for: areaName)), so it went under \(areaName)."
+        let name = cut(areaName, 18)
+        return "That went under \(name)\(name.hasSuffix("…") ? "" : ".")"
     }
-    static let nothingToPlant = "Nothing added yet. Hold the light and say it, or tap it and choose Type it."
+    static let nothingToPlant = "Nothing added yet. Hold the light to speak."
     static let speechOff = "Speaking isn’t available here, so type it."
     /// A second hold in a row that heard nothing.
     static let nothingHeard = "Nothing came through. Type it here."
     /// The permission prompts took the touch and speech was allowed.
     static let speakNow = "Now hold the light and speak."
-    static let ridgeFull = "That’s as many as fit. Tap one to let it go first."
+    static let ridgeFull = "That’s as many as fit. Tap one to let it go."
     static let calendarLine = "See your calendar on Today too"
 
     // MARK: Hint row and banners
@@ -254,9 +273,6 @@ enum WalkCopy {
     static func stubCount(_ count: Int) -> String { "+\(count)" }
     /// An example flag's tag, and the shorter one where the flag is too narrow for it.
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
-    /// The banner width the long tag needs (8.5 pt, by estimate, inside the cloth's padding).
-    static let exampleTagRoom: CGFloat = 116
-    static func exampleTag(forWidth width: CGFloat) -> String { width >= exampleTagRoom ? exampleTag : exampleTagShort }
     /// The ground's own words while speaking and in the why line.
     static let groundWhy = "Tap the ones that matter to you. To add your own, hold the light and say it."
     /// Added to a step's why line while a parent one level up may still be chosen.
@@ -267,7 +283,7 @@ enum WalkCopy {
     static let lookBack = "Look back up: that’s your plan."; static let heresToday = "Here’s today."
     static let showMyDay = "Show my day"; static let lookBackHandle = "See my whole plan"
     static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Go to Today"
-    static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing planted for today yet."
+    static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing for today yet."
     static func nextFlag(_ name: String) -> String { "Next: \(name)" }
     static func forGoal(_ name: String) -> String { "for \(name)" }
     static func nextEvent(_ time: String) -> String { "Next · \(time)" }
@@ -309,6 +325,8 @@ enum WalkCopy {
     }
 
     static let orbLabelWelcome = "Choose how to start"; static let orbLabel = "Hold and speak to add a goal. Double tap for other choices."
+    /// Speech off for this walk: a double tap types.
+    static let orbLabelSpeechOff = "Double tap to type it. The other choices are in the actions."
     static let rowDone = "Done"; static let rowOpen = "Not done"
 
     static func levelName(_ level: WalkLevel) -> String {
@@ -361,9 +379,10 @@ enum WalkCopy {
         forGoal.map { "\(title), for \($0)" } ?? title
     }
 
-    /// The light's label: `orbLabelWelcome` on Welcome, `orbLabel` on every other step.
+    /// The light's label: `orbLabelWelcome` on Welcome, `orbLabel` on every other step (`orbLabelSpeechOff` once speech is off).
     static func orbAccessibilityLabel(_ s: WalkState) -> String {
-        s.step == 0 ? orbLabelWelcome : orbLabel
+        if s.step == 0 { return orbLabelWelcome }
+        return s.speechIsOff ? orbLabelSpeechOff : orbLabel
     }
 
     /// The one-line field's label, read once it holds words (the placeholder says how to use it).

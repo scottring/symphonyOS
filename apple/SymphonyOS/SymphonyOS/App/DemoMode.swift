@@ -132,6 +132,7 @@ enum DemoMode {
         let periods = WalkPeriods.pick(now: now)
         let writer = WalkWriter(context: context, userId: userId, periods: periods)
         var s = WalkState()
+        s.taught = true                     // a preview opens mid-walk: the light was taught on the way
         s.step = step
         s.areas = WalkLoad.areas((try? context.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
         func area(_ name: String) -> UUID? { s.areas.first { $0.name == name }?.id }
@@ -183,6 +184,7 @@ enum DemoMode {
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
     /// - `next`: the Next line, so a step is entered as a person arrives on it (Today's calendar line).
     /// - `leave`: Leave for now: the walk closes onto Today with its waiting line.
+    /// - `quick`: Quick start on Welcome; `quick,next` then reaches Year, where the light is taught.
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
     /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
@@ -215,6 +217,8 @@ enum DemoMode {
                 model.choose(.next)
             case "leave":
                 model.choose(.leave)
+            case "quick":
+                model.choose(.quick)
             default:
                 break
             }

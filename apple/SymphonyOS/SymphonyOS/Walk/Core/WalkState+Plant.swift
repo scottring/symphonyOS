@@ -337,6 +337,7 @@ extension WalkState {
         emptyHolds = 0
         sessionOver = false
         sheetOpen = false
+        teachOnce()                         // a walk-down's first step teaches the light, if this walk never has
         return [.save]
     }
 

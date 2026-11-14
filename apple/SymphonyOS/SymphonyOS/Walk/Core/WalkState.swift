@@ -29,6 +29,10 @@ struct WalkState: Equatable {
     // refusal, after which a hold opens typing; a session that ended while still held.
     var emptyHolds = 0; var speechIsOff = false; var sessionOver = false
     var orbWasOpen = false                 // the points were open when this press began, so a short press closes them
+    /// The light is being taught (once per walk, on the first step where holding it answers),
+    /// and it has been: `taught` is saved with the position, so a resume does not teach it again.
+    var teaching = false; var taught = false
+    var orbWasTeaching = false             // this press began while the light was taught: a short press types
     var note: String?; var undoShowing = false
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
@@ -56,6 +60,8 @@ struct WalkState: Equatable {
     /// the person does takes effect, so nothing in that second re-parents it or drops it.
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        // Any touch puts the lesson away (a press on the light does it in `orbDown`, a tap on the veil below).
+        if teaching, !event.leavesAWaitingFlag, event != .orbDown { teaching = false }
         let planted = event.leavesAWaitingFlag ? [] : plantWaitingFlag(env)
         return planted + respond(to: event, env)
     }
@@ -99,7 +105,11 @@ struct WalkState: Equatable {
             return respond(to: line.action, env)
         // A tap on the veil around the open compass closes it; on Welcome the choices stay.
         case .veilTapped:
-            if orb == .open, step != 0 { orb = .idle }
+            if teaching {
+                teaching = false
+            } else if orb == .open, step != 0 {
+                orb = .idle
+            }
             return []
         }
     }
@@ -109,6 +119,7 @@ struct WalkState: Equatable {
     /// A waiting flag is planted first, as for an event (a point chosen through VoiceOver).
     mutating func act(_ action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        teaching = false                    // a compass point chosen through VoiceOver puts the lesson away
         let planted = plantWaitingFlag(env)
         return planted + respond(to: action, env)
     }
@@ -172,6 +183,7 @@ struct WalkState: Equatable {
             ground = false
             orb = .idle
             startTour()
+            teachOnce()
             return [.save]
         }
         if let stop = tour.first {
@@ -215,6 +227,7 @@ struct WalkState: Equatable {
         focusArea = nil
         tour = []
         settle()
+        teachOnce()
         if note == WalkCopy.calendarLine { note = nil }
         guard let level, level != .year else { return [] }
         if level == .season, depth == .full {
@@ -287,6 +300,13 @@ struct WalkState: Equatable {
             .map(\.element)
     }
 
+    /// The first step of a walk where holding the light answers: the light is taught, once.
+    mutating func teachOnce() {
+        guard !taught, (1...5).contains(step), !ground else { return }
+        teaching = true
+        taught = true
+    }
+
     /// What belongs to one step only is put away when the step changes.
     private mutating func settle() {
         selected = nil
@@ -295,6 +315,7 @@ struct WalkState: Equatable {
         typing = nil
         orb = .idle
         sheetOpen = false
+        teaching = false
     }
 
     // MARK: Peaks, parent flags and nudge

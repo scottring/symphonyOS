@@ -8,14 +8,12 @@ enum WalkOrb {
     /// The longest the walk waits, after letting go, for the recogniser's last words.
     static let finishMs = 1000
     static let holdMs = 420; static let slideOut: CGFloat = 1.4; static let window: CGFloat = 32; static let pointDistance: CGFloat = 116
-    /// A point's disc, and the room its words take beside it (a label and a second line, with the gap):
-    /// under the disc, or above it (`wordsAbove`), so they never sit on the ring.
-    static let pointDisc: CGFloat = 46; static let pointWords: CGFloat = 38
+    /// A point's disc. Its words stand under it, or above it (`wordsAbove`); `WalkLayout.pointWords` places them.
+    static let pointDisc: CGFloat = 46
 
-    /// The top point's words sit above its disc (under it they would meet the ring); the bottom
-    /// point's too, in the room between the ring and its disc (under it they would sit in the
-    /// home-indicator zone). Every other point's words hang under its disc.
-    static func wordsAbove(_ point: CompassPoint) -> Bool { point == .n || point == .s }
+    /// The top, upper-right, upper-left and bottom points' words sit above their discs: under
+    /// them they would meet the ring, the next point, or (the bottom one) the home-indicator zone.
+    static func wordsAbove(_ point: CompassPoint) -> Bool { [.n, .ne, .nw, .s].contains(point) }
 
     /// Where a compass point stands, in stage coordinates.
     static func position(of point: CompassPoint) -> CGPoint {

@@ -18,6 +18,14 @@ final class WalkUITests: XCTestCase {
         element.tap()
     }
 
+    /// The first step that listens teaches the light once; a tap anywhere but the light puts it away.
+    @MainActor private func dismissTheLesson(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let lesson = app.staticTexts["Press and hold the light, and say it out loud."]
+        XCTAssertTrue(lesson.waitForExistence(timeout: 15), "the light was not taught", file: file, line: line)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        XCTAssertTrue(lesson.waitForNonExistence(timeout: 15), "a tap did not put the lesson away", file: file, line: line)
+    }
+
     @MainActor func testAQuickStartPlantsAFlag() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]
@@ -29,6 +37,7 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Quick start"], "Quick start")
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")
+        dismissTheLesson(app)
         tap(orb, "the light")
         tap(app.buttons["Show examples"], "Show examples")
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
@@ -73,6 +82,7 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Quick start"], "Quick start")
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")
+        dismissTheLesson(app)
         tap(orb, "the light")
         tap(app.buttons["Show examples"], "Show examples")
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
@@ -94,6 +104,7 @@ final class WalkUITests: XCTestCase {
                       "not back on Year")
         XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15),
                       "the flag planted before leaving is gone")
+        XCTAssertFalse(app.staticTexts["Press and hold the light, and say it out loud."].exists, "taught again on resume")
     }
 }
 #endif

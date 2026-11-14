@@ -454,16 +454,24 @@ struct TodayView: View {
         }
     }
 
-    /// One quiet line: a tap picks the walk back up where it was left.
+    /// One quiet line that reads as a link (the app's amber, at a strength that reads at 4.5:1
+    /// on the page, and a trailing chevron): a tap picks the walk back up where it was left.
     private var walkWaiting: some View {
         Button { appState.resumeWalk() } label: {
-            Text(WalkCopy.walkWaiting)
-                .font(.bodyMedium)
-                .foregroundStyle(Color.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
+            HStack(spacing: 6) {
+                Text(WalkCopy.walkWaiting)
+                    .font(.bodyMedium)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Color.amberStrong)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(WalkCopy.walkWaiting)
     }
 
     /// For today, the way into this week's shelf, and tonight's dinner.

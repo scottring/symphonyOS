@@ -29,6 +29,7 @@ struct WalkView: View {
                         .accessibilityHidden(model.state.step > 5 && model.state.sheetRaised)
                         .accessibilitySortPriority(2)
                     if model.state.step <= 5 {
+                        WalkUnderlay(model: model)
                         WalkOrbView(model: model)
                             .accessibilitySortPriority(1)
                         WalkHintRow(model: model)

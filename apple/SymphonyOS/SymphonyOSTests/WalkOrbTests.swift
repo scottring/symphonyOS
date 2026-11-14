@@ -130,9 +130,9 @@ struct WalkOrbTests {
     }
 
     @Test func aDirectionWithNoPointChoosesNothing() {
-        var s = state(step: 1, planted: true)   // no Undo yet, so NW is not offered
+        var s = state(step: 1, planted: true)   // no Undo yet, so SE is not offered
         _ = s.apply(.orbDown, env)
-        _ = s.apply(.orbMoved(polar(-135, 100)), env)
+        _ = s.apply(.orbMoved(polar(45, 100)), env)
         #expect(s.orb == .holding(hover: nil))
         _ = s.apply(.orbUp(heldMs: 900), env)
         #expect(s.step == 1 && s.orb == .idle)
@@ -233,7 +233,7 @@ struct WalkOrbTests {
         #expect(s.step == 2 && s.orb == .idle)
         var t = state(step: 1, planted: true)
         t.orb = .open
-        _ = t.apply(.point(.nw), env)       // not offered
+        _ = t.apply(.point(.se), env)       // not offered (Undo, with nothing to undo)
         #expect(t.step == 1 && t.orb == .open)
     }
 
@@ -314,11 +314,11 @@ struct WalkOrbTests {
         var ground = state(step: 1); ground.ground = true
         for var s in [ground] + (1...5).map({ state(step: $0, planted: true) }) {
             #expect(WalkCopy.points(s, env.periods).contains {
-                $0.at == .se && $0.action == .leave && $0.label == WalkCopy.leaveForNow && $0.detail == WalkCopy.leaveDetail
+                $0.at == .nw && $0.action == .leave && $0.label == WalkCopy.leaveForNow && $0.detail == WalkCopy.leaveDetail
             })
             let step = s.step
             s.orb = .open
-            #expect(s.apply(.point(.se), env) == [.timer(.finish, ms: nil), .end(.paused)])
+            #expect(s.apply(.point(.nw), env) == [.timer(.finish, ms: nil), .end(.paused)])
             #expect(s.ended && s.step == step && s.orb == .idle)
         }
         for step in [0, 6] {
@@ -326,6 +326,128 @@ struct WalkOrbTests {
             #expect(s.act(.leave, env) == [])
             #expect(!s.ended)
         }
+    }
+
+    // MARK: The light, taught once
+
+    /// The ground, Health kept, about to walk on to Year (the first step where holding answers).
+    private func onTheGround() -> WalkState {
+        var s = state(step: 1)
+        s.ground = true
+        return s
+    }
+
+    /// Walking on from the ground teaches the light, once: the veil, no Next line, no hint; going
+    /// down and back up does not teach it again, nor does the next step.
+    @Test func theLightIsTaughtOnceOnTheFirstStepThatListens() {
+        var s = onTheGround()
+        #expect(!s.teaching && !s.taught)
+        _ = s.act(.next, env)
+        #expect(s.step == 1 && !s.ground)
+        #expect(s.teaching && s.taught)
+        #expect(s.showsVeil && !s.showsNextLine && !s.showsPoints)
+        #expect(WalkCopy.hint(s) == "")
+        _ = s.apply(.veilTapped, env)
+        #expect(!s.teaching)
+        _ = s.act(.next, env)                       // Season
+        #expect(!s.teaching)
+        _ = s.act(.back, env); _ = s.act(.back, env) // Year, then the ground
+        _ = s.act(.next, env)                       // Year again
+        #expect(!s.teaching)
+        // Skipping straight past the ground with nothing kept teaches it too.
+        var skip = onTheGround(); skip.kept = []
+        _ = skip.act(.next, env)
+        #expect(skip.teaching)
+    }
+
+    /// A tap anywhere puts it away and changes nothing else.
+    @Test func aTapOnTheVeilPutsTheLessonAway() {
+        var s = onTheGround()
+        _ = s.act(.next, env)
+        var expected = s
+        expected.teaching = false
+        #expect(s.apply(.veilTapped, env) == [])
+        #expect(s == expected)
+        #expect(s.orb == .idle)                     // the compass was not opened
+    }
+
+    /// Holding the light puts it away and listens in the same gesture.
+    @Test func holdingTheLightPutsTheLessonAwayAndListens() {
+        var s = onTheGround()
+        _ = s.act(.next, env)
+        let down = s.apply(.orbDown, env)
+        #expect(!s.teaching)
+        #expect(down == [.sound(.bag, afterMs: 0), .sound(.poles, afterMs: 120), .timer(.hold, ms: WalkOrb.holdMs)])
+        #expect(s.apply(.orbHeld, env) == [.listen(true), .sound(.unfurl, afterMs: 280)])
+        #expect(s.orb == .speaking(live: ""))
+    }
+
+    /// This one time a tap on the light types (the lesson's second line says so); after it, a tap opens the points.
+    @Test func aTapOnTheLightPutsTheLessonAwayAndTypes() {
+        var s = onTheGround()
+        _ = s.act(.next, env)
+        _ = s.apply(.orbDown, env)
+        _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(!s.teaching && s.typing == "" && s.orb == .idle)
+        _ = s.apply(.typeDismissed, env)
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(s.orb == .open && s.typing == nil)
+    }
+
+    /// A compass point chosen through VoiceOver puts it away too.
+    @Test func anyActionPutsTheLessonAway() {
+        var s = onTheGround()
+        _ = s.act(.next, env)
+        _ = s.act(.examples, env)
+        #expect(!s.teaching && s.examplesOn.contains(1))
+    }
+
+    /// A walk resumed from its saved place is not taught again; one that never was (left on the
+    /// ground) is, on reaching Year; a save from before the lesson existed reads as taught; a fresh
+    /// walk (a replay) is taught again.
+    @Test func theLessonIsRememberedWithThePosition() throws {
+        let p = env.periods
+        var s = onTheGround()
+        _ = s.act(.next, env)
+        _ = s.apply(.veilTapped, env)
+        let saved = WalkPosition(s, status: .inProgress, planted: [], periods: p, now: p.today)
+        #expect(saved.taught)
+        var resumed = WalkState()
+        saved.apply(to: &resumed)
+        #expect(resumed.taught && !resumed.teaching)
+        _ = resumed.act(.next, env)
+        #expect(!resumed.teaching)
+        let roundTrip = try JSONDecoder.walk.decode(WalkPosition.self, from: JSONEncoder.walk.encode(saved))
+        #expect(roundTrip.taught)
+
+        let onGround = WalkPosition(onTheGround(), status: .inProgress, planted: [], periods: p, now: p.today)
+        #expect(!onGround.taught)
+        var picked = WalkState()
+        onGround.apply(to: &picked)
+        _ = picked.act(.next, env)
+        #expect(picked.teaching)
+
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder.walk.encode(onGround)) as! [String: Any]
+        object.removeValue(forKey: "taught")
+        let old = try JSONDecoder.walk.decode(WalkPosition.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.taught)
+
+        var replay = WalkState()                    // a replay starts from a fresh state
+        replay.areas = s.areas
+        _ = replay.act(.quick, env)
+        _ = replay.act(.next, env)
+        #expect(replay.teaching)
+    }
+
+    /// With speech off the lesson says to tap and type; a tap types, as it always does then.
+    @Test func withSpeechOffTheLessonSaysTapAndType() {
+        var s = onTheGround()
+        s.speechIsOff = true
+        _ = s.act(.next, env)
+        #expect(s.teaching)
+        #expect(WalkCopy.teaching(s) == [WalkCopy.teachSpeechOff])
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(!s.teaching && s.typing == "")
     }
 
     /// What the light carries: a microphone at rest, a keyboard once speech is off, nothing on

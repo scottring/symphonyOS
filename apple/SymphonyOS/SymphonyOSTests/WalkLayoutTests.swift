@@ -817,71 +817,107 @@ struct WalkLayoutTests {
     }
 
     /// The controls under the light, in every generated state at rest, with the Undo pill, with
-    /// a note, with speech off, and with the compass open: the Next line, the hint line and the
-    /// Undo pill never meet each other or the light's ring (and so its touch), at rest never a flag
-    /// or a label (open, the hint sits on the veil over the scene, as the points' words do), and stay on the stage; the Next line, the Undo pill and a one-line hint stay above the
-    /// home-indicator zone. Open, the hint sits above the top point and its words, below the question.
-    /// A hint that wraps to two lines reaches into that zone: those are listed, so the gap is in sight.
-    @Test func theControlsUnderTheLightKeepClear() {
-        let c = WalkOrb.centre
+    /// notes, with speech off, with the compass open, speaking and with the light being taught, on
+    /// both footings: the Next line, the hint line, the Undo pill and the lesson never meet each
+    /// other or the light's ring (and so its touch), at rest never a flag or a label (open or
+    /// taught, they sit on the veil over the scene, as the points' words do), stay on the stage
+    /// below the question and above the home-indicator zone; the hint is always one line.
+    @Test(arguments: [WalkFooting.natural, .level]) func theControlsUnderTheLightKeepClear(_ footing: WalkFooting) {
         let insetTop = art.stage.height - WalkLayout.homeIndicator
-        func meetsRing(_ r: CGRect) -> Bool {
-            hypot(c.x - min(max(c.x, r.minX), r.maxX), c.y - min(max(c.y, r.minY), r.maxY)) <= WalkLayout.ring
-        }
-        let north = WalkOrb.position(of: .n)
-        let topPoint = CGRect(x: north.x - 70, y: north.y - WalkOrb.pointDisc / 2 - WalkOrb.pointWords,
-                              width: 140, height: WalkOrb.pointWords + WalkOrb.pointDisc)
-        var twoLine: Set<String> = []
+        let notes = [WalkCopy.nothingToPlant, WalkCopy.ridgeFull, WalkCopy.speechOff, WalkCopy.placed("People"),
+                     WalkCopy.placed("A very long area of my own")]
         var checked = 0
         for base in Generated.states() where (0...5).contains(base.step) {
-            let layout = WalkLayout.make(base, today: today)
+            let layout = WalkLayout.make(base, today: today, footing: footing)
             let drawn = layout.posts.flatMap(\.banners).map(\.drawn) + layout.labels.map(\.frame)
             var variants = [base]
             var undo = base; undo.undo = [.plant(uid(1))]; undo.undoShowing = true; variants.append(undo)
-            var noted = base; noted.note = WalkCopy.nothingToPlant; variants.append(noted)
-            var full = base; full.note = WalkCopy.ridgeFull; variants.append(full)
+            for note in notes { var v = base; v.note = note; variants.append(v) }
             var off = base; off.speechIsOff = true; variants.append(off)
             var open = base; open.orb = .open; variants.append(open)
             var speaking = base; speaking.orb = .speaking(live: "x"); variants.append(speaking)
+            var taught = base; taught.teaching = (1...5).contains(base.step) && !base.ground; variants.append(taught)
             for v in variants {
-                let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)), ("undo", WalkLayout.undoFrame(v))]
+                let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)),
+                              ("undo", WalkLayout.undoFrame(v)), ("lesson", WalkLayout.teachFrame(v))]
                     .compactMap { name, f in f.map { (name, $0) } }
                 var problems: [String] = []
                 for (i, a) in frames.enumerated() {
                     for b in frames[(i + 1)...] where Invariants.overlap(a.1, b.1) { problems.append("\(a.0) meets \(b.0)") }
-                    if meetsRing(a.1) { problems.append("\(a.0) \(a.1) meets the ring") }
-                    // With the compass open the scene is under the veil, the points' words included (rule 5).
-                    if !v.showsPoints {
+                    if Invariants.orbDistance(a.1) <= WalkLayout.ring { problems.append("\(a.0) \(a.1) meets the ring") }
+                    if !v.showsVeil {
                         for d in drawn where Invariants.overlap(a.1, d) { problems.append("\(a.0) \(a.1) meets \(d)") }
                     }
                     if a.1.minX < 0 || a.1.maxX > art.stage.width || a.1.minY < WalkLayout.question { problems.append("\(a.0) leaves the stage") }
-                    if a.0 != "hint", a.1.maxY > insetTop + 0.01 { problems.append("\(a.0) in the home-indicator zone") }
+                    if a.1.maxY > insetTop + 0.01 { problems.append("\(a.0) \(a.1) in the home-indicator zone") }
                 }
-                if let hint = WalkLayout.hintFrame(v) {
-                    let text = WalkCopy.hint(v)
-                    if v.showsPoints {
-                        if Invariants.overlap(hint, topPoint) { problems.append("the open hint meets the top point") }
-                    } else if WalkLayout.hintLines(text) == 1 {
-                        if hint.maxY > insetTop + 0.01 { problems.append("a one-line hint in the home-indicator zone") }
-                    } else {
-                        twoLine.insert(text)
-                    }
-                }
-                // Shown exactly when the state says.
+                let hint = WalkCopy.hint(v)
+                if !hint.isEmpty, WalkLayout.hintLines(hint) != 1 { problems.append("“\(hint)” wraps") }
                 if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, WalkPeriods.pick(now: today)) != nil) {
                     problems.append("the Next line's frame and words disagree")
                 }
-                #expect(problems.isEmpty, "\(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
+                if v.showsPoints { problems += Self.pointWordsProblems(v, hint: WalkLayout.hintFrame(v)) }
+                #expect(problems.isEmpty, "\(footing) \(Generated.describe(v)) orb \(v.orb): \(problems.prefix(3))")
                 if !problems.isEmpty { return }
                 checked += 1
             }
         }
-        #expect(checked >= 15_000)
-        // The hints and notes that wrap to two lines at 15 pt; any other would be new and is caught here.
-        let wrapping: Set<String> = [WalkCopy.hintFirst, WalkCopy.hintStartHere, WalkCopy.hintSpeechOff,
-                                     WalkCopy.nothingToPlant, WalkCopy.ridgeFull]
-        #expect(twoLine.isSubset(of: wrapping), "\(twoLine.subtracting(wrapping))")
-        #expect(wrapping.allSatisfy { WalkLayout.hintLines($0) == 2 })
+        #expect(checked >= 20_000)
+    }
+
+    /// Every compass point's words, line by line: inside the stage with the margin, below the
+    /// question, above the home-indicator zone, off the ring, off every disc and every other
+    /// point's words, and off the hint above the compass.
+    static func pointWordsProblems(_ s: WalkState, hint: CGRect?) -> [String] {
+        let insetTop = art.stage.height - WalkLayout.homeIndicator
+        var problems: [String] = []
+        let points = WalkCopy.points(s, WalkPeriods.pick(now: today))
+        let discs = points.map { p in
+            let c = WalkOrb.position(of: p.at)
+            return (p.at, CGRect(x: c.x - WalkOrb.pointDisc / 2, y: c.y - WalkOrb.pointDisc / 2,
+                                 width: WalkOrb.pointDisc, height: WalkOrb.pointDisc))
+        }
+        let words = points.flatMap { p in WalkLayout.pointWords(p, among: points.map(\.at)).map { (p.at, $0) } }
+        for (at, line) in words {
+            let f = line.frame
+            if f.minX < WalkLayout.wordsMargin - 0.01 || f.maxX > art.stage.width - WalkLayout.wordsMargin + 0.01 {
+                problems.append("\(at) “\(line.text)” \(f) is not inside the margin")
+            }
+            if f.maxY > insetTop + 0.01 { problems.append("\(at) “\(line.text)” in the home-indicator zone") }
+            if f.minY < WalkLayout.question { problems.append("\(at) “\(line.text)” in the question") }
+            if Invariants.orbDistance(f) <= WalkLayout.ring + 1 { problems.append("\(at) “\(line.text)” \(f) on the ring") }
+            for (other, disc) in discs where Invariants.overlap(f, disc) { problems.append("\(at) “\(line.text)” on the \(other) disc") }
+            for (other, o) in words where other != at && Invariants.overlap(f, o.frame) {
+                problems.append("\(at) “\(line.text)” meets \(other) “\(o.text)”")
+            }
+            if let hint, Invariants.overlap(f, hint) { problems.append("\(at) “\(line.text)” meets the hint") }
+            if line.text.count > 0, !line.detail, s.step > 0, at == .s, CGFloat(line.text.count) * WalkLayout.labelChar + 4
+                > WalkLayout.southLabelWidth / 0.8 { problems.append("the bottom label “\(line.text)” is too long to shrink") }
+        }
+        return problems
+    }
+
+    /// Welcome, the ground and every step with every point offered (Undo, the calendar, examples):
+    /// the words sweep on its own, at today's periods and July's.
+    @Test func thePointsWordsKeepClear() {
+        var states: [WalkState] = [WalkState()]
+        var g = WalkState(); g.step = 1; g.ground = true; g.undo = [.plant(uid(1))]; g.orb = .open; states.append(g)
+        for step in 1...5 {
+            var s = WalkState(); s.step = step; s.undo = [.plant(uid(1))]; s.calendarOffer = true; s.orb = .open
+            states.append(s)
+            s.items = [WalkItem(id: uid(2), level: step == 5 ? .week : WalkLevel(rawValue: step)!, title: "x")]
+            if step == 5 { s.firstThing = uid(2) }
+            states.append(s)
+        }
+        for s in states {
+            let problems = Self.pointWordsProblems(s, hint: WalkLayout.hintFrame(s))
+            #expect(problems.isEmpty, "step \(s.step) ground \(s.ground): \(problems)")
+        }
+        // Welcome's choices: their words at full width, two lines of description each, off the ring.
+        let welcome = WalkCopy.points(WalkState(), WalkPeriods.pick(now: today))
+        for p in welcome where p.at != .n {
+            #expect(WalkLayout.pointWords(p, among: welcome.map(\.at)).filter(\.detail).count == 2, "\(p.label)")
+        }
     }
 
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.

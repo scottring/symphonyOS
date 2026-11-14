@@ -11,6 +11,8 @@ struct WalkPosition: Codable, Equatable {
     var focus: [String: UUID]                              // key = String(WalkLevel.rawValue)
     var tour: [UUID]; var planted: [UUID]; var firstThing: UUID?
     var lastPlanted: [String: UUID] = [:]                  // key = String(WalkLevel.rawValue); the parent the next step's first flag links to
+    /// The light has been taught in this walk. A save from before it was kept reads as taught.
+    var taught = true
     var year: Int; var seasonStart: String; var monthStart: String; var weekStart: String; var day: String   // YYYY-MM-DD
     var savedAt: Date
 
@@ -23,6 +25,7 @@ struct WalkPosition: Codable, Equatable {
         self.planted = planted.sorted { $0.uuidString < $1.uuidString }
         firstThing = state.firstThing
         lastPlanted = Dictionary(state.lastPlanted.map { (String($0.key.rawValue), $0.value) }, uniquingKeysWith: { $1 })
+        taught = state.taught
         year = periods.year
         seasonStart = Self.dayString(periods.season.start)
         monthStart = Self.dayString(periods.monthStart)
@@ -32,11 +35,11 @@ struct WalkPosition: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, status, depth, step, ground, areas, kept, focusArea, focus, tour, planted, firstThing, lastPlanted
+        case version, status, depth, step, ground, areas, kept, focusArea, focus, tour, planted, firstThing, lastPlanted, taught
         case year, seasonStart, monthStart, weekStart, day, savedAt
     }
 
-    /// Every key but `lastPlanted` is required: a save missing one loads as nothing saved.
+    /// Every key but `lastPlanted` and `taught` is required: a save missing one loads as nothing saved.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int.self, forKey: .version)
@@ -52,6 +55,7 @@ struct WalkPosition: Codable, Equatable {
         planted = try c.decode([UUID].self, forKey: .planted)
         firstThing = try c.decodeIfPresent(UUID.self, forKey: .firstThing)
         lastPlanted = try c.decodeIfPresent([String: UUID].self, forKey: .lastPlanted) ?? [:]
+        taught = try c.decodeIfPresent(Bool.self, forKey: .taught) ?? true
         year = try c.decode(Int.self, forKey: .year)
         seasonStart = try c.decode(String.self, forKey: .seasonStart)
         monthStart = try c.decode(String.self, forKey: .monthStart)
@@ -111,6 +115,7 @@ struct WalkPosition: Codable, Equatable {
         }, uniquingKeysWith: { $1 })
         state.tour = tour
         state.firstThing = firstThing
+        state.taught = taught
         state.undo = []
         state.undoShowing = false
         if state.depth == .full, state.step == 2, !state.ground { state.resumeSeasonTour() }

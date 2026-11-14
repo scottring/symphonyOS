@@ -29,7 +29,7 @@ struct WalkOrbView: View {
         let points = WalkCopy.points(s, model.periods)
         let showsPoints = s.showsPoints
         ZStack(alignment: .topLeading) {
-            dial(needleDown: model.layout.needleDown)
+            dial(needleDown: model.layout.needleDown, pulses: s.teaching && !reduceMotion)
                 .frame(width: Self.dial.width, height: Self.dial.height)
                 .offset(x: Self.dial.minX, y: Self.dial.minY)
                 .allowsHitTesting(false)
@@ -67,6 +67,17 @@ struct WalkOrbView: View {
                     .transition(reduceMotion ? .opacity
                         : .scale(scale: 0.4).combined(with: .opacity)
                             .animation(.timingCurve(0.2, 0.9, 0.3, 1.2, duration: 0.26)))
+                    // Its words, line by line where the layout puts them: a tap on them chooses it too.
+                    ForEach(Array(WalkLayout.pointWords(point, among: points.map(\.at)).enumerated()), id: \.offset) { _, line in
+                        // The tap is the line's own frame, set before it is placed (`.position` fills the stage).
+                        WalkPointLine(line: line)
+                            .frame(width: line.frame.width, height: line.frame.height)
+                            .contentShape(Rectangle())
+                            .onTapGesture { model.send(.point(point.at)) }
+                            .accessibilityHidden(true)            // the disc carries the label and the second line
+                            .position(x: line.frame.midX, y: line.frame.midY)
+                            .transition(.opacity.animation(.easeOut(duration: 0.2)))
+                    }
                 }
             }
         }
@@ -85,6 +96,10 @@ struct WalkOrbView: View {
             if pressOnLight { model.send(.orbCancelled) }
         }
         .onChange(of: s) { old, new in
+            // The lesson, read once as it appears.
+            if new.teaching && !old.teaching {
+                UIAccessibility.post(notification: .announcement, argument: WalkCopy.teaching(new).joined(separator: " "))
+            }
             // The flag's words, spoken once, politely, as they are let go (`WalkCopy.announcement`).
             guard let words = WalkCopy.announcement(from: old, to: new) else { return }
             let announcement = NSAttributedString(string: words,
@@ -171,11 +186,16 @@ struct WalkOrbView: View {
 
     /// The ring, four ticks and the needle, in dial coordinates (centre 150, 150). The open
     /// compass has the veil behind it (no pale wash, which white words cannot be read on).
-    private func dial(needleDown: Bool) -> some View {
+    private func dial(needleDown: Bool, pulses: Bool) -> some View {
         ZStack {
-            Circle()
-                .stroke(.white.opacity(0.55), lineWidth: 1)
-                .frame(width: 132, height: 132)
+            // While the light is taught the ring pulses slowly (not with Reduce Motion).
+            TimelineView(.animation(minimumInterval: nil, paused: !pulses)) { timeline in
+                let wave = pulses ? 0.5 - 0.5 * cos(2 * .pi * timeline.date.timeIntervalSinceReferenceDate / 1.8) : 0
+                Circle()
+                    .stroke(.white.opacity(0.55 + 0.4 * wave), lineWidth: 1 + 1.5 * wave)
+                    .frame(width: 132, height: 132)
+                    .scaleEffect(1 + 0.06 * wave)
+            }
             Path { p in
                 p.move(to: CGPoint(x: 150, y: 80)); p.addLine(to: CGPoint(x: 150, y: 88))
                 p.move(to: CGPoint(x: 150, y: 212)); p.addLine(to: CGPoint(x: 150, y: 220))
@@ -295,16 +315,14 @@ struct WalkNeedle: Shape {
     }
 }
 
-/// One compass point: a glowing disc with its symbol at the point's place, and its words (the
-/// label, and a second line where there is one) under the disc, or above it for the top point.
-/// The hovered one grows.
+/// One compass point: a glowing disc with its symbol at the point's place. Its words are drawn
+/// apart (`WalkPointLine`), where `WalkLayout.pointWords` puts them. The hovered one grows.
 struct WalkPointView: View {
     let point: WalkCopy.Point
     let hot: Bool
     let action: () -> Void
 
     var body: some View {
-        let above = WalkOrb.wordsAbove(point.at)
         Button(action: action) {
             ZStack {
                 Circle()
@@ -321,47 +339,37 @@ struct WalkPointView: View {
             }
             .frame(width: hot ? 54 : 46, height: hot ? 54 : 46)
             .frame(width: WalkOrb.pointDisc, height: WalkOrb.pointDisc)
-            .overlay(alignment: above ? .top : .bottom) {
-                words
-                    .alignmentGuide(above ? .top : .bottom) { d in above ? d[.bottom] + 4 : d[.top] - 4 }
-            }
-            .contentShape(Rectangle())
+            .contentShape(Circle())
             .animation(.easeOut(duration: 0.16), value: hot)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(point.label)
         .walkAccessibilityHint(point.detail)
     }
+}
 
-    private var words: some View {
-        VStack(spacing: 1) {
-            // The bottom point's words sit between the ring and its disc: one line, narrow enough
-            // to pass between the discs on either side.
-            Text(point.label)
-                .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
-                .foregroundStyle(.white)
-                .lineLimit(point.at == .s ? 1 : 2)
-                .minimumScaleFactor(point.at == .s ? 0.85 : 1)
-                .frame(maxWidth: point.at == .s ? 116 : 120)
-            if let detail = point.detail {
-                // A sentence to a line: "Every part of life." over "About 25 minutes."
-                Text(detail.replacingOccurrences(of: ". ", with: ".\n"))
-                    .font(.custom("DMSans-Regular", size: 12.5))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(3)
-                    .frame(maxWidth: 156)
-            }
-        }
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-        .walkGlow()
-        .frame(width: 156)
+/// One line of a point's words: the label in white, or its second line at 13 pt and 90% white,
+/// never dimmed further. Left-side points' words read from the margin, right-side ones to it.
+struct WalkPointLine: View {
+    let line: WalkLayout.PointLine
+
+    var body: some View {
+        Text(line.text)
+            .font(line.detail ? .custom("DMSans-Regular", size: 13) : .custom("DMSans-SemiBold", size: 12))
+            .foregroundStyle(.white.opacity(line.detail ? 0.9 : 1))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            // A close halo of the ground colour under the usual glow, so a word over the veiled
+            // mountain (a kept area's pill, a flag) still reads as one clear line.
+            .shadow(color: WalkPalette.ground.opacity(0.95), radius: 2.5)
+            .walkGlow()
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 /// The flag rising out of the light while the person speaks (contract §7 "Live flag"):
 /// a pole 86 tall standing on the light, and a swallow-tailed cloth unfurling from
-/// its top with the words so far and a blinking caret. Its origin is the pole's top.
+/// its top with the words so far (no caret: that means typing). Its origin is the pole's top.
 struct WalkLiveFlag: View {
     let text: String
     let colour: Color
@@ -396,29 +404,20 @@ struct WalkLiveFlag: View {
         }
     }
 
+    /// The words so far, with no caret: a caret means typing, and this is speaking.
     private var cloth: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-            let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text(text)
-                    .font(.custom("DMSans-SemiBold", size: 14))
-                    .lineSpacing(1)
-                    .foregroundStyle(.white)
-                    .lineLimit(3)
-                    .truncationMode(.head)
-                Rectangle()
-                    .fill(.white)
-                    .frame(width: 2, height: 14)
-                    .opacity(caretOn ? 1 : 0)
-                    .alignmentGuide(.lastTextBaseline) { d in d[.bottom] - 2 }
-            }
+        Text(text)
+            .font(.custom("DMSans-SemiBold", size: 14))
+            .lineSpacing(1)
+            .foregroundStyle(.white)
+            .lineLimit(3)
+            .truncationMode(.head)
             .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 18))
             .frame(minWidth: 40, alignment: .leading)
             .background(WalkSwallowtail().fill(colour))
             .fixedSize(horizontal: false, vertical: true)
             // Room for the widest cloth; the cloth itself hugs its words.
             .frame(width: Self.maxClothWidth, alignment: .leading)
-        }
     }
 }
 

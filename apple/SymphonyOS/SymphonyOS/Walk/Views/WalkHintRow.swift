@@ -1,7 +1,7 @@
 #if os(iOS)
 import SwiftUI
 
-/// The foot of the stage (contract §14, §10), on a scrim of the ground colour: the Next
+/// The foot of the stage (contract §14, §10), over the scrim (`WalkUnderlay`): the Next
 /// line under the light, the hint line under it (or, with the compass open, above the
 /// compass), and the quiet Undo pill beside the Next line, each where `WalkLayout` puts
 /// it; the Move row while a flag is selected; the one-line field while typing, the hint
@@ -16,9 +16,6 @@ struct WalkHintRow: View {
     /// walk first (and closed the field there) cannot lose them.
     @State private var text = ""
 
-    /// The scrim's height at the foot of the stage, and its strongest opacity.
-    static let scrimHeight: CGFloat = 120
-
     init(model: WalkModel) {
         self.model = model
     }
@@ -28,13 +25,12 @@ struct WalkHintRow: View {
         let layout = model.layout
         let stage = WalkArt.overlookSquare.stage
         ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(width: stage.width, height: Self.scrimHeight)
-                .offset(y: stage.height - Self.scrimHeight)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-
+            // The lesson: two lines above the light, on the veil (any tap puts it away; they take none).
+            if let frame = layout.lesson {
+                teachingLines(WalkCopy.teaching(s))
+                    .frame(width: frame.width, height: frame.height, alignment: .bottom)
+                    .position(x: frame.midX, y: frame.midY)
+            }
             if s.typing != nil {
                 bottom(typingRow(hint: WalkCopy.hint(s)))
             } else {
@@ -46,20 +42,7 @@ struct WalkHintRow: View {
                 if s.selected != nil {
                     bottom(moveRow(s.moveTargets))
                 } else if let frame = layout.hintLine {
-                    // Above the open compass the line sits on the veil, over the mountain: a soft band of
-                    // the ground colour under it keeps the flags beneath from showing through the words.
-                    if s.showsPoints {
-                        LinearGradient(stops: [.init(color: WalkPalette.ground.opacity(0), location: 0),
-                                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.3),
-                                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.7),
-                                               .init(color: WalkPalette.ground.opacity(0), location: 1)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .frame(width: stage.width, height: frame.height + 28)
-                            .position(x: stage.width / 2, y: frame.midY)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                    hintText(WalkCopy.hint(s), lines: WalkLayout.hintLines(WalkCopy.hint(s)))
+                    hintText(WalkCopy.hint(s))
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }
@@ -93,8 +76,8 @@ struct WalkHintRow: View {
                     .font(.custom("DMSans-SemiBold", size: 16))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 13, weight: .semibold))
             }
             .foregroundStyle(.white.opacity(line.skip ? 0.7 : 1))
             .walkGlow()
@@ -125,12 +108,32 @@ struct WalkHintRow: View {
         .accessibilityLabel(WalkCopy.undo)
     }
 
-    private func hintText(_ hint: String, lines: Int = 2) -> some View {
+    /// The 20-point serif line, then the 15-point line (none with speech off), as the walk's other words.
+    private func teachingLines(_ lines: [String]) -> some View {
+        VStack(spacing: 8) {
+            if let first = lines.first {
+                Text(first)
+                    .font(.custom("CrimsonPro-Regular", size: 20))
+                    .frame(maxWidth: 250)               // two even lines: "Press and hold the light," / "and say it out loud."
+            }
+            if lines.count > 1 {
+                Text(lines[1])
+                    .font(.custom("DMSans-Regular", size: 15))
+            }
+        }
+        .foregroundStyle(.white)
+        .multilineTextAlignment(.center)
+        .walkGlow()
+        .allowsHitTesting(false)            // VoiceOver also reads it once as it appears (an announcement)
+    }
+
+    /// One line, always: every hint and note is short enough (`WalkCopy.hintMaxLength`).
+    private func hintText(_ hint: String) -> some View {
         Text(hint)
             .font(.custom("DMSans-SemiBold", size: 15))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
-            .lineLimit(lines)
+            .lineLimit(1)
             .minimumScaleFactor(0.85)
             .walkGlow()
             .allowsHitTesting(false)
@@ -221,6 +224,61 @@ struct WalkHintRow: View {
                 model.send(.typeDismissed)
             }
         }
+    }
+}
+
+/// Under the light's own layer, so nothing on the compass is dimmed: the scrim at the foot of
+/// the stage (the ground colour from 0 to 80% over the last 120 points), and soft bands of the
+/// ground colour behind the open compass's hint, the points' words and the lines that teach
+/// the light, where they stand over the veiled mountain.
+struct WalkUnderlay: View {
+    let model: WalkModel
+    static let scrimHeight: CGFloat = 120
+
+    var body: some View {
+        let layout = model.layout
+        let stage = WalkArt.overlookSquare.stage
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(width: stage.width, height: Self.scrimHeight)
+                .offset(y: stage.height - Self.scrimHeight)
+            if model.state.showsPoints, let hint = layout.hintLine {
+                band(height: hint.height + 20).position(x: stage.width / 2, y: hint.midY)
+            }
+            // Behind each point's words, a soft blot of the ground colour (no edge, no panel): a
+            // kept area's pill or a flag under the veil does not show through the words.
+            if model.state.showsPoints {
+                let points = WalkCopy.points(model.state, model.periods)
+                ForEach(points, id: \.at) { point in
+                    let frame = WalkLayout.pointWords(point, among: points.map(\.at))
+                        .map(\.frame).reduce(CGRect.null) { $0.union($1) }
+                    if !frame.isNull {
+                        Ellipse()
+                            .fill(EllipticalGradient(stops: [.init(color: WalkPalette.ground.opacity(0.9), location: 0),
+                                                             .init(color: WalkPalette.ground.opacity(0.85), location: 0.6),
+                                                             .init(color: WalkPalette.ground.opacity(0), location: 1)]))
+                            .frame(width: frame.width + 48, height: frame.height + 32)
+                            .position(x: frame.midX, y: frame.midY)
+                    }
+                }
+            }
+            if let teach = layout.lesson {
+                band(height: teach.height + 40).position(x: stage.width / 2, y: teach.midY)
+            }
+        }
+        .frame(width: stage.width, height: stage.height, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func band(height: CGFloat) -> some View {
+        LinearGradient(stops: [.init(color: WalkPalette.ground.opacity(0), location: 0),
+                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.3),
+                               .init(color: WalkPalette.ground.opacity(0.8), location: 0.7),
+                               .init(color: WalkPalette.ground.opacity(0), location: 1)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(width: WalkArt.overlookSquare.stage.width, height: height)
     }
 }
 
