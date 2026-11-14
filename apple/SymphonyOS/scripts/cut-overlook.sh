@@ -78,3 +78,4 @@ cut OverlookWeek             0.2     0.498   0.8     0.214  0.471  0.558  0.389 
 cut OverlookWeekWide         0.2     0.5243  0.8     0.214  0.471  0.558  0.225   2317
 cut OverlookHalfOpenLaptop   0       0.220   1       0.152  0.133  0.696  0.496   2700
 cut OverlookHalfOpenBook     0       0.215   1       0.33   0.15   0.446  0.729   2896
+cut OverlookSpread           0.25    0.6075  0.75    0.055  0.15   0.89   0.266   2172

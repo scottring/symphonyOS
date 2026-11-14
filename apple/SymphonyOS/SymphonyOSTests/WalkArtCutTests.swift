@@ -76,6 +76,25 @@ struct WalkArtCutTests {
                 #expect((0.665...0.712).contains(foot.y) && (0.42...0.9).contains(foot.x), "Week \(size): a foot at \(foot)")
             }
         }
+        // The spread opened flat: the band across both pages, at the board's size and folds 435 to 455.
+        for top: CGFloat in [0, 10, 24, 44] {
+            for fold: CGFloat in [435, 445, 455] {
+                let sp = DailyMetrics.spread(size: CGSize(width: 890, height: 626), safeTop: top, safeBottom: 0, fold: fold)
+                let shows = sp.picture.intersection(sp.band)
+                #expect(covers(.spread, shows, picture: sp.picture), "spread, top \(top), fold \(fold)")
+                let upper = onPainting(CGPoint(x: shows.midX, y: shows.minY), picture: sp.picture, cut: .spread).y
+                let lower = onPainting(CGPoint(x: shows.midX, y: shows.maxY), picture: sp.picture, cut: .spread).y
+                #expect(upper < tall.bands[.week]! && tall.bands[.week]! < lower, "spread, top \(top): \(upper)…\(lower)")
+                let goals = [Signpost.Named(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, title: "Pick the tile"),
+                             Signpost.Named(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, title: "Find a gym")]
+                let flags = DailyMetrics.spreadFlags(goals, on: sp)
+                #expect(!flags.isEmpty)
+                for flag in flags {
+                    let foot = onPainting(CGPoint(x: flag.pole.midX, y: flag.pole.maxY), picture: sp.picture, cut: .spread)
+                    #expect((0.665...0.712).contains(foot.y) && (0.42...0.9).contains(foot.x), "spread, top \(top): a foot at \(foot)")
+                }
+            }
+        }
         for (size, split, across) in Self.tents {
             let t = DailyMetrics.tent(size: size, split: split, across: across)
             let cut = WalkArt.Cut.halfOpen(across: across)
@@ -101,6 +120,7 @@ struct WalkArtCutTests {
             let cut = WalkArt.Cut.halfOpen(across: across)
             largest[cut] = max(largest[cut] ?? 0, DailyMetrics.tent(size: size, split: split, across: across).picture.width)
         }
+        largest[.spread] = DailyMetrics.spread(size: CGSize(width: 890, height: 626), safeTop: 10, safeBottom: 0, fold: nil).picture.width
         for cut in WalkArt.Cut.allCases {
             let holds = Int((cut.region.width * CGFloat(WalkArt.tallMasterWidth)).rounded())
             let needs = Int((largest[cut, default: 0] * 3).rounded(.up))

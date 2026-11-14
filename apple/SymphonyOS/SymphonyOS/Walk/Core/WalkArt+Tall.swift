@@ -32,6 +32,9 @@ extension WalkArt {
         case weekWide
         /// The half-open display's look half, laptop and book: the peaks behind the time, the flats below.
         case halfOpenLaptop, halfOpenBook
+        /// The Duo opened flat: one band across both pages, the meadow under the month flags on the
+        /// left page and the sign over the right (the ledge cannot share a band with the meadow).
+        case spread
 
         var imageName: String {
             switch self {
@@ -42,6 +45,7 @@ extension WalkArt {
             case .weekWide: "OverlookWeekWide"
             case .halfOpenLaptop: "OverlookHalfOpenLaptop"
             case .halfOpenBook: "OverlookHalfOpenBook"
+            case .spread: "OverlookSpread"
             }
         }
 
@@ -56,6 +60,7 @@ extension WalkArt {
             case .weekWide: (x, y, w) = (0.2, 0.5243, 0.8)
             case .halfOpenLaptop: (x, y, w) = (0, 0.220, 1)
             case .halfOpenBook: (x, y, w) = (0, 0.215, 1)
+            case .spread: (x, y, w) = (0.25, 0.6075, 0.75)
             }
             return CGRect(x: x, y: y, width: w, height: w / WalkArt.tallAspect)
         }
@@ -70,6 +75,7 @@ extension WalkArt {
             case .weekWide: CGRect(x: 0.214, y: 0.471, width: 0.558, height: 0.225)
             case .halfOpenLaptop: CGRect(x: 0.152, y: 0.133, width: 0.696, height: 0.496)
             case .halfOpenBook: CGRect(x: 0.33, y: 0.15, width: 0.446, height: 0.729)
+            case .spread: CGRect(x: 0.055, y: 0.15, width: 0.89, height: 0.266)
             }
         }
 
@@ -82,6 +88,7 @@ extension WalkArt {
             case .week, .weekWide: 2317      // all 0.8 of the painting's 2896 holds
             case .halfOpenLaptop: 2700       // 900 pt
             case .halfOpenBook: 2896         // the whole width (1000 pt would want 3000)
+            case .spread: 2172               // all 0.75 of the painting holds (1000 pt would want 3000)
             }
         }
 
@@ -103,7 +110,7 @@ extension WalkArt {
         var level: WalkLevel {
             switch self {
             case .todayTall, .todayWide, .todayShort: .today
-            case .week, .weekWide: .week
+            case .week, .weekWide, .spread: .week
             case .halfOpenLaptop, .halfOpenBook: .year
             }
         }

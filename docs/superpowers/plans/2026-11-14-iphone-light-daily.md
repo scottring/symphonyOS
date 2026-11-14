@@ -1028,15 +1028,15 @@ plan-handle `WalkCopy` member.
 
 ## As built (2026-11-14): what changed from the plan above
 
-All 21 tasks are built and reviewed, in two lanes run side by side and merged three times. This record
-is written from lane B (`claude/ios-light-build-b`), which holds Tasks 1 to 21 with the Duo's four windows.
-Lane A (`claude/ios-light-build`) holds the same work except Task 18 (the spread) and Merge 3 (phones
-only, the day turning), plus the new tall painting on the everyday bands, which is being scrolled behind the walk (Tasks A1 and A2, not in this tree yet: see
-`apple/SymphonyOS/PLANNING.md`, "The art"). Nothing is pushed, merged into main or deployed, and nothing
+All 21 tasks are built and reviewed, in two lanes run side by side and merged four times. This record
+was written in lane B (`claude/ios-light-build-b`, Tasks 1 to 21 with the Duo's four windows); Merge 4
+put lane A's painting work (Tasks A1 and A2: the tall painting on every band and behind the walk, see
+`apple/SymphonyOS/PLANNING.md`, "The art") on top of it in `claude/ios-light-build`, with the spread's
+own cut of the painting. Nothing is pushed, merged into main or deployed, and nothing
 in this plan needs a database, server or web change. On the lane-B iPhone 17 simulator the unit target
 passes (1033 tests before Task 21, 1038 after) and so do the UI classes (`LightDailyUITests`,
 `FullHouseholdUnchangedUITests`, `LightEditionUITests`, `LightSpreadUITests`, `WalkUITests`,
-`PlannerScreensUITests`), each alone and all together in one run. Nobody has spoken to the bar, typed
+`PlannerScreensUITests`), each alone and all together in one run; after Merge 4 the unit target passes 1053 tests in 72 suites. Nobody has spoken to the bar, typed
 into it, heard it with VoiceOver or held a real Duo: the hand walk below is still the gate.
 
 ### Where the build departs from the plan's text
@@ -1083,6 +1083,13 @@ into it, heard it with VoiceOver or held a real Duo: the hand walk below is stil
   and header, the next event, the ring, Week's band flags, day labels and Move to panel, as well as the row
   of words, the signpost, the bar and the mountain pages. They stand in the boards' fixed frames; the
   rows grow instead.
+- **The painting (Tasks A1, A2).** The owner supplied a tall painting, summit to ledge, and chose
+  "Scroll it behind the walk" (fallback, if it looks wrong: a new sharp square picture for the walk).
+  The walk's layout is unchanged in the square print's world; the painting is drawn behind it by a
+  camera of its own for each step and each zoom, so each step's own flags stand on their level and the
+  levels above stand a little up-slope. From Season down a navy shade sits behind the question so it
+  reads at 4.5:1 on the brighter valley. Every band (Today, Week, the half-open look half, the spread)
+  draws its own cut of the same painting. The old square picture is no longer bundled.
 - **The painting was already hidden from VoiceOver** in code (`accessibilityHidden` on the walk's
   picture, the bands and the half-open display's). XCUITest lists hidden elements anyway (it lists the
   bar's hidden microphone glyph too), so the "painting is read" finding came from the test tree; no
@@ -1107,11 +1114,11 @@ into it, heard it with VoiceOver or held a real Duo: the hand walk below is stil
 13. **D13** A move on a light page never adds to `deferCount`. If wrong: a household later made full sees lower "deferred" counts for what it carried forward while light.
 14. **D14** A light page under the half-open display stays in the tree, inert and silent. If wrong: a covered page that still reacts (tested in the core).
 15. **D15** A tick on the half-open display offers Undo. If wrong: one more line after a tick.
-16. **D16** (lane A) The walk uses a 2048 × 6144 copy of the tall painting, not the master. If wrong: the zoomed-in column is enlarged about 1.5 times.
+16. **D16** (lane A) The walk and the mountain pages draw one 2048 × 6144 copy of the tall painting, not the 2896 × 8688 master (memory: 48 MiB decoded instead of about 100). If wrong: a zoomed-in column is enlarged up to 1.59 times (Month) and looks soft at full size; a sharper copy costs memory.
 17. **D17** Light pages are for the phone idiom only. If wrong: a light household on an iPad sees the older screens until iPad is designed.
 18. **D18** A selected date that was today or later and is now past becomes today; a past date the person went to stays. If wrong: someone who left the app on tomorrow's page finds today's page days later.
 19. **D19** A light household's Tell on an iPad keeps speech on the device. If wrong: dictation there is less accurate than server recognition.
-20. **D20** (lane A) A band's cut of the painting need not be square. If wrong: a sliver of unpainted frame if a band ever shows more than the core says (tested).
+20. **D20** (lane A) A band's cut of the painting holds only the part of its square frame that can ever show (decoded 2.7 to 11.2 MB each, down from 9 to 33.5). If wrong: a sliver of unpainted frame if a band ever shows more than the core says (tested on every listed window).
 
 The 17 consistency amendments of the pre-flight scan were adopted as written.
 
@@ -1147,6 +1154,12 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - The Mac destination did not build at Task 1 (`DinnerCard.swift`, outside this plan); not re-checked here.
 
 ### What only a real phone can show (the owner's hand walk)
+
+- **The painting, three known items to look at:** on Look back up the Health column's season flag hangs
+  over the upper pine and today's flag stands on the river's bend, and the view ends in the valley, not
+  on the ledge; a zoomed column is enlarged up to 1.59 times and is soft at full size; at the handover the
+  scenery jumps from the walk's last view (sky behind the ending's sheet) to Today's band (forest and
+  ledge). If any of these is wrong to the eye, the fallback is a new sharp square picture for the walk.
 
 - **Speech:** tap the bar's light and say a task with a day; refuse the microphone once; a phone with no on-device speech for its language types, with nothing sent to Apple.
 - **Sounds:** the walk's five recorded sounds are still synthesized placeholders.
