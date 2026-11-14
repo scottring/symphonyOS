@@ -974,3 +974,50 @@ Each line is a decision the spec and boards do not settle, with what it costs if
 - **Sign up on a real iPhone once sign-up is open,** with a new address: no invite wording anywhere on the way in.
 - **VoiceOver, once through:** Today, Week, Month, and the bar.
 - **Nothing here is pushed.** The foundations plan's release checklist (database, functions, signup) still comes first; TestFlight and main wait for Scott.
+
+## Pre-flight amendments (binding; they override the task text above)
+
+A scan of this plan against itself and the code found 22 conflicts. The scan, with the exact fragments
+and line numbers, is `.superpowers/sdd/2026-11-14-iphone-light-daily/preflight.md` ("Findings to rule
+on"); every builder and reviewer reads the findings listed for their task there and applies the
+"Amendment" text exactly as written, with these rulings on the ones that were product decisions.
+
+**By task** (finding numbers): Global Constraints ← 17, 19 · Task 1 ← 10 · Task 2 ← 20 · Task 3 ← 2,
+15, 22 · Task 5 ← 1, 4 · Task 6 ← 1, 5, 16 · Task 7 ← 6, 13 · Task 8 ← 7, 10, 11, 14, 21, 22 ·
+Task 9 ← 17, 19 · Task 10 ← 15, 20 · Task 11 ← 4, 20 · Task 13 ← 1, 12 · Task 14 ← 1, 12, 20, 21 ·
+Task 15 ← 9, 18 · Task 16 ← 18, 20 · Task 17 ← 3, 11, 13 · Task 18 ← 3, 14 · Task 19 ← 8 ·
+Task 21 ← 11, 18, 20.
+
+**Rulings on the product decisions** (each is a call made for the owner; cost if wrong in brackets):
+
+- **2. "Period ends" always names the month.** The sign reads "<Month> ends on <weekday>" on the
+  month's last three days, whatever else ends that day, as the approved board shows ("NOVEMBER ENDS ON
+  MONDAY"), and a tap goes up to that month's page. Task 3's rule is "the month whose last day is
+  within two days", not "largest first"; its test expects `(.month, "November", …)` on 28–30 November
+  2026, and 29–31 December gives December, not the year. [A season's or a year's end passes without
+  its own sign: one rule.]
+- **9. A walk-down returns to the page it was started from and is never stored** (option a): it runs
+  with no position store, so it cannot become a "waiting" walk and cannot replace one; "Leave for now"
+  inside it simply closes it; what it added stays. Task 15 Step 5's expectation stands as written.
+  [If wrong: one flag.]
+- **10. The line at the top of Today shows in two cases, with different words.** A walk left with
+  "Leave for now" (stored paused): `DailyCopy.walkWaiting`, "Your walk is waiting. Pick it back up.",
+  which resumes it. A walk declined at Welcome ("Not now", stored left) by someone who has no goals at
+  all: `DailyCopy.walkWhenReady`, "Walk down from the year when you’re ready.", which starts it from
+  the top; it goes away as soon as one goal exists, and never shows in a full household. Task 1's
+  `aWalkLeftPartWayIsWaiting` covers the first; add `aDeclinedWalkWithNoGoalsOffersIt` and
+  `aDeclinedWalkWithGoalsSaysNothing`. Review Focus 4 and Task 8 read accordingly. [If wrong: delete
+  the second case.]
+- **21. Screenshots stay pinned to 2026-11-10** (option a). On that day the season is fall, so every
+  line the boards print with "winter" reads "fall" in the app; that is correct and is not a defect.
+  Tasks 8 and 14 judge the season word as "fall".
+- **22. Following a sign puts that kind away for the day** (option b): after a tap on a sign that
+  takes you somewhere (the week, a page, a walk-down), `model.dismiss(kind)` is called, so on coming
+  back Today shows the next true kind, as the spec says ("Get there and it turns to the next place").
+  "First, today" does not navigate and is not put away by a tap; it goes when its task is done.
+  Task 3 adds `aFollowedSignGivesWayToTheNext`; Task 8 wires it. [If wrong: one line.]
+
+**Order.** This plan starts only after the walk's clarity pass (which adds "Leave for now" and the
+paused position) and the natural-footing fix have both landed; Task 1 re-reads the committed walk
+files for the names of: the paused status, "resume the paused walk", "a paused walk exists", and the
+plan-handle `WalkCopy` member.
