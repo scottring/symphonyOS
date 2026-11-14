@@ -84,7 +84,7 @@ struct WalkPennant: Shape {
 /// With Reduce Motion it does not flutter, and it fades in where it stands.
 struct WalkBannerView: View {
     let banner: WalkLayout.Banner
-    /// The stage x of the post's pole; a small flag hangs from it.
+    /// The stage x of the post's pole where the banner meets it; a small flag hangs from it.
     let poleX: CGFloat
     @State private var fluttering = false
     @State private var landed: Bool
@@ -103,6 +103,8 @@ struct WalkBannerView: View {
             .frame(width: banner.frame.width, height: banner.frame.height, alignment: .topLeading)
             .modifier(WalkFlutter(degrees: flutters && fluttering ? -2.5 : 0))
             .modifier(WalkDropIn(progress: landed ? 1 : 0, still: reduceMotion))
+            // Planted by hand: the post's lean and the cloth's own tilt, about where it meets its pole.
+            .rotationEffect(.degrees(banner.turn), anchor: UnitPoint(x: banner.pivotUnit.x, y: banner.pivotUnit.y))
             .onAppear {
                 if !landed {
                     withAnimation(reduceMotion ? WalkSceneView.crossFade : .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.7)) { landed = true }

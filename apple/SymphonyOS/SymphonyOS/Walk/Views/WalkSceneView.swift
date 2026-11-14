@@ -85,14 +85,16 @@ struct WalkSceneView: View {
             }
 
             ForEach(layout.posts) { post in
+                // The pole leans about its foot as the layout says; its banners' frames already lean with it.
                 WalkPoleView(height: max(0, post.base.y - post.top), pale: post.pale)
                     .saturation(post.saturation)
                     .opacity(post.opacity)
+                    .rotationEffect(.degrees(post.lean), anchor: .bottom)
                     .accessibilityHidden(true)
                     .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
                                 camera)
                 ForEach(post.banners) { banner in
-                    Button { tap(banner, on: post) } label: { WalkBannerView(banner: banner, poleX: post.base.x, dropsIn: arrived) }
+                    Button { tap(banner, on: post) } label: { WalkBannerView(banner: banner, poleX: banner.pivot.x, dropsIn: arrived) }
                         .buttonStyle(.plain)
                         .saturation(post.saturation)
                         .opacity(post.opacity)
