@@ -72,6 +72,29 @@ struct DailyGateTests {
         #expect(!DailyGate.walkIsOffered(position(.left, step: 0), goalCount: 12, edition: .light))
     }
 
+    @Test func theLineAtTheTopOfTodayResumesOrStartsTheWalk() {
+        // Left with Leave for now: it waits, and the line picks it back up.
+        #expect(DailyGate.walkLine(position(.paused), goalCount: 3, edition: .light) == .waiting)
+        #expect(DailyGate.walkLine(position(.paused, step: 0), goalCount: 0, edition: .light) == .waiting)
+        // Not now at Welcome with no goals at all: the line starts it from the top.
+        #expect(DailyGate.walkLine(position(.left, step: 0), goalCount: 0, edition: .light) == .whenReady)
+        // Not after one goal exists, nor for a walk in progress, finished or never stored.
+        #expect(DailyGate.walkLine(position(.left, step: 0), goalCount: 1, edition: .light) == nil)
+        #expect(DailyGate.walkLine(position(.inProgress), goalCount: 0, edition: .light) == nil)
+        #expect(DailyGate.walkLine(position(.finished), goalCount: 0, edition: .light) == nil)
+        #expect(DailyGate.walkLine(nil, goalCount: 0, edition: .light) == nil)
+        // Never in a full household.
+        #expect(DailyGate.walkLine(position(.paused), goalCount: 0, edition: .full) == nil)
+        #expect(DailyGate.walkLine(position(.left, step: 0), goalCount: 0, edition: .full) == nil)
+    }
+
+    @Test func todayIsTheLightPageBuilt() {
+        #expect(DailyGate.horizons == [.today])
+        #expect(DailyGate.shows(.today, edition: .light, layout: .oneColumn))
+        #expect(!DailyGate.shows(.today, edition: .full, layout: .oneColumn))
+        #expect(!DailyGate.shows(.week, edition: .light, layout: .oneColumn))
+    }
+
     @Test func theDockGivesWayOnlyWithTheBarAndToday() {
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))

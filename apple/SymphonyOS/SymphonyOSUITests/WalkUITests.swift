@@ -92,7 +92,8 @@ final class WalkUITests: XCTestCase {
         tap(orb, "the light")
         tap(app.buttons["Leave for now"], "Leave for now")
         XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not leave the walk")
-        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 30), "Today is not back")
+        // A light household's Today is the light page.
+        XCTAssertTrue(app.descendants(matching: .any)["daily.today"].waitForExistence(timeout: 30), "Today is not back")
         XCTAssertTrue(app.buttons["Your walk is waiting. Pick it back up."].waitForExistence(timeout: 15),
                       "no line on Today for the waiting walk")
         XCTAssertFalse(orb.waitForExistence(timeout: 3), "the walk came back by itself")

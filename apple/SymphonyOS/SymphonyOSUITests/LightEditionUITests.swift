@@ -11,7 +11,9 @@ final class LightEditionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
         app.launch()
-        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 60), "never reached Today")
+        // A light household lands on light Today (`daily.today`); a full one on the Today it always had.
+        let today = light ? app.descendants(matching: .any)["daily.today"] : app.buttons["Today. Switch horizon"]
+        XCTAssertTrue(today.waitForExistence(timeout: 60), "never reached Today")
         return app
     }
 

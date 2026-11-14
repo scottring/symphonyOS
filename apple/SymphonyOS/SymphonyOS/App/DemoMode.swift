@@ -57,8 +57,18 @@ enum DemoMode {
 
     static func container(for types: [any PersistentModel.Type]) -> ModelContainer {
         let container = try! ModelContainer(for: Schema(types), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-        if !isWalk { seed(ModelContext(container)) }
+        if !isWalk && !seedsDaily { seed(ModelContext(container)) }
         return container
+    }
+
+    /// `-SymphonyDaily` (iOS): the light pages' seed instead of the family one, written by
+    /// `sharedContainer` on the main actor (`DailyDemo.swift`).
+    private static var seedsDaily: Bool {
+        #if os(iOS)
+        return isDaily && !isWalk
+        #else
+        return false
+        #endif
     }
 
     static let types: [any PersistentModel.Type] = [
@@ -67,7 +77,13 @@ enum DemoMode {
         SymphonyList.self, SymphonyListItem.self, TaskCommitment.self, TaskFocus.self, Goal.self, GoalArea.self, PendingChange.self,
     ]
 
-    @MainActor static let sharedContainer: ModelContainer = container(for: types)
+    @MainActor static let sharedContainer: ModelContainer = {
+        let made = container(for: types)
+        #if os(iOS)
+        if seedsDaily { seedDaily(made.mainContext, seed: dailySeed, today: DailyClock.now()) }
+        #endif
+        return made
+    }()
 
     /// A sample dinner every night: a recipe to cook from, with a cue.
     static func dinner(on date: Date) -> Dinner? {

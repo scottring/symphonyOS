@@ -63,6 +63,10 @@ final class CalendarFeed {
     /// list while access is off, so a view never waits on a calendar that
     /// will not come; nil only until the day is first read.
     func items(for date: Date) -> [TimelineItem]? {
+        #if DEBUG && os(iOS)
+        // The light pages' demo (`-SymphonyDemo -SymphonyDaily`) reads its two sample events.
+        if DemoMode.isOn && DemoMode.isDaily { return DemoMode.dailyEvents(on: date) }
+        #endif
         switch source {
         case nil: return nil
         case .google: return google.items(for: date)

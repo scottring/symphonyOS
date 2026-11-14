@@ -20,6 +20,16 @@ struct PlannerView: View {
     private var seasons: [SeasonBoundary]? { households.first?.seasons }
 
     var body: some View {
+        #if os(iOS)
+        // A light household's pages where they are built (`DailyGate`); every other page as before.
+        if appState.edition == .light { LightPlannerView { full } } else { full }
+        #else
+        full
+        #endif
+    }
+
+    /// The Planner every household has: one horizon at a time, and the switcher.
+    private var full: some View {
         ZStack(alignment: .topLeading) {
             Group {
                 switch shown ?? appState.horizon {

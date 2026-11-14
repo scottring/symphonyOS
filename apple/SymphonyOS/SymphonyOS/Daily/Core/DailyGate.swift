@@ -4,8 +4,8 @@ import Foundation
 /// mixed or unknown one (which `Edition.resolve` already makes full), keeps every
 /// screen it has today; a light household gets a light page only once it is built.
 enum DailyGate {
-    /// Light pages that are built. Tasks 8, 11 and 14 add theirs.
-    static let horizons: Set<Horizon> = []
+    /// Light pages that are built. Tasks 11 and 14 add theirs.
+    static let horizons: Set<Horizon> = [.today]
     /// Window shapes the light pages are built for. Tasks 17 and 18 add theirs; never
     /// `.glanceWide`, where a phone on its side keeps the old screens.
     static let layouts: Set<TodayLayout> = [.oneColumn]
@@ -45,5 +45,16 @@ enum DailyGate {
     /// all, in a light household: Today offers it from the top. It goes as soon as one goal exists.
     static func walkIsOffered(_ position: WalkPosition?, goalCount: Int, edition: Edition) -> Bool {
         edition == .light && position?.status == .left && goalCount == 0
+    }
+
+    /// The one quiet line at the top of light Today, if any: `waiting` resumes a walk left
+    /// with Leave for now (`DailyCopy.walkWaiting`); `whenReady` starts one declined at
+    /// Welcome by someone with no goals (`DailyCopy.walkWhenReady`). Never in a full household.
+    enum WalkLine: Equatable { case waiting, whenReady }
+
+    static func walkLine(_ position: WalkPosition?, goalCount: Int, edition: Edition) -> WalkLine? {
+        guard edition == .light else { return nil }
+        if walkIsWaiting(position) { return .waiting }
+        return walkIsOffered(position, goalCount: goalCount, edition: edition) ? .whenReady : nil
     }
 }
