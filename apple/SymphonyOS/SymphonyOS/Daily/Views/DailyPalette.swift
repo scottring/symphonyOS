@@ -46,10 +46,25 @@ enum DailyPalette {
                                               .init(color: Color(hex: 0xEBBF72), location: 0.76),
                                               .init(color: Color(hex: 0xDDA152), location: 1)]
 
-    // The six bundled faces.
-    static func crimson(_ size: CGFloat) -> Font { .custom("CrimsonPro-Regular", size: size) }
-    static func sans(_ size: CGFloat) -> Font { .custom("DMSans-Regular", size: size) }
-    static func sansMedium(_ size: CGFloat) -> Font { .custom("DMSans-Medium", size: size) }
-    static func sansSemiBold(_ size: CGFloat) -> Font { .custom("DMSans-SemiBold", size: size) }
+    // The six bundled faces. Each grows with the person's text size as `relativeTo` does (body
+    // unless the size is a heading's or a small line's), so a title grows as a title does.
+    static func crimson(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        .custom("CrimsonPro-Regular", size: size, relativeTo: style)
+    }
+    static func sans(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        .custom("DMSans-Regular", size: size, relativeTo: style)
+    }
+    static func sansMedium(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        .custom("DMSans-Medium", size: size, relativeTo: style)
+    }
+    static func sansSemiBold(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        .custom("DMSans-SemiBold", size: size, relativeTo: style)
+    }
+
+    /// Words that stand in the boards' fixed frames stop growing here: the row of words, the
+    /// signpost, the bar, the sheet's handle and header, the next event, the ring, Week's band flags,
+    /// its day labels and its Move to panel, and the mountain pages (drawn on the walk's stage). The rows, and the
+    /// week's lines and fold, grow on: a row grows in height and its title wraps.
+    static let largestChrome = DynamicTypeSize.xLarge
 }
 #endif

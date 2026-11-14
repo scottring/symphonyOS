@@ -134,6 +134,16 @@ struct DailyCopyTests {
         #expect(DailyCopy.tomorrow("Choose the tile") == "Tomorrow: Choose the tile")
     }
 
+    /// VoiceOver reads a day in the week by its whole name, never "TUE, 10": today says so first,
+    /// and the group with no day is Any day.
+    @Test func aDayIsReadByItsWholeName() {
+        let today = day(2026, 11, 10)
+        #expect(DailyCopy.spokenDay(day(2026, 11, 11), today: today) == "Wednesday, 11 November")
+        #expect(DailyCopy.spokenDay(today, today: today) == "Today, Tuesday, 10 November")
+        #expect(DailyCopy.spokenDay(day(2026, 11, 10, 15), today: today) == "Today, Tuesday, 10 November")
+        #expect(DailyCopy.spokenDay(nil, today: today) == DailyCopy.anyDay)
+    }
+
     @Test func everySignSaysWhatATapDoes() {
         let kinds = ["dayDone", "firstToday", "todayOpen", "newWeek", "periodEnds", "noPiece"]
         for kind in kinds { #expect(!DailyCopy.signHint(kind).isEmpty, "\(kind)") }

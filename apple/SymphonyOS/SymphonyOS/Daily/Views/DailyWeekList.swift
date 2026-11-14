@@ -15,8 +15,11 @@ struct DailyWeekChoice: Equatable {
     let chosen: Binding<DailyWeekChoice?>
     let reduceMotion: Bool
 
+    /// The panel and the chosen row's halo come and go: with Reduce Motion a 0.25 s cross-fade, as the walk's.
+    private var fade: Animation { reduceMotion ? WalkWorldView.crossFade : .easeOut(duration: 0.18) }
+
     func choose(_ row: DailyDay.Row, day: Date?) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+        withAnimation(fade) {
             chosen.wrappedValue = chosen.wrappedValue?.id == row.id ? nil : DailyWeekChoice(id: row.id, day: day)
         }
     }
@@ -24,13 +27,13 @@ struct DailyWeekChoice: Equatable {
     /// A chip moves the task and closes the panel; Undo shows.
     func move(_ id: UUID, to day: Date?) {
         model.move(id, to: day)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { chosen.wrappedValue = nil }
+        withAnimation(fade) { chosen.wrappedValue = nil }
     }
 
     /// The task goes from the week at once (written once its Undo can no longer be used); the panel closes.
     func pullUp(_ id: UUID) {
         model.pullUp(id, level: .week)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { chosen.wrappedValue = nil }
+        withAnimation(fade) { chosen.wrappedValue = nil }
     }
 }
 
@@ -83,6 +86,7 @@ struct DailyWeekList: View {
     @Binding var unfolded: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var frames = DailyRowFrames()
 
     /// The 4 points above the list leave room for a chosen card's halo.
@@ -166,7 +170,7 @@ struct DailyWeekList: View {
                 Spacer(minLength: 8)
                 if let done = past.doneLine { Text(done) }
             }
-            .font(DailyPalette.sans(13))
+            .font(DailyPalette.sans(13, relativeTo: .footnote))
             .foregroundStyle(DailyPalette.muted)
             .lineLimit(1)
             .padding(.horizontal, look.labelInset)
@@ -232,7 +236,11 @@ struct DailyWeekList: View {
         .lineLimit(1)
         .padding(.leading, look.labelInset)
         .frame(width: look.labelWidth, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        // The label's column is the board's width: its words keep their size from extra large up.
+        .dynamicTypeSize(...DailyPalette.largestChrome)
+        // Read by the day's whole name ("Wednesday, 11 November"), never "WED, 11".
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(DailyCopy.spokenDay(day.date, today: model.today))
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -243,11 +251,11 @@ struct DailyWeekList: View {
             HStack(spacing: 10) {
                 if !time.isEmpty {
                     Text(time)
-                        .font(DailyPalette.crimson(16))
+                        .font(DailyPalette.crimson(16, relativeTo: .callout))
                         .foregroundStyle(DailyPalette.rust)
                 }
                 Text(title)
-                    .font(DailyPalette.sans(14.5))
+                    .font(DailyPalette.sans(14.5, relativeTo: .callout))
                     .foregroundStyle(DailyPalette.soft)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -259,7 +267,7 @@ struct DailyWeekList: View {
             taskCard(row, day: day)
         case .open:
             Text(DailyCopy.open)
-                .font(DailyPalette.sans(13))
+                .font(DailyPalette.sans(13, relativeTo: .footnote))
                 .foregroundStyle(DailyPalette.openCircle)
                 .padding(.leading, 10)
                 .frame(maxWidth: .infinity, minHeight: look.openHeight, alignment: .leading)
@@ -286,7 +294,7 @@ struct DailyWeekList: View {
                         .font(DailyPalette.sansMedium(15.5))
                         .foregroundStyle(row.done ? DailyPalette.doneInk : DailyPalette.ink)
                         .strikethrough(row.done, color: DailyPalette.strike)
-                        .lineLimit(1)
+                        .lineLimit(DailyMetrics.titleLines(accessibilitySize: typeSize.isAccessibilitySize))
                         .truncationMode(.tail)
                         .frame(minHeight: 19)
                     if let goal = row.forGoal { lineage(goal) }
@@ -337,10 +345,10 @@ struct DailyWeekList: View {
     /// "for" in the lineage ink, the goal's name in Crimson Pro green, after a small flag.
     private func lineage(_ goal: String) -> some View {
         var text = AttributedString(WalkCopy.forGoal(goal))
-        text.font = DailyPalette.sans(12)
+        text.font = DailyPalette.sans(12, relativeTo: .footnote)
         text.foregroundColor = DailyPalette.lineageInk
         if let range = text.range(of: goal, options: .backwards) {
-            text[range].font = DailyPalette.crimson(14)
+            text[range].font = DailyPalette.crimson(14, relativeTo: .footnote)
             text[range].foregroundColor = DailyPalette.green
         }
         return HStack(spacing: 5) {
@@ -406,6 +414,7 @@ struct DailyMovePanel: View {
             .offset(x: frame.minX)
         }
         .frame(width: frame.maxX, height: frame.maxY, alignment: .bottomLeading)
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // above the bar, at the bar's size: the list stays in sight
         .transition(.opacity)
     }
 

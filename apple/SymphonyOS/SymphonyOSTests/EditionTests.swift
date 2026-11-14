@@ -58,6 +58,25 @@ struct EditionLastKnownTests {
         #expect(state.bottomInset == state.dockHeight)
     }
 
+    /// Off the light pages nothing light is left to come back to: the last day the light Planner
+    /// saw goes (a later light Planner starts from its own today), and so does a handover not yet played.
+    @MainActor @Test func leavingTheLightPagesForgetsTheirDayAndTheHandover() {
+        let state = AppState()
+        state.dailyLastDay = Date(timeIntervalSince1970: 1_000_000)
+        state.handover = true
+        state.leaveDaily()
+        #expect(state.dailyLastDay == nil)
+        #expect(state.handover == false)
+    }
+
+    /// The signed-out person's last light day goes with them.
+    @MainActor @Test func signingOutForgetsTheLastLightDay() {
+        let state = AppState()
+        state.dailyLastDay = Date(timeIntervalSince1970: 1_000_000)
+        state.signedOut()
+        #expect(state.dailyLastDay == nil)
+    }
+
     /// A Tell still waiting (behind the walk) when the person signs out is dropped, not answered.
     @MainActor @Test func aWaitingTellGoesWithTheSignedOutPerson() {
         let state = AppState()

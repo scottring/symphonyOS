@@ -420,7 +420,7 @@ final class LightEditionUITests: XCTestCase {
             + (remembers ? ["-SymphonyHandoverRemembers"] : [])
         app.launchDemo()
         // The ending's last control (`WalkCopy.goToToday`).
-        let openToday = app.descendants(matching: .any)["Open Today"]
+        let openToday = app.descendants(matching: .any)["walk.goToToday"]
         XCTAssertTrue(openToday.waitForExistence(timeout: 60), "the walk's ending never showed")
         openToday.tap()
         XCTAssertTrue(app.buttons["walk.orb"].waitForNonExistence(timeout: 30), "the walk did not close")

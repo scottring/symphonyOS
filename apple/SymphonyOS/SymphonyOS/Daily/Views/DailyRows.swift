@@ -16,6 +16,8 @@ struct DailyRow: View {
     let details: () -> Void
     let pullUp: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 12) {
@@ -25,7 +27,7 @@ struct DailyRow: View {
                         .font(DailyPalette.sansMedium(16))
                         .foregroundStyle(row.done ? DailyPalette.doneInk : DailyPalette.ink)
                         .strikethrough(row.done, color: DailyPalette.strike)
-                        .lineLimit(1)
+                        .lineLimit(DailyMetrics.titleLines(accessibilitySize: typeSize.isAccessibilitySize))
                         .truncationMode(.tail)
                         .frame(minHeight: 20)
                     if let goal = row.forGoal { lineage(goal) }
@@ -93,10 +95,10 @@ struct DailyRow: View {
     /// `WalkCopy.forGoal`, with the goal's name set apart.
     static func forLine(_ goal: String) -> AttributedString {
         var text = AttributedString(WalkCopy.forGoal(goal))
-        text.font = DailyPalette.sans(12.5)
+        text.font = DailyPalette.sans(12.5, relativeTo: .footnote)
         text.foregroundColor = DailyPalette.lineageInk
         if let range = text.range(of: goal, options: .backwards) {
-            text[range].font = DailyPalette.crimson(14.5)
+            text[range].font = DailyPalette.crimson(14.5, relativeTo: .footnote)
             text[range].foregroundColor = DailyPalette.green
         }
         return text
@@ -115,6 +117,8 @@ struct DailyRing: View {
         self.diameter = diameter
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         let k = diameter / 56
         let progress = total > 0 ? CGFloat(done) / CGFloat(total) : 0
@@ -124,7 +128,7 @@ struct DailyRing: View {
                 .trim(from: 0, to: progress)
                 .stroke(DailyPalette.green, style: StrokeStyle(lineWidth: 6 * k, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.4), value: progress)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.4), value: progress)     // with Reduce Motion it does not sweep
             Text(WalkCopy.ring(done: done, total: total))
                 .font(DailyPalette.sansSemiBold(14 * k))
                 .monospacedDigit()
@@ -132,6 +136,7 @@ struct DailyRing: View {
         }
         .frame(width: 46 * k, height: 46 * k)
         .frame(width: diameter, height: diameter)
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // a drawing of a fixed size: its count does not grow
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(WalkCopy.ringLabel(done: done, total: total))
         .accessibilityIdentifier("daily.ring")
@@ -145,7 +150,7 @@ struct DailyNextCard: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(DailyCopy.clock(next.start))
-                .font(DailyPalette.crimson(19))
+                .font(DailyPalette.crimson(19, relativeTo: .title3))
                 .foregroundStyle(DailyPalette.rust)
             Text(next.title)
                 .font(DailyPalette.sans(15.5))
@@ -154,7 +159,7 @@ struct DailyNextCard: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(DailyCopy.next.uppercased())
-                .font(DailyPalette.sansSemiBold(11))
+                .font(DailyPalette.sansSemiBold(11, relativeTo: .caption))
                 .tracking(1.2)
                 .foregroundStyle(DailyPalette.rust)
         }
@@ -162,6 +167,7 @@ struct DailyNextCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: 14).fill(DailyPalette.nextFill))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DailyPalette.nextLine, lineWidth: 1))
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // a card of a fixed height
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(DailyCopy.nextEvent(next.title, at: next.start))
     }

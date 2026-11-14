@@ -199,4 +199,32 @@ struct DailyBarTests {
         _ = quiet.apply(.noteExpired)
         #expect(quiet.slot == .empty)
     }
+
+    /// What VoiceOver hears as the line slot changes: the listening line, a note, Undo, a refused
+    /// microphone and the handover's line, each once as it appears; nothing as a line goes, and
+    /// nothing again for what was already there.
+    @Test func eachLineIsHeardOnceAsItAppears() {
+        let listening = DailyCopy.listening(.today)
+        let said = "It’s on Friday the 20th."
+        func heard(_ old: DailyBar.Slot, _ new: DailyBar.Slot) -> String? {
+            DailyBar.announcement(from: old, to: new, listening: listening)
+        }
+        #expect(heard(.empty, .listening) == listening)
+        #expect(heard(.say(note: nil, undo: true), .listening) == listening)
+        #expect(heard(.listening, .listening) == nil)
+        #expect(heard(.empty, .say(note: nil, undo: true)) == WalkCopy.undo)
+        #expect(heard(.listening, .say(note: said, undo: true)) == "\(said) \(WalkCopy.undo)")
+        #expect(heard(.say(note: nil, undo: true), .say(note: said, undo: true)) == said)
+        #expect(heard(.say(note: said, undo: true), .say(note: nil, undo: true)) == nil)    // the note going
+        #expect(heard(.say(note: said, undo: true), .say(note: said, undo: false)) == nil)  // Undo going
+        #expect(heard(.say(note: said, undo: false), .empty) == nil)
+        #expect(heard(.empty, .handover) == DailyCopy.handover)
+        #expect(heard(.handover, .empty) == nil)
+
+        // A refused microphone, as the bar reaches it: listening, then the line that it types.
+        var bar = self.listening()
+        let before = bar.slot
+        _ = bar.apply(.speechUnavailable)
+        #expect(heard(before, bar.slot) == WalkCopy.speechOff)
+    }
 }

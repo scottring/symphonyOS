@@ -146,6 +146,7 @@ struct MountainPageView: View {
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .background(WalkPalette.ground)
+        .dynamicTypeSize(...DailyPalette.largestChrome)       // the stage's page: nothing grows past extra large
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("daily.mountain.\(horizon.rawValue)")
         .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin = $0 }

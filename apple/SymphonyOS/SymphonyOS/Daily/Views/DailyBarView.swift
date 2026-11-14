@@ -46,6 +46,7 @@ struct DailyBarView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var typing: Bool
     /// The keyboard's top in window coordinates, while it is up.
     @State private var keyboardTop: CGFloat?
@@ -56,30 +57,42 @@ struct DailyBarView: View {
         let bar = model.bar
         let rise = typing ? keyboardTop.map { metrics.rise(keyboardTop: $0 - pageTop) } ?? 0 : 0
         let field = bar.isListening ? metrics.speaking : metrics.field
+        // VoiceOver reads the line above the bar (Undo, a note), then the field and its light, then More and Inbox.
         ZStack(alignment: .topLeading) {
             if rise > 0 && !night { paper(rise: rise) }
             slot(bar.slot)
                 .offset(y: -rise)
+                .accessibilitySortPriority(4)
             if icons && !bar.isListening {
                 icon(DailyCopy.more, symbol: "ellipsis", id: "daily.bar.more", frame: metrics.more) {
                     appState.dailyPanel = .more
                 }
                 .offset(y: -rise)
+                .accessibilitySortPriority(2)
                 icon(DailyCopy.inbox, symbol: "tray", id: "daily.bar.inbox", frame: metrics.inbox) {
                     appState.dailyPanel = .inbox
                 }
                 .offset(y: -rise)
+                .accessibilitySortPriority(1)
             }
             fieldView(bar, frame: field)
                 .offset(y: -rise)
+                .accessibilityElement(children: .contain)
+                .accessibilitySortPriority(3)
         }
+        .accessibilityElement(children: .contain)
+        // The bar keeps its board size from extra large up; the sheet's words grow on.
+        .dynamicTypeSize(...DailyPalette.largestChrome)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: bar.isListening)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { pageTop = $0 }
         .onChange(of: bar.fieldAsked) { _, _ in typing = true }
         .onChange(of: typing) { _, on in if on { touched() } }
-        // The handover's line is heard once, as it shows.
-        .onChange(of: bar.slot == .handover) { _, on in
-            if on { AccessibilityNotification.Announcement(DailyCopy.handover).post() }
+        // Each line in the slot (listening, a note, a refused microphone's, Undo, the handover's) is
+        // heard once, as it appears (`DailyBar.announcement`), never again as the page redraws.
+        .onChange(of: bar.slot) { old, new in
+            if let words = DailyBar.announcement(from: old, to: new, listening: listening) {
+                AccessibilityNotification.Announcement(words).post()
+            }
         }
         // Listening takes the keyboard down: the field shows what is heard.
         .onChange(of: bar.isListening) { _, on in if on { typing = false } }
@@ -130,6 +143,8 @@ struct DailyBarView: View {
                 .submitLabel(.done)
                 .onSubmit { model.send(.submitted) }
                 .frame(height: metrics.field.height)
+                // Always the whole sentence, though a narrow field shows the short one.
+                .accessibilityLabel(placeholder)
                 .accessibilityIdentifier("daily.bar.field")
         }
     }
@@ -139,7 +154,9 @@ struct DailyBarView: View {
     private var shown: String {
         guard let shortPlaceholder else { return placeholder }
         let base = UIFont(name: "DMSans-Regular", size: textSize) ?? .systemFont(ofSize: textSize)
-        let font = UIFontMetrics.default.scaledFont(for: base)
+        // Measured at the size the field's words are drawn: the person's, up to the bar's largest.
+        let drawn = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(min(typeSize, DailyPalette.largestChrome)))
+        let font = UIFontMetrics.default.scaledFont(for: base, compatibleWith: drawn)
         return DailyCopy.fitting([placeholder, shortPlaceholder], room: metrics.wordsRoom) {
             ($0 as NSString).size(withAttributes: [.font: font]).width
         }

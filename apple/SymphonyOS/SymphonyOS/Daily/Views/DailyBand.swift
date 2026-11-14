@@ -61,6 +61,7 @@ struct DailyBandFlags: View {
                 cloth(flag)
             }
         }
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // cloths of the board's size
     }
 
     private func cloth(_ flag: DailyMetrics.BandFlag) -> some View {

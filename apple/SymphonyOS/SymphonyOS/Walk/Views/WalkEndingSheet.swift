@@ -230,6 +230,7 @@ struct WalkEndingSheet: View {
             .contentShape(Rectangle())
             .onTapGesture { model.send(.goToToday) }
             .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("walk.goToToday")
     }
 }
 

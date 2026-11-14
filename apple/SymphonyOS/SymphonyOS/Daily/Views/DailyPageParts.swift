@@ -18,29 +18,32 @@ struct DailyPageHeader: View {
     let frame: CGRect
 
     var body: some View {
-        if ringColumn {
-            HStack(alignment: .center, spacing: 12) {
-                words
-                Spacer(minLength: 0)
-                if let ring { DailyRing(done: ring.done, total: ring.total, diameter: ringDiameter) }
-            }
-            .frame(width: frame.width, height: frame.height)
-            .offset(x: frame.minX, y: frame.minY)
-        } else {
-            words
-                .frame(width: frame.width, height: frame.height, alignment: .leading)
+        Group {
+            if ringColumn {
+                HStack(alignment: .center, spacing: 12) {
+                    words
+                    Spacer(minLength: 0)
+                    if let ring { DailyRing(done: ring.done, total: ring.total, diameter: ringDiameter) }
+                }
+                .frame(width: frame.width, height: frame.height)
                 .offset(x: frame.minX, y: frame.minY)
+            } else {
+                words
+                    .frame(width: frame.width, height: frame.height, alignment: .leading)
+                    .offset(x: frame.minX, y: frame.minY)
+            }
         }
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // a fixed frame: the rows under it grow instead
     }
 
     private var words: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(eyebrow.uppercased())
-                .font(DailyPalette.sansMedium(11))
+                .font(DailyPalette.sansMedium(11, relativeTo: .caption))
                 .tracking(1.5)
                 .foregroundStyle(DailyPalette.muted)
             Text(title)
-                .font(DailyPalette.crimson(27))
+                .font(DailyPalette.crimson(27, relativeTo: .title))
                 .foregroundStyle(DailyPalette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -157,7 +160,7 @@ struct DailyTodayList: View {
     var body: some View {
         if page.rows.isEmpty {
             Text(WalkCopy.nothingToday)
-                .font(DailyPalette.crimson(19))
+                .font(DailyPalette.crimson(19, relativeTo: .title3))
                 .foregroundStyle(DailyPalette.soft)
                 .frame(width: frame.width - 2 * inset - 12, alignment: .leading)
                 .offset(x: frame.minX + inset + 6, y: frame.minY + 6)
@@ -223,7 +226,7 @@ struct DailyWalkLine: View {
             }
         } label: {
             Text(words)
-                .font(DailyPalette.sansMedium(13))
+                .font(DailyPalette.sansMedium(13, relativeTo: .subheadline))
                 .foregroundStyle(DailyPalette.deepGreen)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -232,6 +235,7 @@ struct DailyWalkLine: View {
         }
         .buttonStyle(.plain)
         .offset(x: frame.minX, y: frame.minY)
+        .dynamicTypeSize(...DailyPalette.largestChrome)        // one line in a fixed frame
         .accessibilityIdentifier("daily.walkWaiting")
     }
 }

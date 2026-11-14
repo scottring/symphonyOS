@@ -120,10 +120,13 @@ final class AppState {
     var handover = false
 
     /// Off the light pages (the Planner went away, or the household is no longer light):
-    /// the dock comes back and nothing light is left open on top.
+    /// the dock comes back and nothing light is left open on top, or kept to come back to (the
+    /// last day the light Planner saw, a handover not yet played).
     func leaveDaily() {
         dailyHidesDock = false
         dailyPanel = nil
+        dailyLastDay = nil
+        handover = false
     }
 
     // Domain filter
@@ -175,6 +178,7 @@ final class AppState {
         walkResumeRequested = false
         walkDown = nil
         handover = false
+        dailyLastDay = nil
     }
 
     // MARK: - Date Navigation

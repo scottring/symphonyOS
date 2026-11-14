@@ -42,6 +42,7 @@ struct DailyNavRow: View {
         }
         .frame(maxWidth: .infinity, minHeight: DailyMetrics.navHeight)
         .shadow(color: DailyPalette.navy.opacity(0.7), radius: 3, x: 0, y: 1)
+        .dynamicTypeSize(...DailyPalette.largestChrome)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(DailyCopy.navLabel)
     }

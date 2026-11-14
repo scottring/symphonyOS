@@ -40,6 +40,8 @@ struct SignpostView: View {
                 .rotationEffect(.degrees(hand.tilt), anchor: .leading)
                 .offset(x: metrics.plank.minX + drag, y: metrics.plank.minY)
         }
+        // The plank keeps its board size from extra large up (its words shrink to fit before they cut).
+        .dynamicTypeSize(...DailyPalette.largestChrome)
     }
 
     // MARK: The post

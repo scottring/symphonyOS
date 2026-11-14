@@ -63,6 +63,7 @@ struct LightWeekView: View {
             DailyNavRow(current: .week, gap: m.navGap, go: go)
                 .frame(width: size.width)
                 .offset(y: m.navTop)
+                .accessibilitySortPriority(1)        // read first, before the band's flags under it
             DailySheet(top: low?.sheetTop ?? m.sheetTop, radius: m.sheetRadius, grabber: low?.grabber ?? m.grabber,
                        lookBack: low?.lookBack ?? m.lookBack, onLookBack: handleTapped, label: lookBack.label(on: .week),
                        strip: low?.strip) {

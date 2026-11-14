@@ -19,6 +19,13 @@ struct DailyMetricsTests {
     private let largestTurn = 1.7          // the signpost's plank turns 0.7…1.7° (`Signpost.hand`)
     private let outsideSheet: CGFloat = 190 // Duo, outside screen: sheet top 190
 
+    /// A row's title stands on one line, and wraps to three at the accessibility text sizes, where
+    /// the row grows to hold it (Today's rows, Week's tasks, the spread's).
+    @Test func aTitleWrapsToThreeLinesOnlyAtTheAccessibilitySizes() {
+        #expect(DailyMetrics.titleLines(accessibilitySize: false) == 1)
+        #expect(DailyMetrics.titleLines(accessibilitySize: true) == 3)
+    }
+
     @Test func theTodayBoard() {
         let m = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
         #expect(m.band == CGRect(x: 0, y: 0, width: 390, height: 340));       #expect(m.picture == CGRect(x: -20, y: 0, width: 430, height: 430))

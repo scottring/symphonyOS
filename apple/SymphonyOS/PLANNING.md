@@ -112,6 +112,123 @@ Not designed yet:
 
 `SymphonyOSUITests/WalkUITests` taps through a quick start and a replay; nothing is typed or spoken.
 
+## The everyday screens (light) (`Daily/`)
+
+The pages the walk leads to, for a light household: Today with its signpost, rows, ring and add bar;
+Week; Month, Season and Year as the walk's own mountain; the walk's light handed over to the bar; and the
+iPhone Duo's windows. A pure core (`Daily/Core`, Mac-safe, unit-tested), one writer (`Daily/Data/DailyWriter`),
+one observable model (`Daily/DailyModel`), and views that only draw. Plan:
+`docs/superpowers/plans/2026-11-14-iphone-light-daily.md` (its "As built" records every ruling).
+
+**The gate.** `DailyGate.shows` is the one test: a light household (`Edition.light`), on a phone (ruling
+D17: an iPad keeps the old pages and the dock), on a built window shape (`layouts`: one column, the Duo's
+outside screen `.glance`, its inside screen upright `.dayPage`, opened flat `.journal`; never `.glanceWide`,
+a phone on its side, which keeps the old wide glance and the dock). `LightPlannerView` draws the page
+`DailyGate.page` names, or the full Planner where the gate says no; `hidesDock` takes the dock away only on
+a light page. A full household, and a mixed or unknown one (which `Edition.resolve` makes full), keeps
+every screen it had: Today, Week, the horizons, the dock, the Duo glance and journal, the half-open
+display, Inbox (`FullHouseholdUnchangedUITests`). Off light (an invite accepted) `AppState.leaveDaily()`
+brings the dock back and leaves nothing light open or waiting.
+
+**What each page reads and writes.**
+- *Today* reads `DailyTodayPage.read`: the signed-in person's own personal rows for today (`DailyDay.mine`,
+  the walk's ending's rows), the first thing first, each with "for ‹goal›" (`WalkEnding.forGoal`); the
+  ring (none on an empty day); the next timed event not ticked off (`DailyDay.nextEvent`, the walk's rule);
+  and the sign (`Signpost.pick`).
+- *Week* reads `DailyWeek.make` (today to the week's end, each day's events then its tasks, Any day last,
+  the days behind folded to one line with anything still open from earlier weeks) and
+  `DailyWeek.bandGoals` (at most two month goals on the band).
+- *Month, Season, Year* read `MountainPage.flags`: the page's period from the selected date, each flag's
+  real parent by its links, and the walk's current upper flags; drawn by `WalkLayout.make(…, footing: .natural)`.
+- *Writes* all go through `DailyWriter`, which calls only `WalkWriter`, `PlanWriter` and `ItemCompletion`,
+  on the person's own rows, `context = "personal"`: the bar adds a week task (on the day said, at the
+  time said, never the first thing) or a goal on a mountain page (filed into that page's periods, under
+  the focused flag); a tick completes; Move to sets a day or Any day; "Remove" (`WalkCopy.pullUp`) takes
+  a row out of the plan; Move to on a mountain flag changes its area; a row's press-and-hold menu (or
+  VoiceOver's actions) sets or clears the first thing. Every add, move, area change and Remove offers Undo.
+- *The half-open display* reads Today's page through `DailyTentPage`; a tick there offers Undo.
+
+**The signpost.** Six kinds in a fixed order; the first true one not put away today shows
+(`Signpost.Kind`: That's the day, First today, Today is open, A new week, ‹Month› ends, No piece). Every
+title is the person's own words. A sideways swipe puts that kind away for the day; following a sign that
+goes somewhere puts it away too, so the next true kind shows on coming back. What is put away is kept per
+person per day in `UserDefaults` (`daily.signpost.<user id>`, `SignpostMemory`); another day reads as
+nothing put away.
+
+**Speech.** In a light household the bar, and Tell Symphony wherever a light household can still open it
+(the Lock Screen control, a `symphony://tell` link, the old Tell sheet on an iPad), listen on the phone
+only (`DailyGate.speechOnPhoneOnly`, `Dictation.onDeviceOnly`); with no on-device recogniser they type. On
+a light page a Tell makes the bar listen, never the sheet. A full household's Tell is unchanged.
+
+**The waiting walk's line.** One quiet line under the sheet's handle (`DailyGate.walkLine`): a walk left
+with Leave for now reads "Your walk is waiting. Pick it back up." and resumes it; a walk declined at
+Welcome by someone with no goals reads "Walk down from the year when you’re ready." and starts it from the
+top. Never in a full household.
+
+**The first thing.** The oldest open "chosen for today" mark (`TaskFocus`) of the person's own that is dated
+today (`DailyDay.firstThing`); yesterday's mark is not today's. Sending an Inbox item to Today makes that
+mark too.
+
+**Unfinished tasks.** Nothing is counted or marked late. Yesterday's open tasks wait in Week's folded past
+days, with anything still open from earlier weeks; Move to brings one back. The fold says only what was
+done ("3 done"), never what was missed.
+
+**The handover, and the art.** An ordinary walk that finishes onto light Today hands its light down to the
+bar (`DailyHandover.plays`); its line shows once per person per phone (`HandoverMemory`,
+`daily.handover.seen.<user id>`). The bands' picture: see The art.
+
+**Accessibility.** Every gesture has a button or a VoiceOver action. Reading order on Today: the row of
+words (a container, "Where you are"; the current word selected), the signpost (one button, its label the
+eyebrow, the title and what a tap does; action "Put this sign away for today"), the sheet's handle, the
+waiting walk's line, the heading and the ring, the next event, each row (label "‹title›, for ‹goal›",
+value Done or Not done, actions First today, Details, Remove), then the bar: the line above it, the field
+(always read by its whole sentence, though a narrow field shows the short one), its light ("Speak it",
+"Add what you said" while listening, "Type it" with speech off), More and Inbox. Week: the row of words
+first, then the band's flags, the fold (its state as the value), each day by its whole name ("Today,
+Tuesday, 10 November"), each task one element with an action per Move to chip and Remove; an event and
+"open" read as text. The mountain pages: flags carry Walk it down, Move to ‹area› and Remove. Lowered,
+the sheet is one button and the whole plan behind it is read. The half-open display reads the time, the
+next event, the sign (without what a tap would do), then To do today. The line above the bar (listening,
+a note, a refused microphone, Undo, the handover's line) is announced once as it appears
+(`DailyBar.announcement`). Decorative pictures are hidden from VoiceOver. With Reduce Motion nothing
+slides or travels: the handover's light does not travel, the ring does not sweep, and the Move to panel
+cross-fades in 0.25 s. Text: the row of words, the signpost, the bar, the sheet's handle and header, the
+next event, the ring, Week's band flags, its day labels and its Move to panel, and the mountain pages stop
+growing at extra large (`DailyPalette.largestChrome`); the rows grow on, their titles wrapping to three lines
+at the accessibility sizes (`DailyMetrics.titleLines`).
+
+**Behaviour a change must keep:**
+- A full household never sees a light page, on any window, and keeps its dock (`DailyGateTests.fullIsNeverReplaced`, `FullHouseholdUnchangedUITests`).
+- Light pages are for the phone idiom only; an iPad keeps the old pages (D17).
+- A Remove is written only when its Undo can no longer be used (the window ends, another change takes the Undo, the app goes to the background, the page goes, the day turns); until then the row is hidden everywhere (D7).
+- A move on a light page never adds to `deferCount`, and writes the page's own week, never the wall clock's (D13).
+- A light page under the light half-open display stays in the tree, inert (no touch) and silent (its bar cannot listen and takes no Tell); only the display's bar can (D14).
+- A tick on the half-open display offers Undo (D15).
+- A selected date that was today or later when the day turned, and is now past, becomes today; a past date the person went to is left alone (D18).
+- A light household's speech stays on the phone everywhere, Tell on an iPad included (D19).
+- A walk-down is never stored, never becomes a waiting walk, and returns to the page it started from (D2).
+- Only an ordinary walk finishing hands the light over, never behind the half-open display, and the light travels only on windows where `DailyHandover.travels` says so (not on the spread).
+- A Tell never makes a bar listen where it cannot be seen: during a walk it waits, while the whole plan shows the sheet rises first, under the half-open display only the display's bar takes it.
+- After the second tap on its light the bar waits up to 1 s for the last words (`WalkOrb.finishMs`), as the walk does; nothing empty is ever added.
+- `AppState.dailyLastDay` and a pending handover are cleared on sign-out and by `leaveDaily()`.
+
+**Debug launch arguments** (with `-SymphonyDemo -SymphonyLight`):
+- `-SymphonyDaily`: the light pages' demo seed in place of the family one, with two sample calendar events.
+- `-SymphonyDailyNow YYYY-MM-DD`: pins the light pages' clock (`DailyClock`) to noon that day. The walk keeps the real clock.
+- `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty` (`morning` by default).
+- `-SymphonyDailyPage today|week|month|season|year`: the page the demo opens on.
+- `-SymphonyDailyState a,b,…`: `point`, `waiting`, `speak`, `hear`, `refused`, `undo`, `more`, `inbox`, `lookback`, `handover`, `travel`; on Week `select`, `unfold`; on a mountain page `select`, `move`, `zoom`, `walkdown` (see `DailyDemo.swift`).
+- Also: `-TodaySize WxH` and `-HalfOpen laptop|book` (Duo sizes on a phone), `-HalfOpenSplit N`, `-SpreadFold N`, `-SymphonyHandoverRemembers`.
+
+`SymphonyOSUITests/LightDailyUITests`, `LightEditionUITests`, `LightSpreadUITests` and
+`FullHouseholdUnchangedUITests` walk these pages by taps; nothing is typed or spoken.
+
+**Not designed:** a phone or the Duo's outside screen held sideways (the old wide glance); a way to step
+to another week, month, season or year (only the "‹Month› ends" sign opens a past one); a task's time
+(stored, not shown); opening or ticking a calendar event from Week; Month, Season, Year and the walk
+letterboxed on the Duo; tent mode (the Duo standing like a tent, its outside screen showing), parked by
+the owner until after this work; an iPad.
+
 ## Reviewing on the simulator
 
 In a Debug build, launching with `-SymphonyDemo` gives you:

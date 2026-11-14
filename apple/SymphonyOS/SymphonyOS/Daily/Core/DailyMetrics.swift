@@ -113,6 +113,9 @@ struct DailyMetrics: Equatable {
     // MARK: Fixed numbers
 
     static let minTouch: CGFloat = 44
+    /// How many lines a row's title may take: one, as the boards draw it, and three at the
+    /// accessibility text sizes, where the row grows in height to hold them.
+    static func titleLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 1 }
     /// A window under this height takes the short shape.
     static let shortHeight: CGFloat = 760
     /// A nail head stands this far in from the plank's top and bottom edges.

@@ -35,7 +35,9 @@ struct DailySheet<Content: View>: View {
                 .offset(x: grabber.minX, y: grabber.minY)
                 .accessibilityHidden(true)
             if let lookBack { handle(lookBack) }
+            // Lowered, the strip is the one control VoiceOver reads on the sheet; its header is only seen.
             content()
+                .accessibilityHidden(strip != nil)
             if let strip { raiser(strip) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -51,6 +53,7 @@ struct DailySheet<Content: View>: View {
             .minimumScaleFactor(0.8)
             .frame(width: frame.width, height: DailyMetrics.handleWords)
             .frame(width: frame.width, height: frame.height, alignment: .bottom)
+            .dynamicTypeSize(...DailyPalette.largestChrome)        // one line in the handle's fixed frame
         if strip == nil {
             Button(action: onLookBack) { words.contentShape(Rectangle()) }
                 .buttonStyle(.plain)

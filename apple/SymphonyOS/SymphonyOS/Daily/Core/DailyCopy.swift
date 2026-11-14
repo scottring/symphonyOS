@@ -143,6 +143,13 @@ enum DailyCopy {
     /// The Any day group's label in the week, in capitals as a day's is ("TUE", "10").
     static let anyDayLabel = (label: "ANY", number: "day")
 
+    /// A day in the week read aloud by its whole name: "Wednesday, 11 November"; today
+    /// "Today, Tuesday, 10 November"; the group with no day "Any day".
+    static func spokenDay(_ d: Date?, today: Date) -> String {
+        guard let d else { return anyDay }
+        return PlanCalendar.sameDay(d, today) ? "\(Self.today), \(date(d))" : date(d)
+    }
+
     /// A move chip read aloud: the walk's own Move to, then the place ("Wed", "Any day").
     static func moveTo(_ place: String) -> String { "\(WalkCopy.moveTo) \(place)" }
 

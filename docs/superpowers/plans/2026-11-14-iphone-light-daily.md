@@ -952,8 +952,8 @@ Each line is a decision the spec and boards do not settle, with what it costs if
 ## Known gaps
 
 - A regular iPhone held sideways, and the Duo's outside screen held sideways, keep the existing wide glance and the old dock.
-- On the Duo's inside screen held sideways, until the spread is built (Task 18), setting the phone down half open closes an open sheet and its unsent words. Held upright, the light page stays as it was under the display, but Inbox or More, and a row's Details, close (Details keeps what is typed in it as it is typed, except a link not yet added).
-- Dynamic Type beyond wrapping: the signpost, the row of words, the bar and everything on the mountain stage do not grow past extra-large.
+- Set down half open, on every Duo window that has a light page (the inside screen upright, and opened flat as the spread), the light page stays as it was under the display, inert and silent (ruling D14), with any words typed into its bar. Inbox or More, and a row's Details, close as the display comes up (Details keeps what is typed in it as it is typed, except a link not yet added). Only a page that is not light is taken away under the display, and on the Duo none of those windows is.
+- Dynamic Type beyond wrapping: the row of words, the signpost, the bar, the sheet's handle and header, the next event, the ring, Week's band flags, day labels and Move to panel, and everything on the mountain pages do not grow past extra large (they stand in the boards' fixed frames); the rows and the week's lines do, a row's title wrapping to three lines.
 - The doorstep art, and the tall painting: the pages stand on the square overlook, as the walk does.
 - Month, Season and Year, and the walk, are letterboxed on the Duo's screens.
 - No way to step to another week, month, season or year in light, and no page for a past one except through the "period ends" sign.
@@ -1025,3 +1025,138 @@ Task 21 ← 11, 18, 20.
 paused position) and the natural-footing fix have both landed; Task 1 re-reads the committed walk
 files for the names of: the paused status, "resume the paused walk", "a paused walk exists", and the
 plan-handle `WalkCopy` member.
+
+## As built (2026-11-14): what changed from the plan above
+
+All 21 tasks are built and reviewed, in two lanes run side by side and merged three times. This record
+is written from lane B (`claude/ios-light-build-b`), which holds Tasks 1 to 21 with the Duo's four windows.
+Lane A (`claude/ios-light-build`) holds the same work except Task 18 (the spread) and Merge 3 (phones
+only, the day turning), plus the new tall painting on the everyday bands, which is being scrolled behind the walk (Tasks A1 and A2, not in this tree yet: see
+`apple/SymphonyOS/PLANNING.md`, "The art"). Nothing is pushed, merged into main or deployed, and nothing
+in this plan needs a database, server or web change. On the lane-B iPhone 17 simulator the unit target
+passes (1033 tests before Task 21, 1038 after) and so do the UI classes (`LightDailyUITests`,
+`FullHouseholdUnchangedUITests`, `LightEditionUITests`, `LightSpreadUITests`, `WalkUITests`,
+`PlannerScreensUITests`), each alone and all together in one run. Nobody has spoken to the bar, typed
+into it, heard it with VoiceOver or held a real Duo: the hand walk below is still the gate.
+
+### Where the build departs from the plan's text
+
+- **"Period ends" names the month** on its last three days, whatever else ends then (D1); the "Calls"
+  line "names the largest period ending" is no longer true.
+- **A mountain page is built from the person's rows by their links** (D9): its own level by the page's
+  period, above it each flag's real parent whatever its period plus the walk's current upper flags.
+  It replaces the call "the levels above it are the walk's".
+- **The take-out-of-plan action reads "Remove"** (`WalkCopy.pullUp`), not the boards' "Pull it up"
+  (the owner's word). It is written only once its Undo can no longer be used (D7), and Undo puts back
+  exactly what a move made (D8).
+- **Moves on a light page never add to `deferCount`** and write the page's own week (D13).
+- **Today's top line has two cases** (D3), and **a followed sign is put away for the day** (D5).
+- **A walk-down is never stored** and returns to its page (D2).
+- **Under the light half-open display a light page stays, inert and silent** (D14), instead of being
+  taken away; a tick on the display offers Undo (D15).
+- **Light pages are for phones only** (D17); a light household on an iPad keeps the old pages, and its
+  Tell stays on the device (D19).
+- **The day turning mends the selected date** (D18), so Week and the spread's left page never strand
+  someone on a "tomorrow" that has passed.
+- **The real Duo outside screen is not the board's window** (Task 17): no top inset, a 34-point foot and
+  the system's 84-point column on the right; the page stands 382 wide inside it, and a placeholder too
+  long for the field takes its short form ("Add a goal").
+- **The spread's left page follows the selected week** (Task 18 fix), not always "the rest of this week".
+- **Touch sizes over the boards:** Week's tick circle is 44 wide (board 40) and its fold 44 high (board
+  34); the Move to panel's foot stands on the bar's line slot, not at the board's y 604 (Task 11).
+- **Week's band flags:** pole and cloth lean opposite ways, as Task 7's test asks, though the boards lean
+  them the same way (owner to look).
+- **The mountain pages' row of words, heading, panel, hint and bar** stand in window points, not stage
+  points, so they keep the safe area and 44-point touch on every phone (Task 14).
+- **The handover:** the travelling light has the microphone fade in over its last quarter; the bar is not
+  dimmed and no trail is drawn (the owner kept it so). It does not travel on the spread.
+- **The lowered sheet** stands 128 above the window's foot; on a 402 × 874 phone about 6 points of the
+  walk's ground show above it (Task 15).
+- **Task 21's identifiers and launches, as built:** the bar's light reads `DailyBar.lightLabel` ("Speak
+  it" / "Add what you said" / "Type it"), not `speakIt`/`stopListening`; the walk ending's last control
+  carries `walk.goToToday`; `FullHouseholdUnchangedUITests` expects the old Today, not "Tell Symphony",
+  at `-TodaySize 466x678` (pre-flight finding 11); `testATaskIsTickedAndTheRingMoves` launches with
+  `-SymphonyDemo -SymphonyLight -SymphonyDaily` (finding 20). Finding 18's two hand checks are UI tests
+  already (`LightEditionUITests.testWalkItDownOpensSeasonAndComesBackToYear`,
+  `testFinishingTheWalkHandsTheLightToTheBarOnce`); the handover's speed stays for the owner.
+- **Dynamic Type (Task 21):** more stops growing at extra large than the plan named: the sheet's handle
+  and header, the next event, the ring, Week's band flags, day labels and Move to panel, as well as the row
+  of words, the signpost, the bar and the mountain pages. They stand in the boards' fixed frames; the
+  rows grow instead.
+- **The painting was already hidden from VoiceOver** in code (`accessibilityHidden` on the walk's
+  picture, the bands and the half-open display's). XCUITest lists hidden elements anyway (it lists the
+  bar's hidden microphone glyph too), so the "painting is read" finding came from the test tree; no
+  change was made, and VoiceOver itself is for the hand walk.
+
+### Rulings made for the owner
+
+"If wrong" is what it costs to change. D16 and D20 belong to lane A's painting work.
+
+1. **D1** "Period ends" always names the month (the board shows it). If wrong: a season's or a year's end has no sign of its own; one rule.
+2. **D2** A walk-down returns to the page it started from and is never stored. If wrong: one flag.
+3. **D3** Today's top line: a paused walk reads "Your walk is waiting…", a walk declined at Welcome with no goals reads "Walk down from the year when you’re ready." (a new person never lands on an empty page with no way back). If wrong: delete the second case.
+4. **D4** Screenshots are pinned to 10 November 2026, so the season reads "fall". If wrong: screenshots only.
+5. **D5** Following a sign puts its kind away for the day. If wrong: one line.
+6. **D6** A past day said with a time moves on a week keeping the time (one calendar step outside the listed helpers). If wrong: none recorded.
+7. **D7** A Remove is written only once its Undo can no longer be used. If wrong: a row survives if the app is killed inside the Undo window.
+8. **D8** Undo of a move takes back exactly what the move made. If wrong: none recorded.
+9. **D9** A mountain page reads flags by their links. If wrong: one pure function.
+10. **D10** Three rows fit on every window from 320 × 568 up; where short, the sheet rises. If wrong: no signpost on the very smallest windows with a waiting line.
+11. **D11** On windows 604 points tall or less with the waiting line, the risen sheet may cover part of the row of words; windows 698 tall or less may lose the signpost. If wrong: the owner checks on a device (the outside screen's real insets were found later, Task 17).
+12. **D12** The row of words always stands on the walk's dark top shade. If wrong: a slightly darker sky on Today.
+13. **D13** A move on a light page never adds to `deferCount`. If wrong: a household later made full sees lower "deferred" counts for what it carried forward while light.
+14. **D14** A light page under the half-open display stays in the tree, inert and silent. If wrong: a covered page that still reacts (tested in the core).
+15. **D15** A tick on the half-open display offers Undo. If wrong: one more line after a tick.
+16. **D16** (lane A) The walk uses a 2048 × 6144 copy of the tall painting, not the master. If wrong: the zoomed-in column is enlarged about 1.5 times.
+17. **D17** Light pages are for the phone idiom only. If wrong: a light household on an iPad sees the older screens until iPad is designed.
+18. **D18** A selected date that was today or later and is now past becomes today; a past date the person went to stays. If wrong: someone who left the app on tomorrow's page finds today's page days later.
+19. **D19** A light household's Tell on an iPad keeps speech on the device. If wrong: dictation there is less accurate than server recognition.
+20. **D20** (lane A) A band's cut of the painting need not be square. If wrong: a sliver of unpainted frame if a band ever shows more than the core says (tested).
+
+The 17 consistency amendments of the pre-flight scan were adopted as written.
+
+### Decisions the owner made
+
+- The everyday control is a plain bar whose microphone is the small light; the walk keeps the big light.
+- "Remove" is the word for taking something out of the plan.
+- The handover stays as built: no trail, the bar not dimmed.
+- Speech stays on the phone in a light household, everywhere (the App Store listing will say so); the walk is silent while you speak; the 1 s wait for the last words stays; "Leave for now" stays.
+- Tent mode (the Duo standing like a tent, its outside screen showing) is not built: parked until after this work, to be raised again with one board.
+- The tall painting goes on the everyday bands and is scrolled behind the walk (lane A); the fallback, if it looks wrong, is a new sharp square picture for the walk.
+- Two build lanes at once; the owner waits for a real-phone build rather than a simulator preview.
+
+### Known and not fixed
+
+Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.md`, collected in
+`deferred-items.md` with the walk's own); the larger ones:
+
+- Late in a month the "A new week" sign reads the walk's next month (on 25–30 November an empty week with only November goals gets no sign). Owner to look.
+- On a 320 × 568 window with the waiting line the risen sheet covers the whole row of words (no current iPhone).
+- Week does not answer a Tell while it shows (Today does); a Tell asked just before a person switch is dropped.
+- A day label half-cut under Week's Move to panel; a past week's left page on the spread says only "WEEK".
+- On a Month page any week task under a goal counts as "something under", while the words say "this week".
+- On an SE-sized window the mountain panel may cover the Year peak labels (not shot); Move to is drawn even with nowhere to go.
+- A walk opening commits a pending Remove (its Undo is lost); so does lowering the handle.
+- A tick or a first-thing mark ends the Undo of a move before it.
+- A Remove or take-back while that row's insert is still in flight leaves the insert out and queues no delete (the app's known in-flight gap).
+- The mountain pages cross the fold on the spread, as the walk does.
+- When email confirmation is required, sign-up ends silently (release checklist).
+- The demo's walk mints new ids each launch, so footing differs between demo shots; make them fixed before App Store screenshots.
+- The launch helper's relaunch path has never run against a real bad launch.
+- VoiceOver's reading order is set by sort priority and read from the code; nobody has listened to it. The listening line is announced as the bar starts listening; whether the microphone hears VoiceOver saying it has not been tried.
+- The Mac destination did not build at Task 1 (`DinnerCard.swift`, outside this plan); not re-checked here.
+
+### What only a real phone can show (the owner's hand walk)
+
+- **Speech:** tap the bar's light and say a task with a day; refuse the microphone once; a phone with no on-device speech for its language types, with nothing sent to Apple.
+- **Sounds:** the walk's five recorded sounds are still synthesized placeholders.
+- **VoiceOver, once through:** Today, Week, Month and the bar; the listening line not heard into the field; and under the half-open display, that VoiceOver skips the kept page (XCUITest lists it whatever is hidden).
+- **A real iPhone Duo:** the fold's real position in both half-open postures, from across a desk; the side insets opened flat; Inbox, More and Details against the outside screen's system column; the inside screen (the simulator stays folded); the dark disc seen in that column on Month and Year.
+- **The handover** on a real phone: the light's travel and speed.
+- A demo on a real phone must be started from the Mac with its launch arguments; a tap on the icon opens the real sign-in.
+
+### Release
+
+Nothing in this plan needs a database change. The foundations plan's release checklist
+(`2026-11-13-iphone-light-foundations.md`, "Release checklist") stands and comes first; TestFlight and
+main wait for Scott. The open product calls are in "Stops for the owner" above.

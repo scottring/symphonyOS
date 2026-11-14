@@ -44,6 +44,25 @@ struct DailyBar: Equatable {
         return handoverLine ? .handover : .empty
     }
 
+    /// What VoiceOver is told as the slot changes from `old` to `new`: each line once, as it
+    /// appears (the listening line, as the page words it; a note, with a refused microphone's among
+    /// them; Undo; the handover's line), and nothing as a line goes or for what was already there.
+    static func announcement(from old: Slot, to new: Slot, listening: String) -> String? {
+        switch new {
+        case .empty:
+            return nil
+        case .listening:
+            return old == .listening ? nil : listening
+        case .handover:
+            return old == .handover ? nil : DailyCopy.handover
+        case .say(let note, let undo):
+            var before: (note: String?, undo: Bool) = (nil, false)
+            if case .say(let n, let u) = old { before = (n, u) }
+            let parts = [note != before.note ? note : nil, undo && !before.undo ? WalkCopy.undo : nil].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+    }
+
     enum Event: Equatable {
         case typed(String), submitted, micTapped, heard(String), speechUnavailable,
              listenEnded, finishExpired, did(note: String?), undoTapped, undoExpired, noteExpired, left,
