@@ -34,6 +34,8 @@ struct WalkLayout: Equatable {
     static let narrowColumns: ClosedRange<CGFloat> = 87...302     // up to four columns off the ground
     static let wideColumns: ClosedRange<CGFloat> = 50...340       // the ground, and five or more
     static let loneGap: CGFloat = 200
+    static let fitTolerance: CGFloat = 0.01     // a fold's ceiling comparisons forgive rounding
+    static let narrowest: CGFloat = 44          // a banner narrowed between neighbouring stubs
 
     static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare) -> WalkLayout {
         Builder(state, today: today, art: art).layout()
@@ -385,6 +387,16 @@ private struct Builder {
             }
         }
 
+        // On a crowded ridge, the stubs the other posts stand: the open post's banners keep clear of them.
+        let stubs: [CGRect] = room ? [] : groups.enumerated().compactMap { i, group in
+            let key = WalkPostKey(level: lvl, column: group.column)
+            let drawKind: L.Kind = s.expanded == key && levelKind != .compact ? .compact : levelKind
+            let risers = levelKind == .tip && s.expanded != key ? group.items.filter(rises) : []
+            guard open != i, group.items.contains(where: { !risers.contains($0) }) else { return nil }
+            let x = stageX(columns.first { $0.id == group.column }!.worldX)
+            return stub("", lvl, base: CGPoint(x: x, y: y), count: 0, scale: drawKind == .tip ? tipScale : 1, below: nil).frame
+        }
+
         var built: [(column: UUID?, base: CGPoint, banners: [L.Banner], risers: [WalkItem], pale: Bool)] = []
         for (i, group) in groups.enumerated() {
             let base = CGPoint(x: stageX(columns.first { $0.id == group.column }!.worldX), y: y)
@@ -410,11 +422,11 @@ private struct Builder {
                 // Opened on Look back up: as many as fit under the flags above in this column; the top one counts the rest.
                 let roof = max(L.question, framesAbove.filter { meets($0, span) }.map { $0.maxY + 4 }.max() ?? L.question)
                 banners = stack(id, lvl, base: base, ghosts: [], reals: reals, ceiling: roof, hard: roof,
-                                scale: scale, moreOnTop: true)
+                                scale: scale, moreOnTop: true, avoid: stubs)
             } else if lookBack {
                 // Look back up: the newest, carrying the count of the others.
                 banners = stack(id, lvl, base: base, ghosts: [], reals: Array(reals.prefix(1)), ceiling: postCeiling,
-                                hard: nil, scale: scale, moreOnTop: true)
+                                hard: nil, scale: scale, moreOnTop: true, avoid: stubs)
                 if reals.count > 1, let last = banners.indices.last { banners[last] = carrying(banners[last], more: reals.count - 1) }
             } else {
                 let ghostEntries = ghostHere ? ghosts.map { text in
@@ -422,7 +434,8 @@ private struct Builder {
                           label: WalkCopy.bannerLabel(text, level: lvl, tag: nil, role: .example))
                 } : []
                 banners = stack(id, lvl, base: base, ghosts: ghostEntries, reals: reals,
-                                ceiling: postCeiling, hard: hard, scale: scale, moreOnTop: false, own: lvl == level)
+                                ceiling: postCeiling, hard: hard, scale: scale, moreOnTop: false, own: lvl == level,
+                                avoid: stubs)
             }
             built.append((group.column, base, banners, risers, ghostHere && group.items.isEmpty))
         }
@@ -489,9 +502,10 @@ private struct Builder {
     /// under the ceiling. Elsewhere it may pass the ceiling only up to `hard` when it
     /// stands alone, and otherwise a stub takes its place.
     func stack(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
-               ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool = false) -> [L.Banner] {
+               ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool = false,
+               avoid: [CGRect] = []) -> [L.Banner] {
         let plain = flagsThenExamples(id, lvl, base: base, ghosts: ghosts, reals: reals, ceiling: ceiling, hard: hard,
-                                      scale: scale, moreOnTop: moreOnTop, own: own)
+                                      scale: scale, moreOnTop: moreOnTop, own: own, avoid: avoid)
         guard !ghosts.isEmpty, !plain.contains(where: { $0.kind == .ghost }) else { return plain }
         // Examples are on but none found room: the person's flags fold to their newest, then give way,
         // in this order, until the first example fits. Nothing covers a risen flag or crosses the question.
@@ -500,7 +514,7 @@ private struct Builder {
             : [(.full, nil), (.compact, nil), (.compact, 1)]
         for tier in tiers {
             let folded = foldedWithExamples(id, lvl, base: base, ghosts: ghosts, reals: reals, ceiling: ceiling,
-                                            ownKind: tier.own, firstLines: tier.firstLines)
+                                            ownKind: tier.own, firstLines: tier.firstLines, avoid: avoid)
             if folded.contains(where: { $0.kind == .ghost }) { return folded }
         }
         return plain
@@ -510,7 +524,7 @@ private struct Builder {
     /// sitting lower on its pole (down to its base) as far as the first example needs; then the
     /// examples in order, the first cut to `firstLines` if given, while they fit under the ceiling.
     func foldedWithExamples(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
-                            ceiling: CGFloat, ownKind: L.Kind?, firstLines: Int?) -> [L.Banner] {
+                            ceiling: CGFloat, ownKind: L.Kind?, firstLines: Int?, avoid: [CGRect]) -> [L.Banner] {
         var placed: [L.Banner] = []
         let gapY: CGFloat = 4
         let natural = { (e: Entry) in WalkLayout.lines(for: e.text, width: self.bw) }
@@ -523,7 +537,8 @@ private struct Builder {
             b = min(base.y, max(b, ceiling + firstHeight + gapY + h))
             let x = across(ownKind, at: base.x, scale: 1)
             var own = banner(id: "\(id)-\(newest.item?.id.uuidString ?? "0")", e, lvl,
-                             frame: CGRect(x: x.minX, y: b - h, width: x.width, height: h), lines: 1)
+                             frame: keepClear(CGRect(x: x.minX, y: b - h, width: x.width, height: h), pole: base.x, of: avoid),
+                             lines: 1)
             if reals.count > 1 { own = carrying(own, more: reals.count - 1) }
             placed.append(own)
             b = own.frame.minY - gapY
@@ -531,10 +546,11 @@ private struct Builder {
         for (i, ghost) in ghosts.enumerated() {
             let lines = i == 0 ? (firstLines ?? natural(ghost)) : natural(ghost)
             let h = height(.ghost, lines: lines, tag: nil)
-            guard b - h >= ceiling else { break }       // an example that does not fit waits
+            guard b - h >= ceiling - L.fitTolerance else { break }       // an example that does not fit waits
             let x = across(.ghost, at: base.x, scale: 1)
             placed.append(banner(id: "\(id)-example-\(ghost.text)", ghost, lvl,
-                                 frame: CGRect(x: x.minX, y: b - h, width: x.width, height: h), lines: lines))
+                                 frame: keepClear(CGRect(x: x.minX, y: b - h, width: x.width, height: h), pole: base.x, of: avoid),
+                                 lines: lines))
             b -= h + gapY
         }
         return placed
@@ -542,7 +558,8 @@ private struct Builder {
 
     /// The flags as `stack` describes them, then the examples in the room left.
     func flagsThenExamples(_ id: String, _ lvl: WalkLevel, base: CGPoint, ghosts: [Entry], reals: [Entry],
-                           ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool) -> [L.Banner] {
+                           ceiling: CGFloat, hard: CGFloat?, scale: CGFloat, moreOnTop: Bool, own: Bool,
+                           avoid: [CGRect]) -> [L.Banner] {
         var placed: [L.Banner] = []
         let gapY = (reals.first?.kind == .tip ? 3 : 4) * scale
         let stubRoom = moreOnTop ? 0 : gapY + 20 * scale
@@ -558,7 +575,8 @@ private struct Builder {
             let unit: CGFloat = e.kind == .tip ? scale : 1
             let across = self.across(e.kind, at: base.x, scale: unit)
             let h = height(e.kind, lines: lines, tag: e.tag) * unit
-            placed.append(banner(id: id, e, lvl, frame: CGRect(x: across.minX, y: b - h, width: across.width, height: h),
+            let frame = CGRect(x: across.minX, y: b - h, width: across.width, height: h)
+            placed.append(banner(id: id, e, lvl, frame: e.kind == .tip ? frame : keepClear(frame, pole: base.x, of: avoid),
                                  lines: lines))
         }
         func naturalLines(_ e: Entry) -> Int {
@@ -609,6 +627,26 @@ private struct Builder {
             place(ghost, lines: naturalLines(ghost), id: "\(id)-example-\(ghost.text)", at: b)
         }
         return placed
+    }
+
+    /// One rule for every banner of the open post on a crowded ridge, lowered or not: it
+    /// narrows (centred on its pole, sliding inside the edges as banners do, never below
+    /// `narrowest`) until it meets none of the neighbouring posts' stubs. Its text is cut by the view.
+    func keepClear(_ frame: CGRect, pole: CGFloat, of stubs: [CGRect]) -> CGRect {
+        func overlap(_ a: CGRect, _ b: CGRect) -> CGFloat {
+            let down = min(a.maxY, b.maxY) - max(a.minY, b.minY)
+            guard down > L.fitTolerance else { return 0 }
+            return max(0, min(a.maxX, b.maxX) - max(a.minX, b.minX))
+        }
+        var f = frame
+        for _ in 0..<8 {
+            let across = stubs.map { overlap(f, $0) }.max() ?? 0
+            guard across > L.fitTolerance, f.width > L.narrowest else { return f }
+            let centred = abs(f.midX - pole) < 0.5
+            let width = max(L.narrowest, floor(f.width - (centred ? 2 : 1) * across))
+            f = slid(CGRect(x: pole - width / 2, y: f.minY, width: width, height: f.height))
+        }
+        return f
     }
 
     /// A banner that also stands for `more` older flags: it says so, and a tap opens its post.

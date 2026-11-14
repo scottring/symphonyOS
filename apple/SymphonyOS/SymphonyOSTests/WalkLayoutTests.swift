@@ -306,15 +306,69 @@ struct WalkLayoutTests {
         }
     }
 
-    @Test func examplesOffIsTheLayoutBeforeThem() {
+    @Test func examplesOffLeavesTheFlagsWhole() {
+        // A state where examples fold the flags: off again, no example shows and the flags stand at full size.
         for step in 2...4 {
-            let (s, _, _) = underTheParent(step, own: ["One", "Two"], examples: false)
-            var on = s
-            on.examplesOn = [step]
-            var off = on
+            let (s, _, mine) = underTheParent(step, own: ["One", "Two", "Three"], examples: true)
+            let folded = WalkLayout.make(s, today: today).banner(for: mine.last!)!
+            #expect(folded.lines == 1 && folded.more == 2, "step \(step)")
+            var off = s
             off.examplesOn = []
-            #expect(WalkLayout.make(off, today: today) == WalkLayout.make(s, today: today))
-            #expect(WalkLayout.make(on, today: today) != WalkLayout.make(s, today: today))
+            let layout = WalkLayout.make(off, today: today)
+            #expect(layout.posts.flatMap(\.banners).allSatisfy { $0.kind != .ghost })
+            let whole = layout.banner(for: mine.last!)!
+            #expect(whole.kind == .full && whole.lines == WalkLayout.lines(for: "Three", width: whole.frame.width) && whole.more == nil,
+                    "step \(step): \(whole.kind) \(whole.lines) \(String(describing: whole.more))")
+        }
+    }
+
+    @Test func examplesOffMatchesTheGoldenFrames() {
+        // Zoomed on Health under a risen parent, three own flags, examples off: written out so any change shows.
+        let golden: [Int: [(WalkLevel, WalkLayout.Kind, String, CGRect, Int)]] = [
+            3: [(.season, .compact, "Feel strong again", CGRect(x: 142.5, y: 373.4, width: 105, height: 23), 1),
+                (.month, .full, "Three", CGRect(x: 133, y: 461, width: 124, height: 35), 1),
+                (.month, .stub(2), "+2", CGRect(x: 182, y: 437, width: 26, height: 20), 1)],
+            4: [(.month, .compact, "Feel strong again", CGRect(x: 142.5, y: 389, width: 105, height: 23), 1),
+                (.week, .full, "Three", CGRect(x: 133, y: 449, width: 124, height: 47), 1),
+                (.week, .stub(2), "+2", CGRect(x: 182, y: 425, width: 26, height: 20), 1)],
+        ]
+        for (step, expected) in golden.sorted(by: { $0.key < $1.key }) {
+            let (s, _, _) = underTheParent(step, own: ["One", "Two", "Three"], examples: false)
+            let banners = WalkLayout.make(s, today: today).posts.flatMap(\.banners)
+            #expect(banners.count == expected.count, "step \(step)")
+            for (b, e) in zip(banners, expected) {
+                #expect(b.level == e.0 && b.kind == e.1 && b.text == e.2 && b.lines == e.4, "step \(step): \(b.kind) \(b.text)")
+                #expect(near(b.frame.minX, e.3.minX, 0.01) && near(b.frame.minY, e.3.minY, 0.01)
+                        && near(b.frame.width, e.3.width, 0.01) && near(b.frame.height, e.3.height, 0.01),
+                        "step \(step): \(b.text) \(b.frame) ≠ \(e.3)")
+            }
+        }
+    }
+
+    @Test func crowdedRidgesKeepTheLoweredFlagClear() {
+        // The reviewer's two states, unzoomed under an unlabeled parent on a crowded ridge.
+        for (step, keptCount, examples, dated) in [(2, 8, true, false), (4, 7, false, true)] {
+            var s = WalkState()
+            s.areas = ridge
+            s.kept = ridge.prefix(keptCount).map(\.id)
+            s.step = step
+            let level = WalkLevel(rawValue: step)!, above = WalkLevel(rawValue: step - 1)!
+            // The neighbours hold flags on the step's own level only, so nothing lifts the risen parent.
+            for a in s.kept { s.items.append(WalkItem(id: UUID(), level: level, title: "Goal", areaId: a)) }
+            let parent = WalkItem(id: UUID(), level: above, title: "Loose parent", areaId: nil)
+            let own = WalkItem(id: UUID(), level: level, title: "Lift twice a week", areaId: nil, parentId: parent.id,
+                               day: dated ? today : nil)
+            s.items += [parent, own]
+            s.focus[level] = parent.id
+            if examples { s.examplesOn = [step] }
+            let layout = WalkLayout.make(s, today: today)
+            #expect(layout.camera == art.stops[step])
+            let banners = layout.banners(on: level)
+            for i in banners.indices { for j in banners.indices where j > i {
+                #expect(!Invariants.overlap(banners[i].frame, banners[j].frame), "step \(step): \(banners[i].frame) meets \(banners[j].frame)")
+            } }
+            let mine = layout.banner(for: own)!
+            #expect(mine.frame.width >= 44 && near(mine.frame.midX, layout.post(level, nil)!.base.x, 0.01) || mine.frame.minX <= 4.01 || mine.frame.maxX >= 385.99)
         }
     }
 
@@ -710,6 +764,7 @@ private enum Generated {
     static func states() -> [WalkState] {
         var out: [WalkState] = []
         out += ground()
+        out += crowded()
         for step in 1...6 {
             for keptCount in 1...WalkLoad.maxAreas {
                 for unlabeled in [false, true] {
@@ -726,6 +781,49 @@ private enum Generated {
     }
 
     /// The ground and Welcome: every count of kept labels, with old Year flags on some.
+    /// Crowded ridges: 7 or 8 areas and the unlabeled post, two flags on every kept post of every
+    /// level to the step, the focus on an unlabeled parent (so no zoom: little room under it),
+    /// 1 to 6 own unlabeled flags (dated or not on Week), with examples on and off, and the
+/// neighbours' flags on every level or on the step's own level only.
+    static func crowded() -> [WalkState] {
+        var out: [WalkState] = []
+        var n = 50_000
+        for step in 2...4 {
+            for keptCount in [7, 8] {
+                for examples in [false, true] {
+                    for own in 1...6 {
+                        for dated in step == 4 ? [false, true] : [false] { for ownLevelOnly in [false, true] {
+                            var s = WalkState()
+                            s.areas = ridge
+                            s.kept = ridge.prefix(keptCount).map(\.id)
+                            s.step = step
+                            let level = WalkLevel(rawValue: step)!, above = WalkLevel(rawValue: step - 1)!
+                            for raw in (ownLevelOnly ? step : 1)...step {
+                                for a in s.kept { for i in 0..<2 {
+                                    n += 1
+                                    s.items.append(WalkItem(id: uid(n), level: WalkLevel(rawValue: raw)!,
+                                                            title: titles[(n + i) % titles.count], areaId: a))
+                                } }
+                            }
+                            n += 1
+                            let parent = WalkItem(id: uid(n), level: above, title: "Loose parent", areaId: nil)
+                            s.items.append(parent)
+                            for i in 0..<own {
+                                n += 1
+                                s.items.append(WalkItem(id: uid(n), level: level, title: titles[(n + i) % titles.count],
+                                                        areaId: nil, parentId: parent.id, day: dated ? today : nil))
+                            }
+                            s.focus[level] = parent.id
+                            if examples { s.examplesOn = [step] }
+                            out.append(s)
+                        } }
+                    }
+                }
+            }
+        }
+        return out
+    }
+
     static func ground() -> [WalkState] {
         var out: [WalkState] = []
         for keptCount in 0...WalkLoad.maxAreas {
