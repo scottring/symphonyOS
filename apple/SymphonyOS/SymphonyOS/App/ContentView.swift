@@ -41,7 +41,7 @@ struct ContentView: View {
             Task {
                 // A first pull that failed (offline at launch) can finish
                 // here; a failed resync never takes a finished one back.
-                if await engine.resync() { markFirstPullFinished(by: engine) }
+                await engine.resync(onFirstPull: { pulled in if pulled { markFirstPullFinished(by: engine) } })
             }
         }
         .task {
@@ -81,7 +81,9 @@ struct ContentView: View {
         appState.stopSync = { [weak engine] in await engine?.stop() }
         Task {
             await previous?.stop()   // never leave two engines on one socket
-            if await engine.start(userId: userId) { markFirstPullFinished(by: engine) }
+            // Reported as soon as the pull is in, not after realtime has joined:
+            // the walk waits on it, and a join can take long on a poor network.
+            await engine.start(userId: userId, onFirstPull: { pulled in if pulled { markFirstPullFinished(by: engine) } })
         }
         #if os(iOS)
         PushTokens.register()   // no-op until the Push capability is added

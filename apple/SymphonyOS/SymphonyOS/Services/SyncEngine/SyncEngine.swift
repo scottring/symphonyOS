@@ -46,9 +46,11 @@ actor SyncEngine {
     // MARK: - Public API
 
     /// Start sync for the given user. Call after login. Returns true when the
-    /// first pull really ran (see `performInitialSync`).
+    /// first pull really ran (see `performInitialSync`). `onFirstPull` hears the
+    /// same answer as soon as the pull is done, before the realtime channels
+    /// join (each join can wait and retry for a long time on a poor network).
     @discardableResult
-    func start(userId: UUID) async -> Bool {
+    func start(userId: UUID, onFirstPull: (@MainActor @Sendable (Bool) -> Void)? = nil) async -> Bool {
         self.userId = userId
         // Diagnostic + safeguard: force the auth session to load so PostgREST
         // requests carry the user's JWT (anon requests return 0 rows under RLS).
@@ -60,6 +62,7 @@ actor SyncEngine {
         }
         startNetworkMonitoring()
         let pulled = await performInitialSync()
+        await onFirstPull?(pulled)
         await subscribeToRealtime()
         startPushLoop()
         return pulled
@@ -76,12 +79,14 @@ actor SyncEngine {
     ///
     /// Push first so local edits are on the server before the pull reconciles
     /// against it, then re-establish the socket so live changes flow again.
-    /// Returns true when the pull really ran (see `performInitialSync`).
+    /// Returns true when the pull really ran (see `performInitialSync`);
+    /// `onFirstPull` hears it before the channels are joined again, as in `start`.
     @discardableResult
-    func resync() async -> Bool {
+    func resync(onFirstPull: (@MainActor @Sendable (Bool) -> Void)? = nil) async -> Bool {
         guard userId != nil, isOnline, !isSyncing else { return false }
         await pushPendingChanges()
         let pulled = await performInitialSync()
+        await onFirstPull?(pulled)
         await resubscribeToRealtime()
         return pulled
     }
@@ -163,9 +168,8 @@ actor SyncEngine {
                 queuedInserts[change.recordId] = change
             }
             for change in pendingChanges {
-                var parents: [UUID] = []
+                let parents = Self.parentIds(of: change, context: context)
                 if change.changeType != "delete" {
-                    parents = Self.parentIds(table: change.tableName, id: change.recordId, context: context)
                     // Skipped for this pass without counting an attempt; it goes
                     // once its parent's insert lands — or, if that insert keeps
                     // failing, it stops waiting and takes the ordinary path.
@@ -1092,6 +1096,11 @@ extension SyncEngine {
         return links.compactMap { $0 }.filter { $0 != id }
     }
 
+    /// What the push loop reads for a queued change: a delete never waits, so it names none.
+    static func parentIds(of change: PendingChange, context: ModelContext) -> [UUID] {
+        change.changeType == "delete" ? [] : parentIds(table: change.tableName, id: change.recordId, context: context)
+    }
+
     static func mustWait(parents: [UUID], unpushedInserts: Set<UUID>) -> Bool {
         parents.contains { unpushedInserts.contains($0) }
     }
@@ -1136,9 +1145,12 @@ extension SyncEngine {
     /// As above, for a change on `table`. Only tasks and goals have links to
     /// unlink; a `task_focus` row names its task only to wait for it (the task
     /// is its key), so its refusal counts as an ordinary failure, as it always did.
-    static func onPushRejected(table: String, code: String?, parents: [UUID], queuedInserts: Set<UUID>, known: Set<UUID>) -> RejectionAction {
+    /// `known` is read only past that guard: a failed push of a clean row, or of any
+    /// other table, costs no fetch.
+    static func onPushRejected(table: String, code: String?, parents: [UUID], queuedInserts: Set<UUID>,
+                               known: @autoclosure () -> Set<UUID>) -> RejectionAction {
         guard !parents.isEmpty, table == "tasks" || table == "goals" else { return .countAttempt }
-        return onPushRejected(code: code, parents: parents, queuedInserts: queuedInserts, known: known)
+        return onPushRejected(code: code, parents: parents, queuedInserts: queuedInserts, known: known())
     }
 
     /// What happens to a change once its push has succeeded.

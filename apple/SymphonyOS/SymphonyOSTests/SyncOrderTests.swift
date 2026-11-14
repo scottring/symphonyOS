@@ -217,9 +217,7 @@ struct SyncOrderTests {
         var waiting = queue
         var pushed: [UUID] = []
         for change in queue.sorted(by: { $0.createdAt < $1.createdAt }) {
-            // As the loop: a delete never waits.
-            let parents = change.changeType == "delete" ? []
-                : SyncEngine.parentIds(table: change.tableName, id: change.recordId, context: context)
+            let parents = SyncEngine.parentIds(of: change, context: context)     // the loop's own: a delete never waits
             if SyncEngine.mustWait(parents: parents, unpushedInserts: SyncEngine.insertsWorthWaitingFor(waiting)) { continue }
             pushed.append(change.recordId)
             waiting.removeAll { $0 === change }
@@ -385,6 +383,119 @@ struct SyncOrderTests {
                                           queuedInserts: [], known: []) == .countAttempt)
     }
 
+    /// The three whole-table fetches behind `known` are read only for a refused task or
+    /// goal that sends links: any other failed push costs what it did before.
+    @Test func aRefusedPushReadsTheKnownRowsOnlyForARowWithLinks() {
+        var reads = 0
+        func known() -> Set<UUID> {
+            reads += 1
+            return []
+        }
+        let t = UUID()
+        _ = SyncEngine.onPushRejected(table: "tasks", code: "23503", parents: [], queuedInserts: [], known: known())
+        _ = SyncEngine.onPushRejected(table: "tasks", code: nil, parents: [], queuedInserts: [], known: known())
+        _ = SyncEngine.onPushRejected(table: "routines", code: "23503", parents: [t], queuedInserts: [], known: known())
+        _ = SyncEngine.onPushRejected(table: "task_focus", code: "23503", parents: [t], queuedInserts: [], known: known())
+        #expect(reads == 0)
+        #expect(SyncEngine.onPushRejected(table: "tasks", code: "23503", parents: [t], queuedInserts: [], known: known())
+                == .unlink([t]))
+        #expect(reads == 1)
+    }
+
+    // MARK: A pass through the loop's own rules
+
+    /// One pass as `pushPendingChanges` runs one, through its own rules: oldest first; a
+    /// change whose parent's insert is still worth waiting for is skipped with no attempt
+    /// counted; a linked update whose own insert is queued waits for it; a refused push
+    /// is decided by `onPushRejected` and counted. The server refuses the rows in
+    /// `refused` as a dropped connection would. Pushed changes leave `queue`; returns
+    /// the rows pushed, in order.
+    private func loopPass(_ queue: inout [PendingChange], refused: Set<UUID> = [], context: ModelContext) -> [UUID] {
+        var queuedInserts: [UUID: PendingChange] = [:]
+        for change in queue where change.changeType == "insert" { queuedInserts[change.recordId] = change }
+        var pushed: [UUID] = []
+        for change in queue.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let parents = SyncEngine.parentIds(of: change, context: context)
+            if change.changeType != "delete" {
+                if !parents.isEmpty, SyncEngine.mustWait(parents: parents,
+                                                         unpushedInserts: SyncEngine.insertsWorthWaitingFor(Array(queuedInserts.values))) {
+                    continue
+                }
+                if change.changeType == "update", queuedInserts[change.recordId] != nil,
+                   SyncEngine.linkStamp(table: change.tableName, id: change.recordId, context: context) != nil {
+                    continue
+                }
+            }
+            if refused.contains(change.recordId) {
+                let code = SyncEngine.postgresCode(of: URLError(.notConnectedToInternet))
+                let action = SyncEngine.onPushRejected(table: change.tableName, code: code, parents: parents,
+                                                       queuedInserts: Set(queuedInserts.keys),
+                                                       known: SyncEngine.knownIds(context: context))
+                if action == .countAttempt { change.attempts += 1 }
+                continue
+            }
+            pushed.append(change.recordId)
+            if change.changeType == "insert" { queuedInserts[change.recordId] = nil }
+            queue.removeAll { $0 === change }
+        }
+        return pushed
+    }
+
+    /// A walk-made chain whose goal fails to go up: the season line and its first-thing
+    /// focus wait without spending an attempt, and go on the pass after the goal lands.
+    /// Beside them a task pulled from the web, its links set there (flags clean), is
+    /// ticked on the phone: it goes at once, and its row names none of its links.
+    @Test func aFailedParentHoldsItsChildrenAndACleanRowGoesAtOnce() throws {
+        let context = try makeContext()
+        let me = UUID()
+        let area = GoalArea(userId: me, name: "Health", context: "personal")
+        context.insert(area)
+        context.queueSync(table: "goal_areas", recordId: area.id, type: "insert")
+        let goal = PlanWriter(context: context, userId: me)
+            .createGoal(name: "Feel strong again", notes: nil, context: "personal", year: 2027)
+        goal.areaId = area.id
+        goal.areaDirty = true
+        let season = newTask(context, "Lift twice a week")
+        season.goalId = goal.id
+        season.areaId = area.id
+        season.linksDirty = true
+        let first = focus(season, context)
+        let webGoal = UUID(), webSource = UUID()
+        let pulled = SymphonyTask(userId: me, title: "Renew the passport", syncStatus: .synced)
+        pulled.goalId = webGoal
+        pulled.sourceId = webSource
+        context.insert(pulled)
+        try context.save()
+        TaskViewModel(modelContext: context).toggleComplete(pulled)       // as Today ticks it
+
+        let changes = try [change(context, "goal_areas", area.id), change(context, "goals", goal.id),
+                           change(context, "tasks", season.id), change(context, "task_focus", first.id),
+                           change(context, "tasks", pulled.id, "update")]
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        for (i, c) in changes.enumerated() { c.createdAt = t0.addingTimeInterval(Double(i)) }
+        var queue = try context.fetch(FetchDescriptor<PendingChange>())
+        #expect(queue.count == changes.count)
+        let (goalInsert, seasonInsert, focusInsert) = (changes[1], changes[2], changes[3])
+
+        // The goal's insert fails: the area and the ticked task go; the children wait, uncounted.
+        #expect(loopPass(&queue, refused: [goal.id], context: context) == [area.id, pulled.id])
+        #expect(goalInsert.attempts == 1)
+        #expect(seasonInsert.attempts == 0)
+        #expect(focusInsert.attempts == 0)
+        // It lands on the next pass, and they follow it in that pass.
+        #expect(loopPass(&queue, context: context) == [goal.id, season.id, first.id])
+        #expect(queue.isEmpty)
+
+        // The tick never waited and sends none of the links the web set.
+        #expect(SyncEngine.parentIds(table: "tasks", id: pulled.id, context: context) == [])
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: pulled.id, context: context))
+        #expect(row["completed"] == .bool(true))
+        #expect(row["goal_id"] == nil)
+        #expect(row["source_id"] == nil)
+        #expect(row["area_id"] == nil)
+        #expect(pulled.goalId == webGoal && pulled.sourceId == webSource)
+    }
+
     // MARK: Links re-set while a push is in flight
 
     @Test func aRowSendsItsLinksOnlyWhenTheyAreDirty() throws {
@@ -466,5 +577,17 @@ struct SyncOrderTests {
 
     @Test func aFreshAppHasNotSynced() {
         #expect(AppState().initialSyncFinished == false)
+    }
+
+    /// A resync that does not pull (no one signed in to this engine) reports nothing.
+    /// That `start` and `resync` report the pull BEFORE realtime joins needs a network
+    /// to run; it is the order of two lines in each.
+    @Test func aResyncThatDoesNotPullReportsNothing() async throws {
+        let container = try ModelContainer(for: SymphonyTask.self, PendingChange.self,
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let pulled = await SyncEngine(modelContainer: container).resync(onFirstPull: { _ in
+            Issue.record("a resync that did not pull reported a first pull")
+        })
+        #expect(!pulled)
     }
 }
