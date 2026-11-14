@@ -19,7 +19,8 @@ extension DemoMode {
     static var dailyPage: Horizon? { dailyPage(in: ProcessInfo.processInfo.arguments) }
 
     /// `-SymphonyDailyState a,b,…`: states a page is driven into once it is up
-    /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk).
+    /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
+    /// `speak` and `undo`: the bar, see `showDaily`; `more` and `inbox`: that sheet, `dailyPanel`).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
     static func dailySeed(in arguments: [String]) -> String {
@@ -34,6 +35,51 @@ extension DemoMode {
     static func dailyStates(in arguments: [String]) -> [String] {
         guard let list = value(after: "-SymphonyDailyState", in: arguments) else { return [] }
         return list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+    }
+
+    // MARK: The bar
+
+    /// What the stand-in listener hears, as the speaking board shows it.
+    static let dailySpoken = "Call the plumber about the leak"
+
+    /// With `speak` among the states the bar listens through `DemoWalkListener`, which hears
+    /// `dailySpoken` as soon as it starts (nobody can speak to this simulator); with `refused`
+    /// through one that reports the microphone refused; otherwise nil (the bar's own on-phone listener).
+    @MainActor static var dailyListener: WalkListening? { dailyListener(in: ProcessInfo.processInfo.arguments) }
+
+    @MainActor static func dailyListener(in arguments: [String]) -> WalkListening? {
+        let states = dailyStates(in: arguments)
+        if states.contains("refused") {
+            let refused = DemoWalkListener(words: "")
+            refused.problem = WalkCopy.speechOff        // as `Dictation` reports a refused microphone
+            return refused
+        }
+        return states.contains("speak") ? DemoWalkListener(words: dailySpoken) : nil
+    }
+
+    /// `more` or `inbox` among the states: that sheet opens over the page, as a tap beside the bar opens it.
+    static var dailyPanel: DailyPanel? { dailyPanel(in: ProcessInfo.processInfo.arguments) }
+
+    static func dailyPanel(in arguments: [String]) -> DailyPanel? {
+        dailyStates(in: arguments).lazy.compactMap(DailyPanel.init(rawValue:)).first
+    }
+
+    /// Drives the bar into the states that need a touch, as a person's touch would:
+    /// `speak`: a tap on the light, so it listens and hears `dailySpoken`;
+    /// `refused`: a tap on the light with the microphone refused, so the bar types, with its line;
+    /// `undo`: `dailySpoken` typed and added, so Undo shows.
+    @MainActor static func showDaily(_ model: DailyModel, _ states: [String]) {
+        for state in states {
+            switch state {
+            case "speak", "refused":
+                model.send(.micTapped)
+            case "undo":
+                model.send(.typed(dailySpoken))
+                model.send(.submitted)
+            default:
+                break
+            }
+        }
     }
 
     private static func value(after flag: String, in arguments: [String]) -> String? {

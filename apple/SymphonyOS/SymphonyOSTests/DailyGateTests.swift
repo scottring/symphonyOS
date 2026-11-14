@@ -95,6 +95,23 @@ struct DailyGateTests {
         #expect(!DailyGate.shows(.week, edition: .light, layout: .oneColumn))
     }
 
+    /// The bar is built: a light household's phone, upright, has the bar and no dock.
+    @Test func theDockGivesWayNow() {
+        #expect(DailyGate.barBuilt)
+        #expect(DailyGate.hidesDock(edition: .light, layout: .oneColumn))
+        #expect(!DailyGate.hidesDock(edition: .full, layout: .oneColumn))
+        #expect(!DailyGate.hidesDock(edition: .light, layout: .glanceWide))
+    }
+
+    /// Review Focus 1: a light household whose phone cannot recognise speech on its own never
+    /// listens through a server, at the bar or in Tell; a full household's Tell is as it always was.
+    /// (The bar's own listener is pinned in `DailyModelTests`, which is iOS only.)
+    @Test func lightSpeechStaysOnThePhone() {
+        #expect(Dictation.mayListen(onDeviceOnly: DailyGate.speechOnPhoneOnly(edition: .light), supportsOnDevice: false) == false)
+        #expect(Dictation.mayListen(onDeviceOnly: DailyGate.speechOnPhoneOnly(edition: .light), supportsOnDevice: true) == true)
+        #expect(Dictation.mayListen(onDeviceOnly: DailyGate.speechOnPhoneOnly(edition: .full), supportsOnDevice: false) == true)
+    }
+
     @Test func theDockGivesWayOnlyWithTheBarAndToday() {
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
         #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))

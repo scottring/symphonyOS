@@ -14,6 +14,7 @@ struct TellSheet: View {
     let userId: UUID
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     @State private var listener = Dictation()
     @State private var text = ""
     @FocusState private var typing: Bool
@@ -58,7 +59,11 @@ struct TellSheet: View {
         .padding(20)
         .background(Color.bgBase.ignoresSafeArea())
         .onChange(of: listener.transcript) { _, words in if !words.isEmpty { text = words } }
-        .task { await listener.start() }
+        .task {
+            // A light household's speech stays on the phone; a full one's is as it always was.
+            listener.onDeviceOnly = DailyGate.speechOnPhoneOnly(edition: appState.edition)
+            await listener.start()
+        }
         .onDisappear { listener.stop() }
     }
 

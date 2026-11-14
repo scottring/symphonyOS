@@ -1,6 +1,6 @@
 import XCTest
 
-/// The light edition's dock and hidden features. Demo mode is `.full` unless
+/// The light edition's bar (in place of the dock) and hidden features. Demo mode is `.full` unless
 /// `-SymphonyLight` is also passed. No typing (text entry stalls the simulator).
 final class LightEditionUITests: XCTestCase {
     override func setUpWithError() throws {
@@ -9,7 +9,7 @@ final class LightEditionUITests: XCTestCase {
 
     private func launch(light: Bool) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
+        app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight", "-SymphonyDaily"] : [])
         app.launch()
         // A light household lands on light Today (`daily.today`); a full one on the Today it always had.
         let today = light ? app.descendants(matching: .any)["daily.today"] : app.buttons["Today. Switch horizon"]
@@ -17,28 +17,26 @@ final class LightEditionUITests: XCTestCase {
         return app
     }
 
-    @MainActor func testLightDockHasPlannerInboxAndMoreOnly() throws {
+    /// Light Today has the bar, with Inbox and More beside it, and no dock.
+    @MainActor func testLightHasTheBarAndNoDock() throws {
         let app = launch(light: true)
-        XCTAssertTrue(app.buttons["Planner"].exists)
-        XCTAssertTrue(app.buttons["Inbox"].exists)
-        XCTAssertTrue(app.buttons["Add"].exists)
-        XCTAssertTrue(app.buttons["More"].exists)
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(any["daily.bar.field"].waitForExistence(timeout: 15), "no field")
+        XCTAssertTrue(any["daily.bar.light"].exists, "no light")
+        XCTAssertTrue(any["daily.bar.inbox"].exists, "no Inbox")
+        XCTAssertTrue(any["daily.bar.more"].exists, "no More")
+        XCTAssertFalse(app.buttons["Planner"].exists)
         XCTAssertFalse(app.buttons["Routines"].exists)
+        XCTAssertFalse(app.buttons["Add"].exists)
         XCTAssertFalse(app.staticTexts["Dinner tonight"].exists)
         XCTAssertFalse(app.buttons["Life area: All"].exists)
 
-        // More lists no Projects, Lists or Contacts.
-        app.buttons["More"].tap()
+        // More opens over the page and lists no Projects, Lists or Contacts.
+        any["daily.bar.more"].tap()
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Projects"].exists)
         XCTAssertFalse(app.buttons["Lists"].exists)
         XCTAssertFalse(app.buttons["Contacts"].exists)
-
-        // The Add sheet has the capture bar alone: no photographed pages.
-        app.buttons["Add"].tap()
-        XCTAssertTrue(app.navigationBars["Add"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Snap a page"].exists)
-        XCTAssertFalse(app.buttons["Choose photo"].exists)
     }
 
     @MainActor func testFullDockStillHasRoutines() throws {

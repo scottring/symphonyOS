@@ -55,6 +55,8 @@ struct LightTodayView: View {
                     sheet(page, m, line: line)
                 }
                 fade(m)
+                DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
+                             listening: DailyCopy.listening(.today))
                 #if DEBUG
                 Color.clear.frame(width: 0, height: 0)
                     .onAppear { applyDemoStates(page) }
@@ -67,7 +69,12 @@ struct LightTodayView: View {
         .accessibilityIdentifier("daily.today")
         .sheet(item: $opened) { item in OpenedItemSheet(item: item, date: model.today, userId: userId) }
         .task(id: calendar.readKey(for: model.today)) { await calendar.refresh(model.today, maxAge: 60) }
-        .onAppear { readWalk() }
+        .onAppear {
+            readWalk()
+            answerTell()
+        }
+        // The Lock Screen's Tell Symphony control or a `symphony://tell` link: the bar listens, no sheet.
+        .onChange(of: appState.tellRequested) { _, _ in answerTell() }
         // A walk that ends lands on Today (`goToToday`) and says whether one is left waiting.
         .onChange(of: appState.walkPaused) { _, _ in readWalk() }
         .onChange(of: appState.selectedDate) { _, _ in readWalk() }
@@ -228,17 +235,30 @@ struct LightTodayView: View {
         if sign.putAwayWhenFollowed { model.dismiss(sign.kind) }
     }
 
+    /// Tell asked for from outside: any sheet over the page closes, so the listening bar is seen.
+    private func answerTell() {
+        guard appState.tellRequested else { return }
+        appState.tellRequested = false
+        appState.dailyPanel = nil
+        opened = nil
+        model.tellAsked()
+    }
+
     private func details(_ row: DailyDay.Row) -> TimelineItem {
         TimelineItem(id: "task-\(row.id.uuidString)", type: .task, title: row.title, startTime: nil, isAllDay: true,
                      completed: row.done, context: "personal", entityId: row.id)
     }
 
     #if DEBUG
-    /// `-SymphonyDailyState point`: the sign's row lit, as a tap on "First, today" lights it.
+    /// `-SymphonyDailyState point`: the sign's row lit, as a tap on "First, today" lights it;
+    /// `speak` and `undo`: the bar listening, or one task added with Undo showing (`DemoMode.showDaily`);
+    /// `more` or `inbox`: that sheet open over the page.
     private func applyDemoStates(_ page: DailyTodayPage) {
         guard DemoMode.isOn, !demoStatesApplied else { return }
         demoStatesApplied = true
         if DemoMode.dailyStates.contains("point"), let sign = page.sign, case .light = sign.target { follow(sign) }
+        DemoMode.showDaily(model, DemoMode.dailyStates)
+        if let panel = DemoMode.dailyPanel { appState.dailyPanel = panel }
     }
     #endif
 }

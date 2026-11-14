@@ -92,14 +92,26 @@ final class AppState {
     #if os(iOS)
     /// Bottom, or a side column where the system puts its bars (iPhone Duo).
     var dockLayout = DockLayout()
-    var bottomInset: CGFloat { keyboardVisible || dockLayout.edge != .bottom ? 0 : dockHeight }
+    var bottomInset: CGFloat { keyboardVisible || dailyHidesDock || dockLayout.edge != .bottom ? 0 : dockHeight }
     /// The Duo set down partly open shows the half-open display.
     var posture: DuoPosture = .flat
     /// Tonight's dinner being cooked on the half-open display.
     var cook: CookSession?
     #else
-    var bottomInset: CGFloat { keyboardVisible ? 0 : dockHeight }
+    var bottomInset: CGFloat { keyboardVisible || dailyHidesDock ? 0 : dockHeight }
     #endif
+    /// A light page with its own bar is up (`DailyGate.hidesDock`, set by the light Planner for
+    /// the window it measured): the dock, bottom or side, is not drawn and leaves no inset.
+    var dailyHidesDock = false
+    /// Inbox or More, opened from beside the light bar, as a sheet over the page.
+    var dailyPanel: DailyPanel?
+
+    /// Off the light pages (the Planner went away, or the household is no longer light):
+    /// the dock comes back and nothing light is left open on top.
+    func leaveDaily() {
+        dailyHidesDock = false
+        dailyPanel = nil
+    }
 
     // Domain filter
     var domainFilter: DomainFilter = .all

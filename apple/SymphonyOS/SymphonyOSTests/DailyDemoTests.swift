@@ -104,5 +104,41 @@ struct DailyDemoTests {
         #expect(DemoMode.dailyStates(in: ["app", "-SymphonyDailyState", "point, Waiting"]) == ["point", "waiting"])
         #expect(DemoMode.dailyStates(in: ["app"]).isEmpty)
     }
+
+    /// `-SymphonyDailyState speak`: the bar listens through a stand-in that hears the board's
+    /// words (nobody can speak to the simulator); `undo`: one task added, Undo showing.
+    @Test func theBarsDemoStates() async throws {
+        #expect(DemoMode.dailyListener(in: ["app"]) == nil)
+        #expect(DemoMode.dailyPanel(in: ["app", "-SymphonyDailyState", "undo,more"]) == .more)
+        #expect(DemoMode.dailyPanel(in: ["app", "-SymphonyDailyState", "inbox"]) == .inbox)
+        #expect(DemoMode.dailyPanel(in: ["app", "-SymphonyDailyState", "speak"]) == nil)
+        let stand = try #require(DemoMode.dailyListener(in: ["app", "-SymphonyDailyState", "speak"]) as? DemoWalkListener)
+        #expect(stand.words == DemoMode.dailySpoken)
+
+        let ctx = try walkTestContext()
+        let scheduler = ManualWalkScheduler()
+        let speaking = DailyModel(context: ctx, userId: me, clock: { day(2026, 11, 10, 9) }, scheduler: scheduler,
+                                  listener: stand)
+        DemoMode.showDaily(speaking, ["speak"])
+        await scheduler.settle()
+        #expect(speaking.bar.mic == .listening)
+        #expect(speaking.bar.draft == DemoMode.dailySpoken)
+        #expect(((try? ctx.fetch(FetchDescriptor<SymphonyTask>())) ?? []).isEmpty)   // heard, not yet added
+
+        let undo = DailyModel(context: ctx, userId: me, clock: { day(2026, 11, 10, 9) }, scheduler: scheduler,
+                              listener: FakeWalkListener())
+        DemoMode.showDaily(undo, ["undo"])
+        #expect(undo.bar.undoShowing)
+        #expect(((try? ctx.fetch(FetchDescriptor<SymphonyTask>())) ?? []).map(\.title) == [DemoMode.dailySpoken])
+
+        let refusedListener = try #require(DemoMode.dailyListener(in: ["app", "-SymphonyDailyState", "refused"]))
+        let refused = DailyModel(context: ctx, userId: me, clock: { day(2026, 11, 10, 9) }, scheduler: scheduler,
+                                 listener: refusedListener)
+        DemoMode.showDaily(refused, ["refused"])
+        await scheduler.settle()
+        #expect(refused.bar.speechOff)
+        #expect(refused.bar.note == WalkCopy.speechOff)
+        #expect(refused.bar.fieldAsked == 1)
+    }
 }
 #endif

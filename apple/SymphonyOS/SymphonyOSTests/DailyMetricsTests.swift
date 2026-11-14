@@ -67,9 +67,10 @@ struct DailyMetricsTests {
     }
 
     @Test func aShortPhoneStillShowsThreeRows() {
-        #expect(DailyMetrics.shape(for: .oneColumn, height: 667) == .short)
-        #expect(DailyMetrics.shape(for: .oneColumn, height: 844) == .tall)
-        #expect(DailyMetrics.shape(for: .glance, height: 678) == .short)
+        // The one shape rule a page can call takes the line into account (the coarse one is private).
+        #expect(DailyMetrics.shape(for: .oneColumn, height: 667, safeTop: 20, safeBottom: 0, waiting: false) == .short)
+        #expect(DailyMetrics.shape(for: .oneColumn, height: 844, safeTop: 44, safeBottom: 34, waiting: false) == .tall)
+        #expect(DailyMetrics.shape(for: .glance, height: 678, safeTop: 22, safeBottom: 0, waiting: false) == .short)
         let m = DailyMetrics.today(size: small, safeTop: 20, safeBottom: 0, shape: .short)
         #expect(m.rowsTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY)
         #expect(m.lookBack == nil)
@@ -139,6 +140,24 @@ struct DailyMetricsTests {
         } } } } }
 
         #expect(failures.isEmpty, "\(failures.count) failures, first: \(failures.prefix(5))")
+
+        // The accepted carve-out (ruling D11): on windows 604 points tall or less, with a safe top of
+        // 44 or more and the waiting line showing, the risen sheet may cover part of the row of words,
+        // because three rows fitting comes first. No current iPhone has such a window; `overWords`
+        // counts and prints them and is not asserted. What is asserted: no real iPhone size ever has
+        // its sheet rise past the row of words, with or without the line.
+        let phones: [(CGSize, CGFloat, CGFloat)] = [
+            (CGSize(width: 375, height: 667), 20, 0),
+            (CGSize(width: 375, height: 812), 44, 34), (CGSize(width: 375, height: 812), 50, 34),
+            (CGSize(width: 390, height: 844), 47, 34), (CGSize(width: 393, height: 852), 59, 34),
+            (CGSize(width: 402, height: 874), 62, 34), (CGSize(width: 430, height: 932), 59, 34),
+            (CGSize(width: 440, height: 956), 62, 34),
+        ]
+        for (size, top, bottom) in phones { for line in [false, true] {
+            let shape = DailyMetrics.shape(for: .oneColumn, height: size.height, safeTop: top, safeBottom: bottom, waiting: line)
+            let m = DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape, waiting: line)
+            #expect(m.sheetTop >= top + wordsRow, "\(size) \(top)/\(bottom) line \(line): the sheet covers the row of words")
+        } }
         print("DailyMetrics sweep: \(windows) windows; \(signlessCount) lose the sign; sheet over the row of words on \(overWords.values.map(\.count).reduce(0, +))")
         for key in signless.keys.sorted() {
             let hs = signless[key]!
@@ -205,6 +224,17 @@ struct DailyMetricsTests {
             #expect(s.nails[1].maxY == s.plank.height - nailInset)
             #expect(s.nails.allSatisfy { $0.maxX < s.eyebrow.x && $0.maxX < s.title.x })
         }
+    }
+
+    /// The field and the line rise with the keyboard: the field's foot stands 8 above the
+    /// keyboard's top, and nothing rises while the keyboard is down or lower than the bar.
+    @Test func theBarRisesWithTheKeyboard() {
+        let bar = DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34).bar
+        #expect(bar.field.maxY == 802)
+        #expect(bar.rise(keyboardTop: 844) == 0)                // no keyboard
+        #expect(bar.rise(keyboardTop: 900) == 0)
+        #expect(bar.rise(keyboardTop: 810) == 0)                // its top just clears the field's foot by 8
+        #expect(bar.rise(keyboardTop: 508) == 302)              // a 336-high keyboard: 802 + 8 − 508
     }
 
     @Test func everyTouchTargetIsAtLeast44() {

@@ -51,7 +51,8 @@ struct iOSMainView: View {
     @ViewBuilder private var sideDock: some View {
         @Bindable var state = appState
         let layout = appState.dockLayout
-        if layout.edge != .bottom {
+        // A light page with its own bar has Inbox and More beside it: no side dock either.
+        if layout.edge != .bottom && !appState.dailyHidesDock {
             ZStack(alignment: .topLeading) {
                 Color.clear
                 SymphonyDock(activeTab: $state.activeTab, tabs: AppTab.visible(in: appState.edition), edge: layout.edge, iconsOnly: layout.iconsOnly) { showCapture = true }
@@ -67,7 +68,7 @@ struct iOSMainView: View {
     /// further in than the safe area.
     private func sidePadding(_ edge: DockEdge) -> CGFloat {
         let layout = appState.dockLayout
-        return layout.edge == edge ? max(0, layout.contentInset - layout.safeInset) : 0
+        return layout.edge == edge && !appState.dailyHidesDock ? max(0, layout.contentInset - layout.safeInset) : 0
     }
 
     private func applyEdition() {
@@ -88,6 +89,9 @@ struct iOSMainView: View {
             if !editions.isEmpty { memory.remember(edition, for: userId) }
         }
         let changedToLight = edition == .light && appState.edition != .light
+        // No longer light (an invite accepted, the household row synced): the dock is back at
+        // once and no light sheet is left on top.
+        if edition != .light { appState.leaveDaily() }
         appState.edition = edition
         CalendarFeed.shared.edition = edition   // nil until here: no calendar read goes to the wrong source
         if changedToLight {
@@ -127,7 +131,7 @@ struct iOSMainView: View {
         // While typing, the keyboard owns the bottom edge: hide the dock so
         // the capture bar sits right on the keyboard instead of above a dock.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if appState.dockLayout.edge == .bottom && !appState.keyboardVisible { dock }
+            if appState.dockLayout.edge == .bottom && !appState.keyboardVisible && !appState.dailyHidesDock { dock }
         }
         // A side dock leaves the bottom edge to the keyboard, so it stays up.
         .padding(.leading, sidePadding(.leading))
@@ -190,6 +194,17 @@ struct iOSMainView: View {
                 CaptureSheet(userId: userId)
                     .presentationDetents([.medium])
             }
+        }
+        // Inbox and More, opened from beside the light bar where the dock has given way.
+        .sheet(item: $state.dailyPanel) { panel in
+            NavigationStack {
+                switch panel {
+                case .inbox: InboxView()
+                case .more: MoreView()
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onChange(of: appState.posture) { _, posture in
             // Opening the phone flat after the last step leaves nothing to come back to.
@@ -286,10 +301,12 @@ extension iOSMainView {
             appState.goToToday()
         }
         // Never under a sheet or behind a keyboard: whatever field has the keyboard lets it
-        // go, and the dock's capture sheet closes. (Today's own Tell and Add sheets, and the
-        // half-open display's Tell sheet, are kept by those views and can still sit above it.)
+        // go, and the dock's capture sheet, or light's Inbox or More, closes. (Today's own Tell
+        // and Add sheets, and the half-open display's Tell sheet, are kept by those views and
+        // can still sit above it.)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         showCapture = false
+        appState.dailyPanel = nil
         withAnimation(animated ? walkFade : nil) { walk = model }
         #if DEBUG
         // Driven once it is up, so a step that ends the walk (`leave`) takes it down as a person's would.

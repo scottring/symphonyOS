@@ -125,6 +125,14 @@ import Observation
         }
     }
 
+    /// Tell Symphony asked for from outside the app (the Lock Screen control, a `symphony://tell`
+    /// link) while light Today is up: a tap on the light, if the bar is idle. A listen already
+    /// going is left alone, never finished or restarted. With speech off it asks for the field.
+    func tellAsked() {
+        guard !bar.isListening else { return }
+        send(.micTapped)
+    }
+
     /// The model taken down: a pending pull-up is written, listening stops, nothing waiting runs.
     func close() {
         commitPullUp()

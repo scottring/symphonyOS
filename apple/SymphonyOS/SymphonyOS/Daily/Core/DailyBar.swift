@@ -20,6 +20,20 @@ struct DailyBar: Equatable {
     /// Bumped when the field should take the keyboard.
     var fieldAsked = 0
 
+    /// Listening, or waiting for the last words (which looks the same): the field spans the
+    /// width, More and Inbox give way, and the field shows what is heard but takes no typing.
+    var isListening: Bool { mic != .idle }
+
+    /// The one line slot above the bar, in this order of need: the listening line while the light
+    /// listens; otherwise the note, Undo beside it when both show, either alone, or nothing.
+    enum Slot: Equatable { case empty, listening, say(note: String?, undo: Bool) }
+
+    var slot: Slot {
+        if isListening { return .listening }
+        if note == nil && !undoShowing { return .empty }
+        return .say(note: note, undo: undoShowing)
+    }
+
     enum Event: Equatable {
         case typed(String), submitted, micTapped, heard(String), speechUnavailable,
              listenEnded, finishExpired, did(note: String?), undoTapped, undoExpired, noteExpired, left

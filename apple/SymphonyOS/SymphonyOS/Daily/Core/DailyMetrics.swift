@@ -75,6 +75,12 @@ struct DailyMetrics: Equatable {
         var typing: CGRect {
             CGRect(x: field.minX, y: field.minY, width: lightTouch.minX - field.minX, height: field.height)
         }
+
+        /// How far the field and the line rise so the field's foot stands `keyboardGap` above
+        /// the keyboard's top (in the page's own space); 0 with the keyboard down or below the bar.
+        func rise(keyboardTop: CGFloat) -> CGFloat {
+            max(0, field.maxY + DailyMetrics.keyboardGap - keyboardTop)
+        }
     }
 
     let size: CGSize
@@ -113,6 +119,8 @@ struct DailyMetrics: Equatable {
     static let nailInset: CGFloat = 5
     /// The light stands this far in from the field's right end.
     static let lightInset: CGFloat = 5
+    /// With the keyboard up, the field's foot stands this far above it.
+    static let keyboardGap: CGFloat = 8
     /// Two band flags' feet stand at least this far apart in height.
     static let flagsApart: CGFloat = 4
     /// The row of words from `navTop`: 14 above and below the 11.5 pt words, rounded up to 44.
@@ -122,13 +130,15 @@ struct DailyMetrics: Equatable {
     /// The largest turn `Signpost.hand` gives a plank, in degrees (0.7…1.7).
     static let signTurn: Double = 1.7
 
-    /// Short: the Duo's outside screen, and any window under 760 high.
-    static func shape(for layout: TodayLayout, height: CGFloat) -> Shape {
+    /// Short: the Duo's outside screen, and any window under 760 high. The coarse rule, which
+    /// ignores the waiting line: private, so no page can pick it over the one below.
+    private static func shape(for layout: TodayLayout, height: CGFloat) -> Shape {
         layout == .glance || height < shortHeight ? .short : .tall
     }
 
-    /// The shape Today takes on this window: as `shape(for:height:)`, and short also where the
-    /// tall board's three rows would not end above the fade (with the waiting line when it shows).
+    /// The shape Today takes on this window: the Duo's outside screen and any window under 760
+    /// high are short, and so is any window where the tall board's three rows would not end
+    /// above the fade (with the waiting line when it shows). Every page calls this one.
     static func shape(for layout: TodayLayout, height: CGFloat, safeTop: CGFloat, safeBottom: CGFloat,
                       waiting: Bool) -> Shape {
         guard shape(for: layout, height: height) == .tall else { return .short }

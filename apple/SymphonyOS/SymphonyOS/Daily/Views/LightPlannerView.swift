@@ -39,6 +39,9 @@ struct LightPlannerView<Full: View>: View {
 
     private var showsLight: Bool { DailyGate.shows(appState.horizon, edition: appState.edition, layout: layout) }
 
+    /// The dock gives way to the bar on this window (`DailyGate.hidesDock`).
+    private var hidesDock: Bool { DailyGate.hidesDock(edition: appState.edition, layout: layout) }
+
     var body: some View {
         ZStack {
             if showsLight { light } else { full() }
@@ -51,8 +54,12 @@ struct LightPlannerView<Full: View>: View {
         .onAppear {
             // Appearing again (a sheet or a pushed page going away) keeps the model, its Undo and its lit row.
             if model == nil { makeModel() }
+            appState.dailyHidesDock = hidesDock
             openDemoPage()
         }
+        .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
+        // Gone (another tab, signed out): the dock comes back.
+        .onDisappear { appState.dailyHidesDock = false }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -93,7 +100,12 @@ struct LightPlannerView<Full: View>: View {
             return
         }
         model?.close()
-        model = DailyModel(context: modelContext, userId: userId, seasons: seasons)
+        #if DEBUG
+        let listener = DemoMode.isOn ? DemoMode.dailyListener : nil    // `-SymphonyDailyState speak`
+        #else
+        let listener: WalkListening? = nil
+        #endif
+        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener)
     }
 
     /// A word in the row of words: the date the walk's period for it opens on, then the page.

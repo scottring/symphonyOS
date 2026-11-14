@@ -511,6 +511,44 @@ struct DailyModelTests {
         #expect(dictation.playsAlongside == false)
     }
 
+    /// Review Focus 1 (pre-flight finding 19: the iOS half of `DailyGateTests.lightSpeechStaysOnThePhone`):
+    /// the bar's listener is on the phone only, as a light household's Tell is.
+    @Test func lightSpeechStaysOnThePhone() {
+        #expect(DailyModel.makeListener().onDeviceOnly == true)
+        #expect(DailyModel.makeListener().onDeviceOnly == DailyGate.speechOnPhoneOnly(edition: .light))
+    }
+
+    /// The Lock Screen control or a `symphony://tell` link on light Today: the bar starts
+    /// listening if it is idle, and never finishes or restarts a listen already going.
+    @Test func aTellFromOutsideStartsTheBarListeningOnlyWhenIdle() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        m.tellAsked()
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.starts == 1)
+        m.tellAsked()
+        await scheduler.settle()
+        #expect(m.bar.mic == .listening)
+        #expect(listener.starts == 1)
+        #expect(listener.finishes == 0)
+    }
+
+    /// With speech off the bar types: a Tell from outside asks for the field instead.
+    @Test func aTellFromOutsideWithSpeechOffAsksForTheField() async throws {
+        let ctx = try walkTestContext()
+        listener.problemOnStart = "No speech here"
+        let m = model(ctx)
+        m.send(.micTapped)
+        await scheduler.settle()
+        #expect(m.bar.speechOff)
+        let asked = m.bar.fieldAsked
+        m.tellAsked()
+        await scheduler.settle()
+        #expect(m.bar.fieldAsked == asked + 1)
+        #expect(listener.starts == 1)
+    }
+
     // MARK: The day, the sign, the lit row
 
     @Test func aNewDayIsReadWhenTheAppComesBack() throws {

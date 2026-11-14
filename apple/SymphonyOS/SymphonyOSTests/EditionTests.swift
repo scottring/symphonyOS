@@ -46,6 +46,25 @@ struct EditionLastKnownTests {
         #expect(AppState().edition == .full)
     }
 
+    /// Review Focus 5: an invite accepted while a light page or its Inbox sheet is up
+    /// brings the full household's dock back at once, with nothing light left on top.
+    @MainActor @Test func leavingTheLightPagesBringsTheDockBack() {
+        let state = AppState()
+        state.dailyHidesDock = true
+        state.dailyPanel = .inbox
+        state.leaveDaily()
+        #expect(state.dailyHidesDock == false)
+        #expect(state.dailyPanel == nil)
+        #expect(state.bottomInset == state.dockHeight)
+    }
+
+    @MainActor @Test func noDockNoInset() {
+        let state = AppState()
+        #expect(state.bottomInset == state.dockHeight)
+        state.dailyHidesDock = true
+        #expect(state.bottomInset == 0)
+    }
+
     @Test func memoryIsPerUser() throws {
         let suite = "EditionMemoryTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))

@@ -10,7 +10,7 @@ enum DailyGate {
     /// `.glanceWide`, where a phone on its side keeps the old screens.
     static let layouts: Set<TodayLayout> = [.oneColumn]
     /// The add bar is built (Task 9).
-    static let barBuilt = false
+    static let barBuilt = true
     /// The light half-open display is built (Task 19).
     static let halfOpenBuilt = false
 
@@ -57,4 +57,11 @@ enum DailyGate {
         if walkIsWaiting(position) { return .waiting }
         return walkIsOffered(position, goalCount: goalCount, edition: edition) ? .whenReady : nil
     }
+}
+
+/// What opens over a light page from beside its bar: Inbox and More, each as a sheet
+/// (`AppState.dailyPanel`), since the dock that held them has given way.
+enum DailyPanel: String, Identifiable {
+    case inbox, more
+    var id: String { rawValue }
 }

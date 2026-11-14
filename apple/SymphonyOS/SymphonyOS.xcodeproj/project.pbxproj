@@ -95,6 +95,7 @@
 		61EBDB3A7C44135DE1B7F406 /* SymphonyList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFF39D03A032DEB889523B4 /* SymphonyList.swift */; };
 		643E1691CD4A09CF3180B1D7 /* QuickCaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */; };
 		64B72D487929953D9BF0468B /* RowMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C9315FE094AD463C763A78 /* RowMapper.swift */; };
+		65EA5B62549061DEBD864484 /* DailyBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 744676EA073E9F932BF2B720 /* DailyBarView.swift */; };
 		686DD09EC59D0AA6FA73BAA0 /* TimelineRevision.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F58C1D241835418FB0DB47 /* TimelineRevision.swift */; };
 		69089DEA64956955F94A7A21 /* WalkFootingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C417A13E7A5753F0A7280A58 /* WalkFootingTests.swift */; };
 		69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3550614A2441567DA7ED9B00 /* NordicColors.swift */; };
@@ -399,6 +400,7 @@
 		718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyOSUITests.swift; sourceTree = "<group>"; };
 		721AEC455BE4ADC539A2F13C /* DailyPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyPalette.swift; sourceTree = "<group>"; };
 		729A9989150DA6C5BAC4922C /* WalkWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkWords.swift; sourceTree = "<group>"; };
+		744676EA073E9F932BF2B720 /* DailyBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBarView.swift; sourceTree = "<group>"; };
 		74D46EFFA138731D79B29998 /* MountainPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountainPageTests.swift; sourceTree = "<group>"; };
 		762879785174DAA48771110A /* PlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerView.swift; sourceTree = "<group>"; };
 		76C2953FF3E1846C8971CA4D /* CarriedRoutines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedRoutines.swift; sourceTree = "<group>"; };
@@ -846,6 +848,7 @@
 			isa = PBXGroup;
 			children = (
 				6DB13AFD951099CA1FB80FD2 /* DailyBand.swift */,
+				744676EA073E9F932BF2B720 /* DailyBarView.swift */,
 				0682017A511AD69FB19A969B /* DailyNavRow.swift */,
 				721AEC455BE4ADC539A2F13C /* DailyPalette.swift */,
 				30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */,
@@ -1404,6 +1407,7 @@
 				FEAFECC06EEFC1ED6AE74E53 /* DailyAdd.swift in Sources */,
 				85FD64FFD573B054E19A391F /* DailyBand.swift in Sources */,
 				C10D6371BA71685E976DC1B5 /* DailyBar.swift in Sources */,
+				65EA5B62549061DEBD864484 /* DailyBarView.swift in Sources */,
 				9FFF3C3E678CFBE926AF8126 /* DailyClock.swift in Sources */,
 				4781ED40A58BF18C0BE6847F /* DailyCopy.swift in Sources */,
 				FDDCF7DABEBF1BCA94649B26 /* DailyDay.swift in Sources */,

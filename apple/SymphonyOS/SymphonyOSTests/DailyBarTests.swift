@@ -154,4 +154,36 @@ struct DailyBarTests {
         #expect(finishing.draft == "Water the plants")
         #expect(finishing.apply(.listenEnded) == [])
     }
+
+    /// "Calls made in this plan": the listening line, a note and Undo share one line slot above
+    /// the bar. While the light listens (or waits for the last words) the slot says so and the
+    /// field spans the width; otherwise the note, Undo beside it, either alone, or nothing.
+    @Test func theOneLineAboveTheBarShowsWhatIsNeededMost() {
+        let said = "It’s on Friday the 20th."
+        var bar = DailyBar()
+        #expect(bar.slot == .empty)
+        #expect(!bar.isListening)
+
+        _ = bar.apply(.did(note: said))
+        #expect(bar.slot == .say(note: said, undo: true))
+        _ = bar.apply(.noteExpired)
+        #expect(bar.slot == .say(note: nil, undo: true))
+
+        _ = bar.apply(.micTapped)                       // listening outranks the Undo still open
+        #expect(bar.isListening)
+        #expect(bar.slot == .listening)
+        _ = bar.apply(.heard("Call the plumber"))
+        _ = bar.apply(.micTapped)
+        #expect(bar.mic == .finishing)
+        #expect(bar.isListening)                        // waiting for the last words looks like listening
+        #expect(bar.slot == .listening)
+        _ = bar.apply(.listenEnded)
+        #expect(!bar.isListening)
+
+        var quiet = DailyBar()
+        _ = quiet.apply(.speechUnavailable)             // a note with no Undo
+        #expect(quiet.slot == .say(note: WalkCopy.speechOff, undo: false))
+        _ = quiet.apply(.noteExpired)
+        #expect(quiet.slot == .empty)
+    }
 }
