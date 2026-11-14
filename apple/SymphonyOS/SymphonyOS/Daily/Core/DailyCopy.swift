@@ -112,6 +112,12 @@ enum DailyCopy {
         (format(d, "EEE").uppercased(), format(d, "d"))
     }
 
+    /// The Any day group's label in the week, where a day reads ("TUE", "10").
+    static let anyDayLabel = (label: "Any", number: "day")
+
+    /// A move chip read aloud: the walk's own Move to, then the place ("Wed", "Any day").
+    static func moveTo(_ place: String) -> String { "\(WalkCopy.moveTo) \(place)" }
+
     /// A move chip: "Today", "Wed", or "Any day" with no day.
     static func chip(_ d: Date?, today: Date) -> String {
         guard let d else { return anyDay }
