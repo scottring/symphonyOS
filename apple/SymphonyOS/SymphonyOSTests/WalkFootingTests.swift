@@ -34,6 +34,23 @@ private func walk(step: Int, areas count: Int, perPost: Int = 1, ground: Bool = 
     return s
 }
 
+/// `areas` kept in this order, one flag on each on every level to `step` except the levels each
+/// area skips; ids depend only on the area and the level, so adding an area changes no other id.
+private func ridgeWalk(step: Int, areas: [WalkArea], skip: [UUID: Set<WalkLevel>] = [:]) -> WalkState {
+    var s = WalkState()
+    s.areas = areas
+    s.kept = areas.map(\.id)
+    s.step = step
+    for raw in 1...min(step, 4) {
+        let level = WalkLevel(rawValue: raw)!
+        for a in areas where !(skip[a.id]?.contains(level) ?? false) {
+            let n = Int(a.id.uuidString.suffix(4), radix: 16)! * 10 + raw
+            s.items.append(WalkItem(id: uid(60_000 + n), level: level, title: "Flag", areaId: a.id))
+        }
+    }
+    return s
+}
+
 private func post(_ layout: WalkLayout, _ level: WalkLevel, _ column: UUID?) -> WalkLayout.Post? {
     layout.posts.first { $0.key == WalkPostKey(level: level, column: column) }
 }
@@ -67,8 +84,88 @@ struct WalkFootingTests {
                 }
                 #expect(Set(posts.map(\.lean)).count > 1, "ground \(ground) \(count): every post leans alike")
                 #expect(Set(posts.map(\.base.y)).count > 1, "ground \(ground) \(count): every post on one line")
+                // Up to five areas there is always room: nobody is squeezed, so the 6 pt above is checked for every pair.
+                #expect(count >= 6 || posts.allSatisfy { !$0.squeezed }, "ground \(ground) \(count): \(posts.filter(\.squeezed).map(\.id))")
             }
         }
+        // Season and below, a column with no post between two posts: the two posts are the neighbours.
+        var pairs = 0
+        for count in 3...5 {
+            for gap in 1..<(count - 1) {
+                for step in 2...4 {
+                    let areas = Array(ridge.prefix(count))
+                    let skip = [areas[gap].id: Set([WalkLevel.season, .month, .week])]
+                    let layout = WalkLayout.make(ridgeWalk(step: step, areas: areas, skip: skip), today: today)
+                    for raw in 2...step {
+                        let posts = layout.posts.filter { $0.key.level.rawValue == raw }.sorted { $0.base.x < $1.base.x }
+                        #expect(posts.count == count - 1)
+                        // On Season's own step nothing crowds them, so no one may be squeezed; further down a
+                        // post may be damped to keep clear of the small flags above it, and is then excused.
+                        #expect(step > 2 || posts.allSatisfy { !$0.squeezed }, "\(count) areas, gap \(gap), step \(step), level \(raw)")
+                        for (a, b) in zip(posts, posts.dropFirst()) where !a.squeezed && !b.squeezed {
+                            pairs += 1
+                            #expect(abs(a.footing - b.footing) >= WalkFooting.apart * scale(of: layout, raw) - 0.001,
+                                    "\(count) areas, gap \(gap), step \(step), level \(raw): \(a.id) \(a.footing) beside \(b.id) \(b.footing)")
+                        }
+                    }
+                }
+            }
+        }
+        #expect(pairs >= 30, "\(pairs) pairs checked")
+    }
+
+    /// A level's drawn scale, read off a small flag (20 pt tall at scale 1); 1 for anything else.
+    private func scale(of layout: WalkLayout, _ raw: Int) -> CGFloat {
+        layout.posts.first { $0.key.level.rawValue == raw }?.banners.first { $0.kind == .tip }.map { $0.frame.height / 20 } ?? 1
+    }
+
+    /// A neighbour's arrival nudges at most its immediate drawn neighbours; every other post keeps its footing.
+    @Test func anArrivingAreaMovesOnlyItsNeighbours() {
+        let newcomer = ridge[7]
+        var compared = 0
+        for count in 2...7 {
+            for at in [0, 1, count / 2] {
+                for step in 2...4 {
+                    let before = Array(ridge.prefix(count))
+                    var after = before
+                    after.insert(newcomer, at: at)
+                    let a = WalkLayout.make(ridgeWalk(step: step, areas: before), today: today)
+                    let b = WalkLayout.make(ridgeWalk(step: step, areas: after), today: today)
+                    for raw in 2...step {
+                        let level = WalkLevel(rawValue: raw)!
+                        let order = b.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }.map(\.key.column)
+                        guard let i = order.firstIndex(of: newcomer.id) else { Issue.record("no newcomer post"); continue }
+                        let neighbours = Set([i - 1, i + 1].filter(order.indices.contains).map { order[$0] })
+                        // A post damped to keep a rule (columns move sideways when an area arrives) is not this test's business.
+                        for p in a.posts where p.key.level == level && !neighbours.contains(p.key.column) && !p.squeezed {
+                            let q = post(b, level, p.key.column)!
+                            guard !q.squeezed else { continue }
+                            compared += 1
+                            #expect(abs(p.footing - q.footing) < 0.0001,
+                                    "\(count) areas, newcomer at \(at), step \(step), \(level): \(p.id) \(p.footing) → \(q.footing)")
+                        }
+                    }
+                }
+            }
+        }
+        #expect(compared > 50, "\(compared) posts compared")
+    }
+
+    /// One crowded post never levels the rest: a natural layout equals the ruled one only where
+    /// every post was squeezed by a conflict of its own. (The wholesale fall back to the ruled layout
+    /// is an `assertionFailure`, so any generated state reaching it fails this test outright; before
+    /// the fix 5 states reached it, now 2 states end level, each post damped by its own conflict.)
+    @Test func oneCrowdedPostNeverLevelsTheRest() {
+        var flattened: [String] = []
+        for s in Generated.states() {
+            let natural = WalkLayout.make(s, today: today)
+            guard !natural.posts.isEmpty else { continue }
+            let level = WalkLayout.make(s, today: today, footing: .level)
+            let same = zip(natural.posts, level.posts).allSatisfy { $0.base == $1.base && $0.lean == 0 && $0.banners.map(\.frame) == $1.banners.map(\.frame) }
+            #expect(!same || natural.posts.allSatisfy(\.squeezed), "\(Generated.describe(s))")
+            if natural.posts.allSatisfy({ $0.lean == 0 && $0.footing == 0 }) { flattened.append(Generated.describe(s)) }
+        }
+        #expect(flattened.count <= 2, "\(flattened.count) layouts end level: \(flattened.prefix(3))")
     }
 
     @Test func everythingStaysWithinItsBounds() {
