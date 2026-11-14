@@ -73,6 +73,8 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 - The Year camera stop is −495 (`WalkArt`), not the mockup's −553, so the peak labels clear the orb.
 - When examples are short of room, your own flags on that post fold to one line carrying "+n"; at least one example always shows.
 - On a crowded ridge (six or more columns) one post is open at a time, and its banners narrow to the gap between its neighbours (never below 44 pt).
+- Posts are planted by hand (`WalkFooting.natural`, `Walk/Core/WalkFooting.swift`): a base up to 10 pt off its band line (neighbours at least 6 apart where the peak labels leave room), a bare pole of 18 to 34, a lean of up to 1.5°, each cloth up to 0.9° askew and 2.5 pt off the pole. It is fixed by identity (a hash of the post key or item id), never random, and the same on every step; a label moves with its peak's Year post.
+- The hand only moves and turns what the ruled layout stacked: folds, counts and the open post never change. Where it would break a rule or pile one thing onto another, that post's hand shrinks toward level. `WalkFooting.level` is the contract's ruled geometry; the tests that pin the contract's numbers use it, and the generated-state sweep runs on both, measured on what is drawn.
 - Sounds are synthesized placeholders until the recordings land in `Resources/WalkSounds`. They are silent while the walk's own listening holds the audio session; haptics always play, sound off or not.
 - The ending's rows are today's own personal tasks (planted by the walk or not) and exist only on step 6.
 

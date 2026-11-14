@@ -14,17 +14,43 @@ struct WalkLayout: Equatable {
     struct Camera: Equatable { var x: CGFloat; var y: CGFloat; var k: CGFloat }      // stage = (world − (x, y)) × k
     enum Kind: Equatable { case full, compact, tip, stub(Int), ghost }
     struct Banner: Equatable, Identifiable { let id: String; let itemId: UUID?; let level: WalkLevel; let kind: Kind
-        let frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool; let label: String
+        var frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool; let label: String
         /// Look back up: a banner that also stands for this many older flags ("+n"); a tap opens its post as a stub's does.
         var more: Int? = nil
         /// A tap does something (its label says what); VoiceOver reads one that does not as plain text.
-        var taps: Bool = true }
+        var taps: Bool = true
+        /// The hand (`WalkFooting`): degrees the cloth hangs off its post's line, and points it sits off the pole.
+        var tilt: Double = 0
+        var shift: CGFloat = 0
+        /// As drawn: `frame` (already moved with its post's footing, lean and the shift) turned
+        /// `turn` degrees clockwise (the post's lean plus the tilt) about `pivot`, where the cloth meets its pole.
+        var turn: Double = 0
+        var pivot: CGPoint = .zero
+
+        /// The drawn outline's corners, and their bounding box: what the layout's guarantees are measured on.
+        var corners: [CGPoint] { WalkTurn.corners(frame, degrees: turn, about: pivot) }
+        var drawn: CGRect { turn == 0 ? frame : WalkTurn.bounds(corners) }
+        /// `pivot` as a fraction of the frame, for the view's rotation anchor.
+        var pivotUnit: CGPoint {
+            CGPoint(x: frame.width > 0 ? (pivot.x - frame.minX) / frame.width : 0.5,
+                    y: frame.height > 0 ? (pivot.y - frame.minY) / frame.height : 0)
+        } }
+    /// `base` is where the pole stands, its footing included; the pole rises `base.y − top`
+    /// along a line leaning `lean` degrees clockwise about `base`.
     struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
-        let opacity: Double; let saturation: Double; let pale: Bool; let banners: [Banner] }
+        let opacity: Double; let saturation: Double; let pale: Bool; let banners: [Banner]
+        /// The hand: how far `base` stands below (+) or above (−) the band line, the lean, the bare pole.
+        var footing: CGFloat = 0
+        var lean: Double = 0
+        var pole: CGFloat = WalkLayout.pole
+        /// The hand was reduced here (no room for it, or no room to stand apart from a neighbour).
+        var squeezed: Bool = false }
     struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
         let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String?
         /// For VoiceOver: kept, on the ground; focused, off it.
-        var selected: Bool = false }
+        var selected: Bool = false
+        /// How far the label moved with its peak's Year post (its post's `footing`).
+        var footing: CGFloat = 0 }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let needleDown: Bool
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
@@ -41,8 +67,10 @@ struct WalkLayout: Equatable {
     static let fitTolerance: CGFloat = 0.01     // a fold's ceiling comparisons forgive rounding
     static let narrowest: CGFloat = 44          // a banner narrowed between neighbouring stubs
 
-    static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare) -> WalkLayout {
-        Builder(state, today: today, art: art).layout()
+    /// `footing`: `.natural` plants the posts by hand (the app); `.level` is the contract's ruled geometry.
+    static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare,
+                     footing: WalkFooting = .natural) -> WalkLayout {
+        Builder(state, today: today, art: art, footing: footing).layout()
     }
 
     /// How many lines a title takes at a banner width: a character estimate, so the core needs no fonts.
@@ -93,8 +121,12 @@ private struct Builder {
     let zoomed: Bool
     let bw: CGFloat
     let compactWidth: CGFloat
+    let footing: WalkFooting
+    /// How much of its hand each post keeps (1 when absent); a label goes with its column's Year post.
+    var damp: [WalkPostKey: CGFloat] = [:]
 
-    init(_ s: WalkState, today: Date, art: WalkArt) {
+    init(_ s: WalkState, today: Date, art: WalkArt, footing: WalkFooting) {
+        self.footing = footing
         self.s = s
         self.today = today
         self.art = art
@@ -220,14 +252,20 @@ private struct Builder {
 
     // MARK: The layout
 
+    /// The flags are stacked once, ruled: folds, counts and which post is open never depend on the
+    /// hand. Then each post is planted: ruled, exactly where it was stacked; by hand, moved and
+    /// turned as one piece (`plant`). Every post or label whose drawing then breaks one of the
+    /// layout's guarantees, or meets a flag or label the ruled layout keeps it clear of, keeps
+    /// less of its hand (all, half, a quarter, none) and is planted again: order first, charm
+    /// second. If that does not settle it, the ruled layout, which keeps them all.
     func layout() -> WalkLayout {
         // Top down, so a level knows the flags risen above it and every frame above it.
-        var posts: [L.Post] = []
+        var stacked: [L.Post] = []
         var risen: [CGRect] = []
         var above: [CGRect] = []
         for lvl in levelsDrawn() {
             let made = self.posts(on: lvl, risenAbove: risen, framesAbove: above)
-            posts += made.posts
+            stacked += made.posts
             risen = made.risen
             above += made.posts.flatMap(\.banners).map(\.frame)
         }
@@ -241,7 +279,27 @@ private struct Builder {
         } else {
             needle = false
         }
-        return WalkLayout(camera: camera, labels: labels(), posts: posts, needleDown: needle)
+        let feet = Dictionary(uniqueKeysWithValues: Set(stacked.map(\.key.level)).union([.year]).map { ($0, footings($0)) })
+        func planted(_ b: Builder) -> WalkLayout {
+            WalkLayout(camera: camera, labels: b.labels(feet[.year]!), posts: stacked.map { b.plant($0, feet[$0.key.level]!) },
+                       needleDown: needle)
+        }
+        guard footing == .natural else { return planted(self) }
+        var flat = self
+        flat.damp = Dictionary(uniqueKeysWithValues: columns.flatMap { c in
+            WalkLevel.allCases.map { (WalkPostKey(level: $0, column: c.id), CGFloat(0)) }
+        })
+        let ruled = planted(flat)
+        var builder = self
+        for _ in 0..<12 {
+            let made = planted(builder)
+            let found = builder.conflicts(made, ruled: ruled)
+            if found.isEmpty { return made }
+            let squeeze = found.filter { builder.sigma($0) > 0 }
+            if squeeze.isEmpty { break }
+            for key in squeeze { builder.damp[key] = builder.sigma(key) > 0.5 ? 0.5 : (builder.sigma(key) > 0.25 ? 0.25 : 0) }
+        }
+        return ruled
     }
 
     /// Steps 1 to 5 draw their level and the ones above; Look back up draws all; Welcome none.
@@ -253,14 +311,35 @@ private struct Builder {
     // MARK: Labels
 
     /// Welcome shows the bare vista: no labels, as no posts (at its far zoom they could not keep apart).
-    func labels() -> [L.Label] {
+    /// `feet`: the Year level's footings (a label moves with its peak's Year post).
+    func labels(_ feet: [(value: CGFloat, apart: Bool)]) -> [L.Label] {
         guard s.step >= 1 else { return [] }
+        let d = CGFloat(max(0, min(s.step, 6) - 1))
+        let tappable = s.ground || s.step == 1
+        let slots = labelSlots()
+        return columns.enumerated().compactMap { i, column -> L.Label? in
+            guard let area = column.area, let slot = slots[i] else { return nil }
+            let kept = s.kept.contains(area.id)
+            let focused = !s.ground && s.focusArea == area.id
+            let opacity = s.ground ? (kept ? 1 : 0.62) : max(0.5, 1 - 0.1 * d)
+            // A label stands under its peak's Year post and moves with it.
+            let footing = feet[i].value * sigma(WalkPostKey(level: .year, column: area.id))
+            return L.Label(id: area.id, name: area.name, frame: footing == 0 ? slot.frame : slot.frame.offsetBy(dx: 0, dy: footing),
+                           kept: kept, focused: focused, opacity: Double(opacity), tappable: tappable,
+                           hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
+                           selected: tappable && (s.ground ? kept : focused), footing: footing)
+        }
+    }
+
+    /// The labels where the contract puts them (before footing), by column index, with their row
+    /// (1: the lower of two staggered rows) and scale.
+    func labelSlots() -> [Int: (frame: CGRect, row: Int, scale: CGFloat)] {
+        guard s.step >= 1 else { return [:] }
         let cnt = columns.count
         let rows = cnt > 3
         let width = rows ? min(90, floor(2 * gap - 6)) : 90
         let d = CGFloat(max(0, min(s.step, 6) - 1))
         let scale = s.ground ? 1 : max(0.6, 1 - 0.1 * d)
-        let tappable = s.ground || s.step == 1
         let yearY = stageY(.year)
         // When labels stagger, the one nearest the stage's centre stays on the upper row, clear of the light.
         let labeledXs = columns.enumerated().filter { $0.element.area != nil }.map { ($0.offset, stageX($0.element.worldX)) }
@@ -269,20 +348,162 @@ private struct Builder {
             let da = abs(a.1 - L.centreX), db = abs(b.1 - L.centreX)
             return abs(da - db) < 0.01 ? a.0 < b.0 : da < db
         }?.0 ?? 0
-        return columns.enumerated().compactMap { i, column -> L.Label? in
-            guard let area = column.area else { return nil }
-            let top = yearY + 3 + CGFloat(rows ? abs(i - centre) % 2 : 0) * 34
-            guard top >= L.question else { return nil }        // zoomed low, the peaks are in the question
-            let kept = s.kept.contains(area.id)
-            let focused = !s.ground && s.focusArea == area.id
-            let opacity = s.ground ? (kept ? 1 : 0.62) : max(0.5, 1 - 0.1 * d)
-            let frame = slid(CGRect(x: stageX(column.worldX) - width * scale / 2, y: top,
-                                    width: width * scale, height: 30 * scale))
-            return L.Label(id: area.id, name: area.name, frame: frame, kept: kept, focused: focused,
-                           opacity: Double(opacity), tappable: tappable,
-                           hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
-                           selected: tappable && (s.ground ? kept : focused))
+        var out: [Int: (frame: CGRect, row: Int, scale: CGFloat)] = [:]
+        for (i, column) in columns.enumerated() where column.area != nil {
+            let row = rows ? abs(i - centre) % 2 : 0
+            let top = yearY + 3 + CGFloat(row) * 34
+            guard top >= L.question else { continue }        // zoomed low, the peaks are in the question
+            out[i] = (slid(CGRect(x: stageX(column.worldX) - width * scale / 2, y: top, width: width * scale, height: 30 * scale)),
+                      row, scale)
         }
+        return out
+    }
+
+    // MARK: The hand
+
+    /// How much of its hand a post keeps: none when level, else all unless there was no room.
+    func sigma(_ key: WalkPostKey) -> CGFloat { footing == .level ? 0 : damp[key] ?? 1 }
+
+    /// The scale a level's posts are drawn at (a distant level's small flags shrink).
+    func tipScale(_ lvl: WalkLevel) -> CGFloat {
+        let d = max(0, min(s.step, 6) - lvl.rawValue)
+        return max(0.6, 1 - 0.1 * CGFloat(d - 1))
+    }
+    func drawnScale(_ lvl: WalkLevel) -> CGFloat { kind(of: lvl) == .tip ? tipScale(lvl) : 1 }
+
+    /// Each column's footing on a level before damping, by column index, from its post's identity:
+    /// within ±`WalkFooting.ground` × the level's scale and, left to right, at least
+    /// `WalkFooting.apart` × scale from its left neighbour's. On Year it keeps to the room its
+    /// peak's label has: clear of the light and the question, its staggered row clear of the
+    /// neighbour's in the other row, and (where peaks take taps on a crowded ridge) a stub standing
+    /// on its base clear of the neighbour's label. Where that room is narrower than `apart`, the
+    /// two stand as far apart as it allows and `apart` is false: the older guarantee wins.
+    func footings(_ lvl: WalkLevel) -> [(value: CGFloat, apart: Bool)] {
+        let k = drawnScale(lvl)
+        let reach = WalkFooting.ground * k, gapY = WalkFooting.apart * k
+        let slots = lvl == .year ? labelSlots() : [:]
+        let stubsBesideLabels = lvl == .year && (s.step == 1 || s.ground) && !hasRoom([kind(of: lvl)], scale: k)
+        let margin: CGFloat = 1.5            // what a lean and a tilt may add to a stub's or a cloth's corner
+        var out: [(value: CGFloat, apart: Bool)] = []
+        for (i, column) in columns.enumerated() {
+            var lo = -reach, hi = reach
+            if let slot = slots[i] {
+                hi = min(hi, max(0, orbRoom(slot.frame)))
+                lo = max(lo, min(0, L.question - slot.frame.minY))
+            }
+            if i > 0, let left = out.last?.value, let mine = slots[i], let other = slots[i - 1], mine.row != other.row {
+                let (upper, lower) = mine.row == 0 ? (mine, other) : (other, mine)
+                let lowerX = stageX(columns[mine.row == 1 ? i : i - 1].worldX)
+                // The lower row's footing less the upper's may not fall below −room, nor (a stub beside a label) rise above +room.
+                var down = -CGFloat.infinity, up = CGFloat.infinity
+                if upper.frame.maxX > lower.frame.minX, lower.frame.maxX > upper.frame.minX {
+                    down = -(lower.frame.minY - upper.frame.maxY - 0.5)
+                }
+                if stubsBesideLabels, lowerX + 13 * k + margin > upper.frame.minX, lowerX - 13 * k - margin < upper.frame.maxX {
+                    up = upper.frame.minY - stageY(.year) - margin
+                }
+                if mine.row == 1 { lo = max(lo, left + down); hi = min(hi, left + up) } else { lo = max(lo, left - up); hi = min(hi, left - down) }
+            }
+            if lo > hi { lo = (lo + hi) / 2; hi = lo }           // no room at all: the middle; `layout`'s loop does the rest
+            let clamp = { (v: CGFloat) in min(hi, max(lo, v)) }
+            let raw = CGFloat(WalkFooting.hand(postId(WalkPostKey(level: lvl, column: column.id)), "footing")) * reach
+            var value = clamp(raw), apart = true
+            if let left = out.last?.value, abs(value - left) < gapY {
+                let candidates = [left + gapY, left - gapY].map(clamp)
+                if let best = candidates.filter({ abs($0 - left) >= gapY - 0.0001 }).min(by: { abs($0 - raw) < abs($1 - raw) }) {
+                    value = best
+                } else {
+                    // Not room enough to stand apart: where its own hand puts it within the room there is,
+                    // drawn a little back toward the line so a long ridge does not wander off it.
+                    let u = min(1, max(0, (raw / reach + 1) / 2 - left / reach / 2))
+                    value = lo + (hi - lo) * u
+                    apart = false
+                }
+            }
+            out.append((value, apart))
+        }
+        return out
+    }
+
+    /// How far a label may sink and stay clear of the light (its ring and ticks plus 4 pt while it shows).
+    func orbRoom(_ r: CGRect) -> CGFloat {
+        let c = WalkOrb.centre
+        let clear: CGFloat = (s.step <= 5 ? 74 : WalkOrb.radius) + 0.1
+        let dx = max(0, r.minX - c.x, c.x - r.maxX)
+        guard dx < clear else { return .infinity }
+        return c.y - (clear * clear - dx * dx).squareRoot() - r.maxY
+    }
+
+    /// The bare pole under a post's lowest banner.
+    func pole(_ key: WalkPostKey) -> CGFloat {
+        let u = (CGFloat(WalkFooting.hand(postId(key), "pole")) + 1) / 2
+        let raw = WalkFooting.pole.lowerBound + u * (WalkFooting.pole.upperBound - WalkFooting.pole.lowerBound)
+        return L.pole + (raw - L.pole) * sigma(key)
+    }
+
+    /// A stacked post, planted: its base a little above or below the band line (`feet`, by column),
+    /// a stack standing on the bare pole raised or lowered with the pole's length (small flags and
+    /// stubs stand on the base itself), the post leaning about its base, each cloth hanging askew
+    /// and a little off the pole line. Frames move with the post as one piece, so a stack stays a
+    /// stack; each banner is turned about where it meets its pole. A small flag does not shift off
+    /// its pole. With no hand left (`sigma` 0) the post is exactly as stacked.
+    func plant(_ post: L.Post, _ feet: [(value: CGFloat, apart: Bool)]) -> L.Post {
+        let key = post.key, sigma = sigma(key)
+        let foot = feet[columns.firstIndex { $0.id == key.column }!]
+        let footing = foot.value * sigma, pole = pole(key)
+        let onPole = post.banners.map(\.frame.maxY).max().map { abs($0 - (post.base.y - L.pole)) < L.fitTolerance } ?? true
+        let dy = footing - (onPole ? pole - L.pole : 0)
+        let base = CGPoint(x: post.base.x, y: post.base.y + footing)
+        let banners = dy == 0 ? post.banners : post.banners.map { b -> L.Banner in
+            var b = b
+            b.frame = b.frame.offsetBy(dx: 0, dy: dy)
+            return b
+        }
+        var planted = L.Post(id: post.id, key: key, base: base, top: post.top + dy, opacity: post.opacity,
+                             saturation: post.saturation, pale: post.pale, banners: banners)
+        planted.footing = footing
+        planted.pole = pole
+        planted.squeezed = self.footing == .natural && (sigma < 1 || !foot.apart)
+        let small = kind(of: key.level) == .tip && s.expanded != key
+        return dress(planted, scale: small ? tipScale(key.level) : 1)
+    }
+
+    /// The post's lean and each cloth's tilt and shift (see `plant`).
+    func dress(_ post: L.Post, scale: CGFloat) -> L.Post {
+        let sigma = sigma(post.key)
+        let lean = WalkFooting.hand(post.id, "lean") * WalkFooting.lean * Double(sigma)
+        let banners = post.banners.map { b -> L.Banner in
+            var b = b
+            let who = b.itemId?.uuidString ?? (b.kind == .ghost ? "example:\(b.text)" : b.id)
+            b.tilt = WalkFooting.hand(who, "tilt") * WalkFooting.tilt * Double(sigma)
+            let unit: CGFloat = b.kind == .tip ? 0 : (b.kind == .full || b.kind == .ghost || b.kind == .compact ? 1 : scale)
+            b.shift = CGFloat(WalkFooting.hand(who, "shift")) * WalkFooting.shift * unit * sigma
+            let p0 = CGPoint(x: min(max(post.base.x, b.frame.minX), b.frame.maxX), y: b.frame.minY)
+            if lean == 0 && b.shift == 0 {
+                b.pivot = p0
+            } else {
+                let r = CGFloat(lean * .pi / 180)
+                let on = WalkTurn.turned(p0, degrees: lean, about: post.base)
+                b.pivot = CGPoint(x: on.x + b.shift * cos(r), y: on.y + b.shift * sin(r))
+                b.frame = b.frame.offsetBy(dx: b.pivot.x - p0.x, dy: b.pivot.y - p0.y)
+            }
+            b.turn = lean + b.tilt
+            // Unzoomed, a cloth whose drawing would leave the screen slides back inside, as its frame did.
+            if !zoomed, b.kind != .tip, b.turn != 0 {
+                let d = b.drawn
+                let dx = d.minX < L.edges.lowerBound ? L.edges.lowerBound - d.minX
+                    : (d.maxX > L.edges.upperBound ? L.edges.upperBound - d.maxX : 0)
+                if dx != 0 { b.frame = b.frame.offsetBy(dx: dx, dy: 0); b.pivot.x += dx }
+            }
+            return b
+        }
+        var dressed = L.Post(id: post.id, key: post.key, base: post.base, top: post.top, opacity: post.opacity,
+                             saturation: post.saturation, pale: post.pale, banners: banners)
+        dressed.footing = post.footing
+        dressed.lean = lean
+        dressed.pole = post.pole
+        dressed.squeezed = post.squeezed
+        return dressed
     }
 
     // MARK: Posts on one level
@@ -493,6 +714,101 @@ private struct Builder {
                           pale: post.pale, banners: post.banners)
         }
         return (posts, risen)
+    }
+
+    /// The posts (and labels, by their column's Year post) whose drawing breaks a guarantee the
+    /// ruled layout gives, measured on what is drawn: banners of one level meet (two on one post
+    /// by their turned outlines, as a stack turns as one; any other pair by bounding boxes); a
+    /// banner covers a label that takes taps, or a risen flag above the step; looking back up, flags
+    /// of two levels meet; labels meet, sit in the question or on the light; anything meets the orb,
+    /// leaves the screen's edges unzoomed (a small flag excepted) or the world; a flag rises into
+    /// the question (but the step's own newest alone) or a stub above its ceiling; examples are on
+    /// and none shows. And, measured against `ruled` (the hand never piles one thing onto another):
+    /// two posts' flags meet that it keeps apart, or a flag (not the step's own) covers more of a label than it does.
+    func conflicts(_ made: WalkLayout, ruled: WalkLayout) -> Set<WalkPostKey> {
+        var bad: Set<WalkPostKey> = []
+        let e = L.fitTolerance
+        func overlap(_ a: CGRect, _ b: CGRect) -> Bool {
+            a.minX < b.maxX - e && b.minX < a.maxX - e && a.minY < b.maxY - e && b.minY < a.maxY - e
+        }
+        func orbDistance(_ r: CGRect) -> CGFloat {
+            let c = WalkOrb.centre
+            return hypot(c.x - min(max(c.x, r.minX), r.maxX), c.y - min(max(c.y, r.minY), r.maxY))
+        }
+        let placed = made.posts.flatMap { post in post.banners.map { (post: post, banner: $0, drawn: $0.drawn) } }
+        let ruledFrames = Dictionary(ruled.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
+        let ruledLabels = Dictionary(ruled.labels.map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
+        /// The hand covers more of one thing with another than the ruled layout does (by more than 4 pt²).
+        func piles(_ a: CGRect, _ b: CGRect, ruledA: CGRect?, ruledB: CGRect?) -> Bool {
+            guard overlap(a, b), let ruledA, let ruledB else { return false }
+            let area = { (x: CGRect, y: CGRect) -> CGFloat in
+                let i = x.intersection(y)
+                return i.isNull ? 0 : i.width * i.height
+            }
+            return area(a, b) > area(ruledA, ruledB) + 4
+        }
+        let labelKey = { (l: L.Label) in WalkPostKey(level: .year, column: l.id) }
+
+        for i in placed.indices {
+            let a = placed[i]
+            for j in placed.indices where j > i {
+                let b = placed[j]
+                let meet: Bool
+                if a.post.id == b.post.id {
+                    meet = WalkTurn.meet(a.banner.corners, b.banner.corners)
+                } else if a.banner.level == b.banner.level || s.step >= 6 {
+                    meet = overlap(a.drawn, b.drawn)
+                } else if let level, (2...5).contains(s.step) {
+                    // The step's own flag over a flag risen from the level above.
+                    let covers = { (own: L.Banner, risen: L.Banner) in
+                        own.level == level && risen.level.rawValue == level.rawValue - 1 && risen.kind == .compact && risen.glows
+                    }
+                    meet = (covers(a.banner, b.banner) || covers(b.banner, a.banner)) && overlap(a.drawn, b.drawn)
+                } else {
+                    meet = false
+                }
+                // Whatever the rules allow, the hand does not make two posts' flags meet that the ruled layout keeps apart.
+                // Flags the ruled layout keeps apart stay apart (where it already lets one pass in front of another, it may).
+                let piled = !meet && a.post.id != b.post.id && overlap(a.drawn, b.drawn)
+                    && ruledFrames[a.banner.id].map { r in ruledFrames[b.banner.id].map { !overlap(r, $0) } ?? false } == true
+                if meet || piled { bad.insert(a.post.key); bad.insert(b.post.key) }
+            }
+        }
+        let labelsTakeTaps = s.step == 1 || s.ground
+        for (i, l) in made.labels.enumerated() {
+            for m in made.labels[(i + 1)...] where overlap(l.frame, m.frame) { bad.insert(labelKey(l)); bad.insert(labelKey(m)) }
+            for p in placed where overlap(l.frame, p.drawn) {
+                // A label that takes taps is never covered; any other no more than the ruled layout covers it,
+                // except by the step's own flags, which stand in front of the peaks by design.
+                if labelsTakeTaps || (p.banner.level != level
+                    && piles(l.frame, p.drawn, ruledA: ruledLabels[l.id], ruledB: ruledFrames[p.banner.id])) { bad.insert(labelKey(l)); bad.insert(p.post.key) }
+            }
+            if (s.step <= 5 && orbDistance(l.frame) < 74) || orbDistance(l.frame) <= WalkOrb.radius
+                || l.frame.minY < L.question - e || (!zoomed && (l.frame.minX < L.edges.lowerBound - e || l.frame.maxX > L.edges.upperBound + e)) {
+                bad.insert(labelKey(l))
+            }
+        }
+        for p in placed {
+            let d = p.drawn
+            let world = CGRect(x: d.minX / camera.k + camera.x, y: d.minY / camera.k + camera.y,
+                               width: d.width / camera.k, height: d.height / camera.k)
+            let outside = !zoomed && p.banner.kind != .tip && (d.minX < L.edges.lowerBound - e || d.maxX > L.edges.upperBound + e)
+            let question = !(p.post.key.level == level && p.post.banners.count == 1) && d.minY < L.question - e
+            var stubHigh = false
+            if case .stub = p.banner.kind { stubHigh = d.minY < ceiling(p.post.key.level) - e }
+            if orbDistance(d) <= WalkOrb.radius || outside || question || stubHigh
+                || world.minX < 0 || world.maxX > art.world.width || world.minY < 0 || world.maxY > art.world.height {
+                bad.insert(p.post.key)
+            }
+        }
+        // No example found room: its post, and whatever stands over it (its level, the level above), keep less.
+        if let level, !ghosts.isEmpty, !made.posts.contains(where: { $0.banners.contains { $0.kind == .ghost } }) {
+            bad.insert(WalkPostKey(level: level, column: ghostColumn))
+            for post in made.posts where post.key.level == level || post.key.level.rawValue == level.rawValue - 1 {
+                bad.insert(post.key)
+            }
+        }
+        return bad
     }
 
     /// Neighbouring columns' flags, on stage at this camera, stand at least 6 apart,
