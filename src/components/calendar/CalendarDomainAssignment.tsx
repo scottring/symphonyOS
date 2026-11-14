@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { calendarSource } from '@/lib/calendar/calendarSource'
+import { calendarNameNote, calendarsShownNowhere, mainCalendarsFirst } from '@/lib/calendar/calendarNameNote'
 import { Check, Eye, Calendar, Info, AlertTriangle, Briefcase, Users, User } from 'lucide-react'
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
@@ -16,7 +17,8 @@ const DOMAINS: { value: TaskContext; label: string; color: string; icon: typeof 
   { value: 'personal', label: 'Personal', color: 'bg-purple-500', icon: User },
 ]
 
-export function CalendarDomainAssignment({ calendars, onSave, onBack }: CalendarDomainAssignmentProps) {
+export function CalendarDomainAssignment({ calendars: given, onSave, onBack }: CalendarDomainAssignmentProps) {
+  const calendars = mainCalendarsFirst(given)
   // Initialize with smart defaults
   const getSmartDefault = (calendar: GoogleCalendarInfo): TaskContext[] => {
     const email = calendar.email.toLowerCase()
@@ -84,6 +86,8 @@ export function CalendarDomainAssignment({ calendars, onSave, onBack }: Calendar
 
   const domainValidation = getDomainValidation()
   const allDomainsValid = Object.values(domainValidation).every(v => v)
+
+  const shownNowhere = calendarsShownNowhere(calendars, assignments)
 
   const handleSave = () => {
     onSave(assignments)
@@ -153,6 +157,11 @@ export function CalendarDomainAssignment({ calendars, onSave, onBack }: Calendar
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-neutral-800 truncate">
                             {calendar.summary}
+                            {calendarNameNote(calendar, calendars) && (
+                              <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${calendar.primary ? 'bg-primary-100 text-primary-800' : 'bg-neutral-100 text-neutral-600'}`}>
+                                {calendarNameNote(calendar, calendars)}
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-neutral-500 truncate">
                             {/* Which account it is, when there are several; else the email if it differs from the name */}
@@ -206,6 +215,27 @@ export function CalendarDomainAssignment({ calendars, onSave, onBack }: Calendar
               You won't be able to create new events in domains without a writable calendar.
               You can still view events from read-only calendars.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Calendars with no area show nowhere: say which, before saving
+          (Scott, 2026-11-13 — his main calendar went missing silently). */}
+      {shownNowhere.length > 0 && (
+        <div role="alert" className="p-4 bg-warning-50 rounded-lg border border-warning-200 flex gap-3" data-testid="calendars-shown-nowhere">
+          <AlertTriangle className="w-5 h-5 text-warning-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-warning-900">
+            <p className="font-medium mb-1">
+              {shownNowhere.length === 1 ? 'This calendar won’t show anywhere' : 'These calendars won’t show anywhere'}
+            </p>
+            <ul className="text-warning-700">
+              {shownNowhere.map((c) => (
+                <li key={c.id}>
+                  {c.summary}{calendarNameNote(c, calendars) ? ` (${calendarNameNote(c, calendars)!.toLowerCase()})` : ''}
+                </li>
+              ))}
+            </ul>
+            <p className="text-warning-700 mt-1">Tick an area for it to see its events.</p>
           </div>
         </div>
       )}

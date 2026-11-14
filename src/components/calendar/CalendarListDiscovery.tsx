@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { calendarSource, whereFound } from '@/lib/calendar/calendarSource'
+import { calendarNameNote, mainCalendarsFirst } from '@/lib/calendar/calendarNameNote'
 import { Check, Eye, EyeOff, Briefcase, Users, User } from 'lucide-react'
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
@@ -50,7 +51,7 @@ export function CalendarListDiscovery({ calendars, onContinue, onBack }: Calenda
 
   const hasMappings = mappings.length > 0
 
-  const writableCalendars = calendars.filter(
+  const writableCalendars = mainCalendarsFirst(calendars).filter(
     cal => cal.accessRole === 'owner' || cal.accessRole === 'writer'
   )
   const readOnlyCalendars = calendars.filter(
@@ -90,6 +91,11 @@ export function CalendarListDiscovery({ calendars, onContinue, onBack }: Calenda
           <div className="flex-1 min-w-0">
             <p className={`font-medium truncate ${isHidden ? 'text-neutral-400' : 'text-neutral-800'}`}>
               {calendar.summary}
+              {calendarNameNote(calendar, calendars) && (
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${calendar.primary ? 'bg-primary-100 text-primary-800' : 'bg-neutral-100 text-neutral-600'}`}>
+                  {calendarNameNote(calendar, calendars)}
+                </span>
+              )}
             </p>
             {calendarSource(calendar, calendars) ? (
               <p className="text-sm text-neutral-500 truncate">{calendarSource(calendar, calendars)}</p>
