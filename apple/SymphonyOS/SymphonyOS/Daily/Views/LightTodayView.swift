@@ -49,7 +49,12 @@ struct LightTodayView: View {
             let m = metrics(waiting: line != nil)
             let low = lookBack.sheet(on: m, safeBottom: safeBottom)
             ZStack(alignment: .topLeading) {
-                if low != nil { plan } else { DailyBand(picture: m.picture, height: m.band.height) }
+                if low != nil {
+                    DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
+                                   today: model.today, me: userId, size: size)
+                } else {
+                    DailyBand(picture: m.picture, height: m.band.height)
+                }
                 DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 DailyNavRow(current: .today, gap: m.navGap, go: go)
                     .frame(width: size.width)
@@ -227,16 +232,6 @@ struct LightTodayView: View {
         .buttonStyle(.plain)
         .offset(x: frame.minX, y: frame.minY)
         .accessibilityIdentifier("daily.walkWaiting")
-    }
-
-    /// Behind the lowered sheet: the walk's own top-to-bottom plan, read only; a post's "+n" opens it.
-    private var plan: some View {
-        MountainStage(state: lookBack.plan(goals: goals, tasks: tasks, periods: model.periods, me: userId),
-                      today: model.today, onLabel: { _ in },
-                      onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) }) {
-            EmptyView()
-        }
-        .frame(width: size.width, height: size.height)
     }
 
     // MARK: Touches

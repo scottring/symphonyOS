@@ -26,7 +26,12 @@ struct LightWeekView: View {
     @Query private var goals: [Goal]
     @Query private var focus: [TaskFocus]
     @Query private var commitments: [TaskCommitment]
+    @Query private var goalAreas: [GoalArea]
     @State private var calendar = CalendarFeed.shared
+    /// This person's stored walk, read whenever the page appears and whenever a walk closes.
+    @State private var walkPosition: WalkPosition?
+    /// The sheet lowered by its handle over the whole plan, or not.
+    @State private var lookBack = DailyLookBack()
     /// The task whose words were tapped, and the day it stands on (nil: Any day, or none).
     @State private var chosen: Chosen?
     /// The fold opened: the days behind, then anything still open from earlier weeks.
@@ -53,23 +58,38 @@ struct LightWeekView: View {
     var body: some View {
         let week = read()
         let m = metrics
+        let low = lookBack.sheet(on: m, safeBottom: safeBottom)
         ZStack(alignment: .topLeading) {
-            DailyBand(picture: m.picture, height: m.band.height, veil: 0.97)
+            if low != nil {
+                DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
+                               today: model.today, me: userId, size: size)
+            } else {
+                DailyBand(picture: m.picture, height: m.band.height, veil: 0.97)
+            }
             DailyTopShade(solid: m.shadeSolid, height: m.shade)
-            DailyBandFlags(flags: DailyMetrics.bandFlags(bandGoals, width: size.width, navTop: m.navTop),
-                           open: { go(.month) })
+            if low == nil {
+                DailyBandFlags(flags: DailyMetrics.bandFlags(bandGoals, width: size.width, navTop: m.navTop),
+                               open: { go(.month) })
+            }
             DailyNavRow(current: .week, gap: m.navGap, go: go)
                 .frame(width: size.width)
                 .offset(y: m.navTop)
-            DailySheet(top: m.sheetTop, radius: m.sheetRadius, grabber: m.grabber, lookBack: m.lookBack,
-                       onLookBack: {}) {    // Task 15 wires the whole plan
-                header(week, m)
-                list(week, m)
+            DailySheet(top: low?.sheetTop ?? m.sheetTop, radius: m.sheetRadius, grabber: low?.grabber ?? m.grabber,
+                       lookBack: low?.lookBack ?? m.lookBack, onLookBack: handleTapped, label: lookBack.label(on: .week),
+                       strip: low?.strip) {
+                if let low {
+                    header(week, at: low.header)
+                } else {
+                    header(week, at: m.header)
+                    list(week, m)
+                }
             }
-            DailyPaperFade(fade: m.bar.fade, size: size)
-            if let chosen { movePanel(chosen, m) }
-            DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.week, periods: model.periods),
-                         listening: DailyCopy.listening(.week))
+            if low == nil {
+                DailyPaperFade(fade: m.bar.fade, size: size)
+                if let chosen { movePanel(chosen, m) }
+                DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.week, periods: model.periods),
+                             listening: DailyCopy.listening(.week))
+            }
             #if DEBUG
             Color.clear.frame(width: 0, height: 0)
                 .onAppear { applyDemoStates(week) }
@@ -81,7 +101,16 @@ struct LightWeekView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("daily.week")
         .task(id: calendar.readKey(for: weekStart)) { await calendar.refreshWeek(weekStart) }
-        .onAppear { model.page = .week }
+        .onAppear {
+            model.page = .week
+            readWalk()
+        }
+        .onChange(of: appState.walkPaused) { _, _ in readWalk() }
+        // A Tell taken while the whole plan shows: the sheet rises first, so the bar that answers is
+        // there (a Tell from outside also opens Today, which answers it).
+        .onChange(of: appState.tellRequested) { _, asked in
+            lookBack.tellArrives(asked: asked, walkShowing: appState.walkShowing)
+        }
         // The page went away: a pending pull-up is written and its Undo goes (the planner sends the same
         // when the app goes to the background).
         .onDisappear { model.send(.left) }
@@ -101,6 +130,16 @@ struct LightWeekView: View {
                             pulledUp: model.pulledUp)
     }
 
+    /// Where the walk is saved, as the main view reads it (the demo keeps its own store).
+    private var walkStore: WalkPositionStore {
+        #if DEBUG
+        if DemoMode.isOn { return DemoMode.walkStore }
+        #endif
+        return WalkPositionStore()
+    }
+
+    private func readWalk() { walkPosition = walkStore.load(for: userId) }
+
     private var metrics: DailyMetrics {
         let shape = DailyMetrics.shape(for: layout, height: size.height, safeTop: safeTop, safeBottom: safeBottom,
                                        waiting: false)
@@ -109,7 +148,7 @@ struct LightWeekView: View {
 
     // MARK: The sheet
 
-    private func header(_ week: DailyWeek.Week, _ m: DailyMetrics) -> some View {
+    private func header(_ week: DailyWeek.Week, at frame: CGRect) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(week.eyebrow.uppercased())
                 .font(DailyPalette.sansMedium(11))
@@ -123,8 +162,8 @@ struct LightWeekView: View {
                 .frame(minHeight: 32)
                 .accessibilityAddTraits(.isHeader)
         }
-        .frame(width: m.header.width, height: m.header.height, alignment: .leading)
-        .offset(x: m.header.minX, y: m.header.minY)
+        .frame(width: frame.width, height: frame.height, alignment: .leading)
+        .offset(x: frame.minX, y: frame.minY)
     }
 
     /// The list scrolls in its own space from its top to the page's foot, and can be scrolled clear
@@ -457,14 +496,23 @@ struct LightWeekView: View {
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { chosen = nil }
     }
 
+    /// The handle lowers the sheet over the whole plan, reading the ridge as it goes, or raises it.
+    /// Either way the chosen row and its Move to panel are let go.
+    private func handleTapped() {
+        chosen = nil
+        let ridge = DailyLookBack.ridge(goalAreas, me: userId, saved: walkPosition)
+        for event in lookBack.handleTapped(areas: ridge.areas, kept: ridge.kept) { model.send(event) }
+    }
+
     #if DEBUG
     /// `-SymphonyDailyState select`: the first task chosen, its panel up, as a tap on its words would;
-    /// `unfold`: the fold open, as a tap on it would.
+    /// `unfold`: the fold open, as a tap on it would; `lookback`: the handle tapped, the whole plan behind.
     private func applyDemoStates(_ week: DailyWeek.Week) {
         guard DemoMode.isOn, !demoStatesApplied else { return }
         demoStatesApplied = true
         let states = DemoMode.dailyStates
         if states.contains("unfold") { unfolded = true }
+        if states.contains("lookback") { handleTapped() }
         // A moment after the page is up, as a tap would come, so the list can scroll the row clear of the panel.
         if states.contains("select"), let pick = DemoMode.weekChoice(week) {
             Task { @MainActor in

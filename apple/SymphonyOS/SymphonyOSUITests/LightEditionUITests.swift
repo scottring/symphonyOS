@@ -138,6 +138,81 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 15), "a drag up on the lowered sheet did not raise it")
     }
 
+    /// Week's handle, as Today's: with a task chosen and its Move to panel up, the sheet lowers
+    /// over the whole plan with no bar, no panel and no band flags; a tap on the lowered sheet
+    /// brings Week and its bar back with the task let go, no walk opened and nothing on the week changed.
+    @MainActor func testTheWeeksHandleShowsTheWholePlanAndComesBack() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailyPage", "week", "-SymphonyDailyState", "select"]
+        app.launch()
+        let any = app.descendants(matching: .any)
+        let week = any["daily.week"]
+        XCTAssertTrue(week.waitForExistence(timeout: 60), "never reached Week")
+        let panel = any["daily.moveTo"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 15), "no task chosen")
+        let field = any["daily.bar.field"]
+        let handle = any["daily.lookBack"]
+        XCTAssertTrue(handle.exists && field.exists, "no handle or no bar")
+        // The week's rows, and a year goal, which on Week only a row's "for" line names: once the rows
+        // are gone, only the whole plan's own flag can carry it.
+        let passport = any.matching(NSPredicate(format: "label CONTAINS %@", "Renew the passport")).firstMatch
+        let yearGoal = any.matching(NSPredicate(format: "label CONTAINS %@", "More slow weekends together")).firstMatch
+        XCTAssertTrue(passport.exists, "the week's rows are not there")
+        // What the week holds, leaving out the panel's own chips (the panel goes as the task is let go).
+        let chips = Set(rows(panel))
+        let before = rows(week).filter { !chips.contains($0) }
+        XCTAssertFalse(before.isEmpty)
+        let raisedLabel = handle.label
+
+        handle.tap()
+        XCTAssertTrue(field.waitForNonExistence(timeout: 15), "the bar is still up over the plan")
+        XCTAssertTrue(passport.waitForNonExistence(timeout: 15), "the week's rows are still up")
+        XCTAssertTrue(yearGoal.waitForExistence(timeout: 15), "the whole plan is not behind the sheet")
+        XCTAssertFalse(panel.exists, "the Move to panel stands over the plan")
+        XCTAssertFalse(any["daily.week.flag"].exists, "the band's flags stand over the plan")
+        let strip = any["daily.lookBack"]
+        XCTAssertNotEqual(strip.label, raisedLabel, "the lowered sheet does not say what raising it shows")
+        XCTAssertGreaterThanOrEqual(strip.frame.height, 44)
+        attach(app, "Week, whole plan")
+
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.8)).tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "a tap on the lowered sheet did not raise it")
+        XCTAssertEqual(any["daily.lookBack"].label, raisedLabel)
+        XCTAssertTrue(any["daily.nav.week"].isSelected, "Week is no longer the page")
+        XCTAssertFalse(panel.exists, "the chosen task was not let go")
+        XCTAssertFalse(app.buttons["walk.orb"].exists, "a walk opened")
+        XCTAssertEqual(rows(week), before, "the week changed")
+        attach(app, "Week after the whole plan")
+    }
+
+    /// Every word in the row of words opens a light page with the bar and no dock, and a flag in
+    /// Week's band opens light Month, the mountain page.
+    @MainActor func testEveryWordAndWeeksFlagsOpenLightPagesWithNoDock() throws {
+        let app = launch(light: true)
+        let any = app.descendants(matching: .any)
+        let pages = [("year", "daily.mountain.year"), ("season", "daily.mountain.season"),
+                     ("month", "daily.mountain.month"), ("week", "daily.week"), ("today", "daily.today")]
+        for (word, page) in pages {
+            any["daily.nav.\(word)"].tap()
+            XCTAssertTrue(any[page].waitForExistence(timeout: 15), "\(word) did not open \(page)")
+            XCTAssertTrue(any["daily.bar.field"].waitForExistence(timeout: 5), "no bar on \(word)")
+            XCTAssertFalse(app.buttons["Planner"].exists, "the dock is up on \(word)")
+            XCTAssertFalse(app.buttons["Routines"].exists, "the dock is up on \(word)")
+        }
+        any["daily.nav.week"].tap()
+        let flag = any["daily.week.flag"].firstMatch
+        XCTAssertTrue(flag.waitForExistence(timeout: 15), "no flag in Week's band")
+        flag.tap()
+        XCTAssertTrue(any["daily.mountain.month"].waitForExistence(timeout: 15), "the flag did not open light Month")
+        XCTAssertFalse(app.buttons["Planner"].exists, "the dock is up on Month")
+    }
+
+    /// Each button on a page, with its value: what a write would change.
+    private func rows(_ page: XCUIElement) -> [String] {
+        page.buttons.allElementsBoundByIndex.map { "\($0.label)|\(String(describing: $0.value))" }
+    }
+
     /// The "No piece this <season> yet" sign walks its goal down; left for now, the walk closes
     /// on Today, the sign is put away for the day, and no walk is left waiting.
     @MainActor func testTheNoPieceSignWalksItsGoalDownAndComesBackToToday() throws {

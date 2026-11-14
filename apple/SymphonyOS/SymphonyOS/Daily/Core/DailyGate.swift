@@ -19,10 +19,11 @@ enum DailyGate {
         edition == .light && horizons.contains(horizon) && layouts.contains(layout)
     }
 
-    /// The dock gives way to the bar, only where light Today shows and the bar is built.
-    static func hidesDock(edition: Edition, layout: TodayLayout, barBuilt: Bool = barBuilt,
+    /// The dock gives way to the bar, only where the bar is built and the page on screen
+    /// (`horizon`) is a light page on this window; any other page keeps the dock.
+    static func hidesDock(on horizon: Horizon, edition: Edition, layout: TodayLayout, barBuilt: Bool = barBuilt,
                           horizons: Set<Horizon> = horizons, layouts: Set<TodayLayout> = layouts) -> Bool {
-        barBuilt && shows(.today, edition: edition, layout: layout, horizons: horizons, layouts: layouts)
+        barBuilt && shows(horizon, edition: edition, layout: layout, horizons: horizons, layouts: layouts)
     }
 
     static func halfOpen(edition: Edition, built: Bool = halfOpenBuilt) -> Bool {

@@ -100,6 +100,27 @@ struct DailyPaperFade: View {
     }
 }
 
+/// Behind Today's or Week's lowered sheet (`DailyLookBack`), in place of the band: the walk's own
+/// top-to-bottom plan over the whole window, read only; a post's "+n" opens it.
+struct DailyWholePlan: View {
+    @Binding var lookBack: DailyLookBack
+    let goals: [Goal]
+    let tasks: [SymphonyTask]
+    let periods: WalkPeriods
+    let today: Date
+    let me: UUID
+    let size: CGSize
+
+    var body: some View {
+        MountainStage(state: lookBack.plan(goals: goals, tasks: tasks, periods: periods, me: me),
+                      today: today, onLabel: { _ in },
+                      onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) }) {
+            EmptyView()
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
 /// Where a light page's rows and its list stand, in the page's own space (`space`), kept without
 /// redrawing the page as they scroll, so the row a change touched can be scrolled into sight: clear
 /// of the fade and the Undo above the bar, or of Week's Move to panel (`DailyMetrics.reveal`).

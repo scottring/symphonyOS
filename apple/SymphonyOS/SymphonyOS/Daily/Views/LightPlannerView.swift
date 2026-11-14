@@ -39,8 +39,8 @@ struct LightPlannerView<Full: View>: View {
 
     private var showsLight: Bool { DailyGate.shows(appState.horizon, edition: appState.edition, layout: layout) }
 
-    /// The dock gives way to the bar on this window (`DailyGate.hidesDock`).
-    private var hidesDock: Bool { DailyGate.hidesDock(edition: appState.edition, layout: layout) }
+    /// The dock gives way to the bar on this window and this page (`DailyGate.hidesDock`).
+    private var hidesDock: Bool { DailyGate.hidesDock(on: appState.horizon, edition: appState.edition, layout: layout) }
 
     /// The light half-open display is up over this Planner (`DailyGate.coversPage`): no page is
     /// drawn under it, so nothing here can listen, write or answer a Tell (light's or the old

@@ -19,7 +19,7 @@ struct DailyGateTests {
         let all = Set(Horizon.allCases), shapes: Set<TodayLayout> = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
         for h in all { for l in shapes {
             #expect(!DailyGate.shows(h, edition: .full, layout: l, horizons: all, layouts: shapes))
-            #expect(!DailyGate.hidesDock(edition: .full, layout: l, barBuilt: true, horizons: all, layouts: shapes))
+            #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l, barBuilt: true, horizons: all, layouts: shapes))
         } }
         #expect(!DailyGate.halfOpen(edition: .full, built: true))
     }
@@ -114,9 +114,9 @@ struct DailyGateTests {
     /// The bar is built: a light household's phone, upright, has the bar and no dock.
     @Test func theDockGivesWayNow() {
         #expect(DailyGate.barBuilt)
-        #expect(DailyGate.hidesDock(edition: .light, layout: .oneColumn))
-        #expect(!DailyGate.hidesDock(edition: .full, layout: .oneColumn))
-        #expect(!DailyGate.hidesDock(edition: .light, layout: .glanceWide))
+        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .full, layout: .oneColumn))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .glanceWide))
     }
 
     /// Review Focus 1: a light household whose phone cannot recognise speech on its own never
@@ -145,9 +145,31 @@ struct DailyGateTests {
     }
 
     @Test func theDockGivesWayOnlyWithTheBarAndToday() {
-        #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
-        #expect(!DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))
-        #expect(DailyGate.hidesDock(edition: .light, layout: .oneColumn, barBuilt: true, horizons: [.today]))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: false, horizons: [.today]))
+        #expect(!DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: true, horizons: []))
+        #expect(DailyGate.hidesDock(on: .today, edition: .light, layout: .oneColumn, barBuilt: true, horizons: [.today]))
+    }
+
+    /// The dock is judged by the page on screen, not by Today being built: with all five pages
+    /// built it gives way on every one of them, and only on a light window. A page this window
+    /// does not draw light (the Duo's upright inside screen and the spread until Tasks 17 and 18,
+    /// a phone on its side, the outside screen) keeps the dock, and so does a page the gate does
+    /// not list, even while Today is built.
+    @Test func theDockGivesWayOnEveryLightPageAndOnNoOther() {
+        let shapes: [TodayLayout] = [.oneColumn, .glance, .glanceWide, .dayPage, .journal]
+        for h in Horizon.allCases {
+            #expect(DailyGate.hidesDock(on: h, edition: .light, layout: .oneColumn), "\(h)")
+            for l in shapes {
+                #expect(DailyGate.hidesDock(on: h, edition: .light, layout: l)
+                        == DailyGate.shows(h, edition: .light, layout: l), "\(h) \(l)")
+                #expect(!DailyGate.hidesDock(on: h, edition: .full, layout: l), "\(h) \(l)")
+            }
+            for l in [TodayLayout.dayPage, .journal, .glanceWide] {
+                #expect(!DailyGate.hidesDock(on: h, edition: .light, layout: l), "\(h) \(l)")
+            }
+        }
+        #expect(!DailyGate.hidesDock(on: .month, edition: .light, layout: .oneColumn, horizons: [.today, .week]))
+        #expect(DailyGate.hidesDock(on: .week, edition: .light, layout: .oneColumn, horizons: [.today, .week]))
     }
 
     @Test func halfOpenIsLightOnly() {
