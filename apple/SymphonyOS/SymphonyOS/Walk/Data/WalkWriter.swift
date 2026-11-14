@@ -7,7 +7,8 @@ import SwiftData
 ///
 /// Year goal = a `goals` row with its life area. Season goal = a plain task
 /// on the season, `goal_id` → the year goal. Month goal and week task = plain
-/// tasks, `source_id` → the line above, `goal_id` copied from it. Everything
+/// tasks, `source_id` → the line above, `goal_id` copied from it (a first thing
+/// under a week task names that task's month line). Everything
 /// is `context = "personal"`; `is_goal`, `goal_task_id` and
 /// `supports_goal_task_id` are never written.
 ///
@@ -57,13 +58,18 @@ struct WalkWriter {
     /// The links for a row under `parent`, read from the parent's row. Only a
     /// parent that exists here is named, and only in the column that can hold
     /// it (`goal_id` → goals, `source_id` → tasks): a link the server would
-    /// refuse would hold the insert in the queue for ever.
+    /// refuse would hold the insert in the queue for ever. A week task is never a
+    /// `source_id`: under one (a first thing said on Today) the row names that
+    /// task's own month line, as every week task does, and copies its goal.
     private func links(for level: WalkLevel, under parent: WalkItem?) -> (goalId: UUID?, sourceId: UUID?) {
         guard let parent, level != .year else { return (nil, nil) }
         if let g = goal(parent.id) {
             return Self.links(level: .season, parentId: g.id, parentGoalId: nil)
         }
         if level != .season, let p = task(parent.id) {
+            if parent.level == .week {
+                return Self.links(level: level, parentId: p.sourceId.flatMap { task($0)?.id }, parentGoalId: p.goalId)
+            }
             return Self.links(level: level, parentId: p.id, parentGoalId: p.goalId)
         }
         return (nil, nil)

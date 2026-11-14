@@ -181,6 +181,35 @@ struct WalkWriterTests {
         everyFlagIsQueued(ctx)
     }
 
+    /// A first thing said on Today under a week flag is a week task too: as the web's,
+    /// it names the month line (the week flag's own `source_id`) and copies the goal,
+    /// never naming another week task.
+    @Test func aFirstThingUnderAWeekFlagNamesItsMonthLine() throws {
+        let ctx = try makeContext()
+        let w = writer(ctx)
+        let c = plantChain(w)
+        let first = WalkItem(id: UUID(), level: .week, title: "Find the cheque book", areaId: c.area.id,
+                             parentId: c.w.id, day: periods.today)
+        w.create(first, parent: c.w)
+        w.setFirstThing(first.id, previous: nil)
+        let t = try #require(task(ctx, first.id))
+        #expect(t.sourceId == c.m.id)
+        #expect(t.goalId == c.y.id)
+        #expect(t.areaId == c.area.id)
+        #expect(t.linksDirty)
+        #expect(focus(ctx).map(\.taskId) == [first.id])
+
+        // A week flag with no month line above it: the first thing names none either.
+        let loose = WalkItem(id: UUID(), level: .week, title: "Call the plumber", day: periods.today)
+        w.create(loose, parent: nil)
+        let under = WalkItem(id: UUID(), level: .week, title: "Find the number", parentId: loose.id, day: periods.today)
+        w.create(under, parent: loose)
+        let u = try #require(task(ctx, under.id))
+        #expect(u.sourceId == nil)
+        #expect(u.goalId == nil)
+        everyFlagIsQueued(ctx)
+    }
+
     @Test func aWeekTaskWithNoDayIsOnTheWeek() throws {
         let ctx = try makeContext()
         let w = writer(ctx)

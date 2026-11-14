@@ -187,6 +187,62 @@ struct WalkPlantTests {
         ])
     }
 
+    @Test func startThereLetsGoOfTheSelection() {
+        let earlier = WalkItem(id: UUID(), level: .week, title: "Call the plumber", day: m.today)
+        var s = m.on(5, items: [m.deposit, earlier])
+        s.firstThing = earlier.id
+        s.selected = earlier.id
+        s.focus[.today] = m.deposit.id
+        _ = s.act(.startThere, m.env)
+        #expect(s.firstThing == m.deposit.id)
+        #expect(s.selected == nil)
+    }
+
+    /// On a crowded ridge the post just planted on is the open one, not one opened before.
+    @Test func plantingClosesAnOpenPost() {
+        var s = m.on(4, items: [m.tile])
+        s.focus[.week] = m.tile.id
+        s.expanded = WalkPostKey(level: .week, column: m.health.id)
+        _ = s.plant("call the tile shop", m.env)
+        #expect(s.expanded == nil)
+        s.expanded = WalkPostKey(level: .week, column: m.home.id)
+        _ = s.plantExample("Call the tile shop", m.env)           // examples off: nothing planted, nothing closed
+        #expect(s.expanded == WalkPostKey(level: .week, column: m.home.id))
+    }
+
+    // MARK: Undo keeps the chain
+
+    /// Undoing (or pulling up) the newest flag of a level leaves the one before it as the
+    /// flag the next step links to; with none of the person's own left, none.
+    @Test func undoingTheNewestFlagFallsBackToTheOneBefore() {
+        let theirs = WalkItem(id: UUID(), level: .month, title: "Old plan", areaId: m.health.id, mine: false)
+        var s = m.on(3, items: [m.lift, theirs])
+        s.focus[.month] = m.lift.id
+        _ = s.plant("book the gym induction", m.env)
+        let a = s.items[2]
+        _ = s.plant("buy a foam roller", m.env)
+        let b = s.items[3]
+        #expect(s.lastPlanted[.month] == b.id)
+        _ = s.act(.undo, m.env)
+        #expect(s.lastPlanted[.month] == a.id)
+        _ = s.act(.next, m.env)
+        #expect(s.step == 4)
+        #expect(s.focus[.week] == a.id)                          // the next step's flags still link
+
+        var t = m.on(3, items: [m.lift, theirs])
+        t.focus[.month] = m.lift.id
+        _ = t.plant("book the gym induction", m.env)
+        let one = t.items[2]
+        _ = t.plant("buy a foam roller", m.env)
+        let two = t.items[3]
+        _ = t.select(two.id)
+        _ = t.pullUpSelected()
+        #expect(t.lastPlanted[.month] == one.id)
+        _ = t.select(one.id)
+        _ = t.pullUpSelected()
+        #expect(t.lastPlanted[.month] == nil)                    // a flag it did not plant is never the fallback
+    }
+
     @Test func startThereMarksTheFocusedTask() {
         let earlier = WalkItem(id: UUID(), level: .week, title: "Call the plumber", day: m.today)
         var s = m.on(5, items: [m.deposit, earlier])

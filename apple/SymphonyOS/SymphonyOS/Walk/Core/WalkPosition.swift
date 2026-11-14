@@ -168,25 +168,32 @@ struct WalkPositionStore {
 enum WalkEntry: Equatable {
     case none, start, resume
 
+    /// Every household row on the phone is light (none at all, or an unknown edition, is not).
+    static func lightOnly(_ householdEditions: [String?]) -> Bool {
+        !householdEditions.isEmpty && householdEditions.allSatisfy { $0 == "light" }
+    }
+
     /// The position is local, so a person who left the walk on one phone with no goals is offered it again on another.
+    /// A walk left part-way resumes only in a light household; in a full one (or a mixed or
+    /// unknown one) it is simply left, and "Walk the mountain again" starts it from the top.
     static func decide(replay: Bool, demoWalk: Bool, position: WalkPosition?, householdEditions: [String?],
                        initialSyncFinished: Bool, goalCount: Int) -> WalkEntry {
         if replay || demoWalk { return .start }
-        if let position { return position.status == .inProgress ? .resume : .none }
-        let onlyLight = !householdEditions.isEmpty && householdEditions.allSatisfy { $0 == "light" }
+        let onlyLight = lightOnly(householdEditions)
+        if let position { return position.status == .inProgress && onlyLight ? .resume : .none }
         return onlyLight && initialSyncFinished && goalCount == 0 ? .start : .none
     }
 
     /// Whether `decide` is asked at all: never while a walk is up or with nobody signed in.
-    /// Before the first pull has finished, a saved walk in progress opens at once (it and
-    /// every row it planted are on this phone), and so does a replay over a household
-    /// already on this phone; a replay on a brand-new sign-in waits (still asked for), and
-    /// the automatic first start waits as `decide` says.
+    /// Before the first pull has finished, a saved walk in progress in a light household
+    /// opens at once (it and every row it planted are on this phone), and so does a replay
+    /// over a household already on this phone; a replay on a brand-new sign-in waits (still
+    /// asked for), and the automatic first start waits as `decide` says.
     static func mayDecide(walkUp: Bool, signedIn: Bool, initialSyncFinished: Bool,
-                          position: WalkPosition?, replay: Bool, householdCount: Int) -> Bool {
+                          position: WalkPosition?, replay: Bool, householdEditions: [String?]) -> Bool {
         guard !walkUp, signedIn else { return false }
-        if initialSyncFinished || position?.status == .inProgress { return true }
-        return replay && householdCount > 0
+        if initialSyncFinished || (position?.status == .inProgress && lightOnly(householdEditions)) { return true }
+        return replay && !householdEditions.isEmpty
     }
 
     /// A walk still up on a later day than the one it opened on is taken down and decided

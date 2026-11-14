@@ -234,7 +234,7 @@ extension iOSMainView {
         let replay = appState.walkReplayRequested
         guard WalkEntry.mayDecide(walkUp: walk != nil, signedIn: auth.isAuthenticated && userId != nil,
                                   initialSyncFinished: appState.initialSyncFinished, position: position,
-                                  replay: replay, householdCount: householdRows.count),
+                                  replay: replay, householdEditions: householdRows.map(\.edition)),
               let userId else { return }
         if replay { appState.walkReplayRequested = false }
         let goalCount = (try? modelContext.fetchCount(FetchDescriptor<Goal>())) ?? 0

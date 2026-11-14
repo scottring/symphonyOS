@@ -243,7 +243,17 @@ private struct Saved {
         }
         #expect(decide(true, false, pos(.finished), ["full"], false, 9) == .start)
         #expect(decide(false, true, nil, [], false, 0) == .start)
-        #expect(decide(false, false, pos(.inProgress), ["full"], false, 3) == .resume)
+        #expect(decide(false, true, pos(.inProgress), ["full"], true, 3) == .start)       // the Debug demo
+        // A walk left part-way resumes in a light household only; in a full one it is left,
+        // and "Walk the mountain again" starts it again from the top.
+        #expect(decide(false, false, pos(.inProgress), ["light"], false, 0) == .resume)
+        #expect(decide(false, false, pos(.inProgress), ["light"], true, 3) == .resume)
+        #expect(decide(false, false, pos(.inProgress), ["full"], false, 3) == .none)
+        #expect(decide(false, false, pos(.inProgress), ["full"], true, 3) == .none)
+        #expect(decide(true, false, pos(.inProgress), ["full"], true, 3) == .start)
+        #expect(decide(false, false, pos(.inProgress), ["light", "full"], true, 0) == .none)   // mixed: as full
+        #expect(decide(false, false, pos(.inProgress), [nil], true, 0) == .none)               // unknown: as full
+        #expect(decide(false, false, pos(.inProgress), [], true, 0) == .none)                  // no household row yet
         #expect(decide(false, false, pos(.finished), ["light"], true, 0) == .none)
         #expect(decide(false, false, pos(.left), ["light"], true, 0) == .none)
         #expect(decide(false, false, nil, ["light"], true, 0) == .start)
@@ -256,27 +266,31 @@ private struct Saved {
     }
 
     /// `decide` is asked only with no walk up and someone signed in. Before the first pull has
-    /// finished only a saved walk in progress, or a replay over a household already on this
-    /// phone, may open; the automatic first start waits (and `decide` keeps its own guard).
+    /// finished only a saved walk in progress in a light household, or a replay over a
+    /// household already on this phone, may open; the automatic first start waits (and
+    /// `decide` keeps its own guard).
     @Test func whatMayOpenBeforeTheFirstPull() {
         let p = periods(2026, 11, 13)
         func pos(_ status: WalkStatus) -> WalkPosition {
             WalkPosition(WalkState(), status: status, planted: [], periods: p, now: p.today)
         }
         func may(walkUp: Bool = false, signedIn: Bool = true, synced: Bool, position: WalkPosition? = nil,
-                 replay: Bool = false, households: Int = 0) -> Bool {
+                 replay: Bool = false, editions: [String?] = []) -> Bool {
             WalkEntry.mayDecide(walkUp: walkUp, signedIn: signedIn, initialSyncFinished: synced,
-                                position: position, replay: replay, householdCount: households)
+                                position: position, replay: replay, householdEditions: editions)
         }
         #expect(may(synced: true))
-        #expect(may(synced: false, position: pos(.inProgress)))                 // resume before sync
-        #expect(may(synced: false, replay: true, households: 1))                // replay over a household on the phone
-        #expect(!may(synced: false, replay: true, households: 0))               // a brand-new sign-in still pulling
-        #expect(!may(synced: false, households: 1))                             // the automatic start
-        #expect(!may(synced: false, position: pos(.left), households: 1))       // a left walk is not a resume
-        #expect(!may(synced: false, position: pos(.finished), households: 1))
-        #expect(!may(signedIn: false, synced: true, position: pos(.inProgress), replay: true, households: 1))
-        #expect(!may(walkUp: true, synced: true, position: pos(.inProgress), replay: true, households: 1))
+        #expect(may(synced: false, position: pos(.inProgress), editions: ["light"]))     // resume before sync
+        #expect(!may(synced: false, position: pos(.inProgress), editions: ["full"]))     // a full household's is left
+        #expect(!may(synced: false, position: pos(.inProgress), editions: ["light", "full"]))
+        #expect(!may(synced: false, position: pos(.inProgress)))                         // no household row yet
+        #expect(may(synced: false, replay: true, editions: ["full"]))                    // replay over a household on the phone
+        #expect(!may(synced: false, replay: true))                                       // a brand-new sign-in still pulling
+        #expect(!may(synced: false, editions: ["light"]))                                // the automatic start
+        #expect(!may(synced: false, position: pos(.left), editions: ["light"]))          // a left walk is not a resume
+        #expect(!may(synced: false, position: pos(.finished), editions: ["light"]))
+        #expect(!may(signedIn: false, synced: true, position: pos(.inProgress), replay: true, editions: ["light"]))
+        #expect(!may(walkUp: true, synced: true, position: pos(.inProgress), replay: true, editions: ["light"]))
     }
 
     /// A walk still up on a later day is taken down and decided again with the new day's periods.

@@ -46,7 +46,8 @@ extension WalkState {
                     sessionOver = true       // the words stay; letting go plants them at once
                     return []
                 }
-                return openTypingForSpeechOff()      // not remembered: the next hold tries again
+                // Speech works; it heard nothing this time. Not remembered: the next hold tries again.
+                return openTyping(note: WalkCopy.nothingHeard)
             default:
                 return []
             }
@@ -57,7 +58,7 @@ extension WalkState {
             // Refused, no recogniser, or it could not start: the one-line field opens
             // instead, now and at every hold for the rest of this walk.
             speechIsOff = true
-            return openTypingForSpeechOff()
+            return openTyping(note: WalkCopy.speechOff)
         case .speechReady:
             guard orb == .idle, typing == nil, note == nil else { return [] }
             note = WalkCopy.speakNow
@@ -155,6 +156,14 @@ extension WalkState {
         }
     }
 
+    /// Plants what a flag let go has so far, if one is waiting for its last words on a
+    /// step that plants (Welcome and Look back up have nothing to plant: ending the walk
+    /// there lets it go). Called before any event or point that is not `leavesAWaitingFlag`.
+    mutating func plantWaitingFlag(_ env: WalkEnv) -> [WalkEffect] {
+        guard case .finishing(let live) = orb, level != nil else { return [] }
+        return plantHeard(live, env)
+    }
+
     /// The moment a held flag is planted: the session's end, the finish wait running
     /// out, or a new press. Exactly once per hold; the listener is let go (a cancel is
     /// harmless once it has ended). Blank words are an empty hold, not a refusal.
@@ -180,12 +189,13 @@ extension WalkState {
         return [.timer(.note, ms: WalkState.noteMs)]
     }
 
-    private mutating func openTypingForSpeechOff() -> [WalkEffect] {
+    /// The hold's listening is over: the field opens with `note` (why there is nothing to speak to).
+    private mutating func openTyping(note: String) -> [WalkEffect] {
         orb = .idle
         orbWasOpen = false
         sessionOver = false
         typing = ""
-        note = WalkCopy.speechOff
+        self.note = note
         return [.listen(false), .timer(.hold, ms: nil), .timer(.note, ms: WalkState.noteMs)]
     }
 
@@ -197,5 +207,24 @@ extension WalkState {
     mutating func startTyping() {
         typing = ""
         orb = .idle
+    }
+}
+
+extension WalkEvent {
+    /// Events that leave a flag waiting for its last words to wait on: the words and the
+    /// session's end themselves, the finish wait, touches on the light that do nothing
+    /// while it waits (a cancel lets it go, as it always has; only a press, whose
+    /// `orbDown` already planted it, can be cancelled), and timers and system answers
+    /// that touch no flag. Everything else, a new press included, plants it first.
+    var leavesAWaitingFlag: Bool {
+        switch self {
+        case .heard, .listenEnded, .finishExpired, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
+             .noteExpired, .undoExpired, .speechReady, .calendarAnswered:
+            return true
+        case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
+             .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday:
+            return false
+        }
     }
 }

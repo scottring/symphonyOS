@@ -71,6 +71,7 @@ extension WalkState {
         }
         lastPlanted[level] = item.id
         selected = nil
+        expanded = nil                      // the post just planted on is the open one, not one opened before
         undoShowing = true
         effects += [.sound(.plant, afterMs: plantSoundMs), .timer(.undo, ms: WalkState.undoMs)]
         if let placedNote {
@@ -120,6 +121,7 @@ extension WalkState {
         let previous = firstThing
         moveMark(to: id, env.periods.today)
         undo.append(.firstThing(previous: previous, created: nil))
+        selected = nil
         undoShowing = true
         return [.write(.firstThing(id, previous: previous)), .timer(.undo, ms: WalkState.undoMs), .save]
     }
@@ -289,12 +291,16 @@ extension WalkState {
     }
 
     /// Nothing is left pointing at an id that is gone (a flag, or an area no
-    /// longer kept): not the tour, a focus, the last planted, the first thing,
-    /// the selection, nor a focused peak that is no longer kept.
+    /// longer kept): not the tour, a focus, the first thing, the selection, nor a
+    /// focused peak that is no longer kept. A level whose last planted flag it was
+    /// falls back to the newest flag the person still has planted on it in this
+    /// walk, so the next step's flags still link (nil only when none is left).
     private mutating func forget(_ id: UUID) {
         tour.removeAll { $0 == id }
         focus = focus.filter { $0.value != id }
-        lastPlanted = lastPlanted.filter { $0.value != id }
+        for (level, last) in lastPlanted where last == id {
+            lastPlanted[level] = items(on: level).last(where: \.mine)?.id
+        }
         if firstThing == id { firstThing = nil }
         if selected == id { selected = nil }
         if let f = focusArea, f == id || !kept.contains(f) { focusArea = nil }

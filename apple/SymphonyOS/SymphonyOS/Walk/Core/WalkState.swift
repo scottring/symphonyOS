@@ -52,8 +52,15 @@ struct WalkState: Equatable {
 
     // MARK: Events
 
+    /// A flag let go and still waiting for its last words is planted before anything else
+    /// the person does takes effect, so nothing in that second re-parents it or drops it.
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        let planted = event.leavesAWaitingFlag ? [] : plantWaitingFlag(env)
+        return planted + respond(to: event, env)
+    }
+
+    private mutating func respond(to event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         switch event {
         case .areaTapped(let id): return tapArea(id)
         case .bannerTapped(let id):
@@ -91,8 +98,14 @@ struct WalkState: Equatable {
 
     // MARK: Actions (the compass points)
 
+    /// A waiting flag is planted first, as for an event (a point chosen through VoiceOver).
     mutating func act(_ action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        let planted = plantWaitingFlag(env)
+        return planted + respond(to: action, env)
+    }
+
+    private mutating func respond(to action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
         switch action {
         case .quick: return choose(.quick)
         case .full: return choose(.full)

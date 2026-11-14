@@ -354,7 +354,7 @@ struct WalkModelTests {
         toYear(m)
         await hold(m)
         listener.end()                                         // nothing heard: typing at once
-        #expect(m.state.orb == .idle && m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        #expect(m.state.orb == .idle && m.state.typing == "" && m.state.note == WalkCopy.nothingHeard)
         m.send(.orbUp(heldMs: 900))
         m.send(.typeDismissed)
 

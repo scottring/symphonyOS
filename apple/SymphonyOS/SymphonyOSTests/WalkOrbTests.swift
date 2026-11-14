@@ -297,6 +297,93 @@ struct WalkOrbTests {
         #expect(t.items.isEmpty && t.orb == .idle)
     }
 
+    // MARK: The second after letting go: anything else plants the waiting flag first
+
+    /// Season with two year goals, the first focused, a flag said for it and let go:
+    /// it waits for its last words.
+    private func waitingOnSeason() -> (state: WalkState, focused: WalkItem, other: WalkItem) {
+        var s = state(step: 2)
+        let strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: s.kept[0])
+        let bathroom = WalkItem(id: UUID(), level: .year, title: "Finish the bathroom", areaId: s.kept[1])
+        s.items = [strong, bathroom]
+        s.focus[.season] = strong.id
+        speak(&s, "lift twice a week")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        return (s, strong, bathroom)
+    }
+
+    @Test func aParentTapWhileFinishingPlantsUnderTheParentShownAtRelease() throws {
+        let waiting = waitingOnSeason()
+        var s = waiting.state
+        let (strong, bathroom) = (waiting.focused, waiting.other)
+        #expect(s.orb == .finishing(live: "lift twice a week"))
+        let fx = s.apply(.bannerTapped(bathroom.id), env)
+        let planted = try #require(s.items.last)
+        #expect(planted.title == "Lift twice a week")
+        #expect(planted.parentId == strong.id)
+        #expect(planted.areaId == strong.areaId)
+        #expect(fx.contains(.write(.create(planted, parent: strong))))
+        #expect(fx.contains(.timer(.finish, ms: nil)))
+        #expect(s.focus[.season] == bathroom.id)                  // then the tap takes effect
+        #expect(s.orb == .idle)
+        #expect(s.apply(.finishExpired, env) == [])              // nothing waits any more
+        #expect(s.items.count == 3)
+    }
+
+    @Test func aCompassActionWhileFinishingPlantsThenActs() throws {
+        // Walk on, through VoiceOver: the flag lands on Year, then the walk goes to Season.
+        var s = state(step: 1)
+        speak(&s, "feel strong again")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        let fx = s.act(.next, env)
+        #expect(s.items.map(\.title) == ["Feel strong again"])
+        let planted = try #require(s.items.first)
+        #expect(planted.level == .year)
+        #expect(s.step == 2)
+        #expect(fx.contains(.write(.create(planted, parent: nil))))
+        #expect(s.apply(.listenEnded, env) == [])
+
+        // Type it: planted, then the field opens.
+        var t = state(step: 1)
+        speak(&t, "finish the bathroom")
+        _ = t.apply(.orbUp(heldMs: 900), env)
+        _ = t.act(.type, env)
+        #expect(t.items.map(\.title) == ["Finish the bathroom"])
+        #expect(t.typing == "")
+
+        // Undo: the flag is planted first, so Undo takes back that newest flag.
+        var u = state(step: 1)
+        speak(&u, "run a 5K")
+        _ = u.apply(.orbUp(heldMs: 900), env)
+        _ = u.apply(.undo, env)
+        #expect(u.items.isEmpty)
+        #expect(u.apply(.finishExpired, env) == [])
+        #expect(u.items.isEmpty)
+    }
+
+    @Test func aPeakTapWhileFinishingPlantsOnThePeakFocusedAtRelease() {
+        var s = state(step: 1)
+        let (health, home) = (s.kept[0], s.kept[1])
+        s.focusArea = health
+        speak(&s, "learn the cello")                              // no area's words: the focused peak catches it
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        _ = s.apply(.areaTapped(home), env)
+        #expect(s.items.map(\.areaId) == [health])
+        #expect(s.focusArea == home)
+    }
+
+    /// Timers and other quiet events do not cut the wait short: the last words can still come.
+    @Test func quietEventsLeaveTheFlagWaiting() {
+        var s = waitingOnSeason().state
+        for event: WalkEvent in [.noteExpired, .undoExpired, .orbMoved(WalkOrb.centre), .orbHeld, .orbUp(heldMs: 10)] {
+            _ = s.apply(event, env)
+            #expect(s.orb == .finishing(live: "lift twice a week"), "\(event)")
+        }
+        _ = s.apply(.heard("lift twice a week, heavy"), env)
+        _ = s.apply(.listenEnded, env)
+        #expect(s.items.last?.title == "Lift twice a week, heavy")
+    }
+
     @Test func aFirstEmptyHoldIsAQuietNoteTheSecondOpensTyping() {
         var s = state(step: 1)
         speak(&s)
@@ -340,11 +427,12 @@ struct WalkOrbTests {
         #expect(s.typing == "" && s.orb == .idle)
     }
 
+    /// Speech works here; it just heard nothing that time, so the line says so (not `speechOff`).
     @Test func aSessionThatEndsMidHoldWithNothingOpensTyping() {
         var s = state(step: 1)
         speak(&s)
         _ = s.apply(.listenEnded, env)
-        #expect(s.orb == .idle && s.typing == "" && s.note == WalkCopy.speechOff)
+        #expect(s.orb == .idle && s.typing == "" && s.note == WalkCopy.nothingHeard)
         #expect(!s.speechIsOff)                                // an interruption is not a refusal: the next hold tries again
         _ = s.apply(.orbUp(heldMs: 900), env)
         #expect(s.typing == "" && s.orb == .idle)

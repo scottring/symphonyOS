@@ -93,7 +93,7 @@ enum WalkWords {
         if let comma = text.lastIndex(of: ",") {
             let head = String(text[..<comma])
             let tail = String(text[text.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
-            if let day = keywordDay(tail, today: start, calendar: calendar) { return (head, day) }
+            if let day = keywordDay(tail, afterComma: true, today: start, calendar: calendar) { return (head, day) }
             if !tail.isEmpty, let date = detect(tail) { return (head, calendar.startOfDay(for: date)) }
             return nil
         }
@@ -101,26 +101,33 @@ enum WalkWords {
         let words = text.split(separator: " ").map(String.init)
         for n in [3, 2, 1] where words.count >= n {
             let tail = words.suffix(n).joined(separator: " ")
-            if let day = keywordDay(tail, today: start, calendar: calendar) {
+            if let day = keywordDay(tail, afterComma: false, today: start, calendar: calendar) {
                 return (words.dropLast(n).joined(separator: " "), day)
             }
         }
         return nil
     }
 
-    /// `tail` is exactly a day word, after an optional leading on / this / by.
-    private static func keywordDay(_ tail: String, today: Date, calendar: Calendar) -> Date? {
+    /// Ways of saying the weekend that are clearly a day even without a comma before them.
+    private static let weekendDays: Set<String> = ["this weekend", "on the weekend", "at the weekend", "over the weekend"]
+
+    /// `tail` is exactly a day word, after an optional leading on / this / by. "The
+    /// weekend" is a day only after a comma or as one of `weekendDays` ("Plan the
+    /// weekend" is a task about it).
+    private static func keywordDay(_ tail: String, afterComma: Bool, today: Date, calendar: Calendar) -> Date? {
         var words = tail.lowercased().split(separator: " ").map { $0.trimmingCharacters(in: edgePunctuation) }
+        let whole = words.joined(separator: " ")
         if let first = words.first, ["on", "this", "by"].contains(first) { words.removeFirst() }
         let phrase = words.joined(separator: " ")
         let weekday = calendar.component(.weekday, from: today)
         func plus(_ d: Int) -> Date { calendar.date(byAdding: .day, value: d, to: today) ?? today }
 
+        if weekendDays.contains(whole) || (afterComma && (phrase == "weekend" || phrase == "the weekend")) {
+            return (weekday == 1 || weekday == 7) ? today : plus(7 - weekday)
+        }
         switch phrase {
         case "today", "tonight": return today
         case "tomorrow": return plus(1)
-        case "weekend", "the weekend":
-            return (weekday == 1 || weekday == 7) ? today : plus(7 - weekday)
         default:
             guard let target = weekdays[phrase] else { return nil }
             return plus((target - weekday + 7) % 7)

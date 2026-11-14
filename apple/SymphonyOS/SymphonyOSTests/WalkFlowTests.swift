@@ -163,6 +163,209 @@ final class WalkFlowTests {
         #expect(weekInsert < focusInsert)
     }
 
+    // MARK: A replay over a real plan
+
+    /// Every field of a seeded row a walk could touch, to compare before and after.
+    private func fingerprint(_ ctx: ModelContext, _ ids: Set<UUID>) -> [String] {
+        func s<T>(_ v: T?) -> String { v.map { "\($0)" } ?? "nil" }
+        let goals = fetch(ctx, Goal.self).filter { ids.contains($0.id) }.map { g in
+            "goal \(g.id) \(g.name) \(g.year) \(g.status) \(s(g.context)) \(s(g.areaId)) \(g.areaDirty) "
+                + "\(g.syncStatus) \(s(g.lastSyncedAt)) \(g.updatedAt)"
+        }
+        let tasks = fetch(ctx, SymphonyTask.self).filter { ids.contains($0.id) }.map { t in
+            "task \(t.id) \(t.title) \(t.completed) \(s(t.completedAt)) \(s(t.scheduledFor)) \(s(t.bucket)) "
+                + "\(s(t.weekStart)) \(s(t.monthStart)) \(s(t.seasonStart)) \(s(t.context)) \(s(t.goalId)) "
+                + "\(s(t.sourceId)) \(s(t.areaId)) \(t.linksDirty) \(t.placementDirty) \(s(t.dismissedAt)) "
+                + "\(t.syncStatus) \(t.updatedAt)"
+        }
+        let areas = fetch(ctx, GoalArea.self).filter { ids.contains($0.id) }.map { a in
+            "area \(a.id) \(a.name) \(s(a.context)) \(a.sortOrder) \(a.syncStatus)"
+        }
+        return (goals + tasks + areas).sorted()
+    }
+
+    /// A household with a real plan replays the walk: synced rows (nothing queued, flags clean)
+    /// with a chain linked on the web, a Health area and one with no context, a Family and a
+    /// Work task for today, and another member's task and area. A quick walk plants one new
+    /// chain beside them and changes nothing it did not plant.
+    @Test func aReplayOverARealPlanChangesNothingItDidNotPlant() async throws {
+        let ctx = try walkTestContext()
+        let periods = WalkPeriods.pick(now: now)
+        let other = UUID()
+        func synced(_ t: SymphonyTask) -> SymphonyTask {
+            t.lastSyncedAt = now
+            ctx.insert(t)
+            return t
+        }
+        let health = GoalArea(userId: me, name: "Health", sortOrder: 0, context: "personal", syncStatus: .synced)
+        let garden = GoalArea(userId: me, name: "Garden", sortOrder: 1, context: nil, syncStatus: .synced)
+        let theirArea = GoalArea(userId: other, name: "Allotment", context: "personal", syncStatus: .synced)
+        for a in [health, garden, theirArea] { ctx.insert(a) }
+        let goal = Goal(id: UUID(), userId: me, name: "Run a half marathon", year: periods.year)
+        goal.context = "personal"
+        goal.areaId = health.id
+        goal.lastSyncedAt = now
+        ctx.insert(goal)
+        let season = synced(SymphonyTask(userId: me, title: "Build to ten miles", context: "personal", syncStatus: .synced))
+        season.bucket = "quarter"
+        season.seasonStart = periods.season.start
+        season.goalId = goal.id
+        season.areaId = health.id
+        let month = synced(SymphonyTask(userId: me, title: "Run three times a week", context: "personal", syncStatus: .synced))
+        month.bucket = "month"
+        month.monthStart = periods.monthStart
+        month.sourceId = season.id
+        month.goalId = goal.id
+        let week = synced(SymphonyTask(userId: me, title: "Buy running shoes", scheduledFor: now, context: "personal",
+                                       syncStatus: .synced))
+        week.bucket = "timed"
+        week.weekStart = periods.weekStart
+        week.sourceId = month.id
+        let family = synced(SymphonyTask(userId: me, title: "School run", scheduledFor: now, context: "family", syncStatus: .synced))
+        let work = synced(SymphonyTask(userId: me, title: "Send the report", scheduledFor: now, context: "work", syncStatus: .synced))
+        let theirs = synced(SymphonyTask(userId: other, title: "Their dentist", scheduledFor: now, context: "personal",
+                                         syncStatus: .synced))
+        try ctx.save()
+        #expect(fetch(ctx, PendingChange.self).isEmpty)
+        let seeded: Set<UUID> = [health.id, garden.id, theirArea.id, goal.id, season.id, month.id, week.id,
+                                 family.id, work.id, theirs.id]
+        let before = fingerprint(ctx, seeded)
+        let hidden: Set<UUID> = [family.id, work.id, theirs.id]
+
+        let m = model(ctx, entry: .start, edition: .full)
+        var shown: Set<UUID> = []
+        func look() {
+            shown.formUnion(m.state.items.map(\.id))
+            #expect(!m.state.areas.contains { $0.id == theirArea.id })
+        }
+        /// A seeded flag on the step's own level: a tap never selects it, so Move and Pull up do nothing.
+        func tryToTake(_ id: UUID) {
+            #expect(m.state.items.contains { $0.id == id && !$0.mine })
+            m.send(.bannerTapped(id))
+            #expect(m.state.selected == nil)
+            m.send(.moveTo(garden.id))
+            m.send(.pullUp)
+            #expect(m.state.items.contains { $0.id == id })
+        }
+
+        look()
+        quickStart(m, keeping: ["Health"])
+        look()
+        tryToTake(goal.id)
+        await say(m, "feel strong again")
+        m.choose(.next)
+        look()
+        tryToTake(season.id)
+        await say(m, "lift twice a week")
+        m.choose(.next)
+        look()
+        tryToTake(month.id)
+        await say(m, "book the gym induction")
+        m.choose(.next)
+        look()
+        tryToTake(week.id)
+        await say(m, "gym induction, today")
+        m.choose(.next)
+        look()
+        m.choose(.startThere)
+        m.choose(.next)
+        look()
+        #expect(m.state.step == 6)
+        let ending = Set(m.endingRows.map(\.id))
+        #expect(ending.isDisjoint(with: hidden))
+        #expect(shown.isDisjoint(with: hidden))
+        m.send(.goToToday)
+
+        // Nothing seeded changed, nor was queued; one Health, reused.
+        #expect(fingerprint(ctx, seeded) == before)
+        let queued = fetch(ctx, PendingChange.self)
+        #expect(!queued.isEmpty)
+        #expect(Set(queued.map(\.recordId)).isDisjoint(with: seeded))
+        #expect(fetch(ctx, GoalArea.self).filter { $0.name == "Health" }.count == 1)
+        let planted = Set(m.state.items.filter(\.mine).map(\.id))
+        let focusRows = Set(fetch(ctx, TaskFocus.self).map(\.id))
+        let commitments = Set(fetch(ctx, TaskCommitment.self).filter { planted.contains($0.taskId) }.map(\.id))
+        #expect(Set(queued.map(\.recordId)).isSubset(of: planted.union(focusRows).union(commitments)))
+        #expect(planted.count == 4)
+        let newGoal = try #require(m.state.items.first { $0.level == .year && $0.mine })
+        #expect(fetch(ctx, Goal.self).first { $0.id == newGoal.id }?.areaId == health.id)
+    }
+
+    // MARK: Speech refused
+
+    /// With speech refused: a hold opens the field (the first by the listener's refusal,
+    /// later ones at once), and the words go in as the field sends them.
+    private func typeIt(_ m: WalkModel, _ words: String) async {
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        await scheduler.settle()
+        m.send(.orbUp(heldMs: 900))
+        #expect(m.state.typing == "")
+        m.send(.typeChanged(words))
+        m.send(.typeSubmitted)
+    }
+
+    /// Speech refused on the first hold: every level is typed, and the rows are the same
+    /// linked chain a spoken quick start leaves, with a first thing typed under the week flag.
+    @Test func speechRefusedTypesTheSameChain() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        listener.problemOnStart = "Allow the microphone in Settings to speak — or type it."
+        quickStart(m, keeping: ["Health", "Home"])
+        m.send(.orbDown)
+        scheduler.advance(WalkOrb.holdMs)
+        await scheduler.settle()
+        #expect(m.state.typing == "" && m.state.note == WalkCopy.speechOff)
+        m.send(.orbUp(heldMs: 900))
+        m.send(.typeChanged("feel strong again"))
+        m.send(.typeSubmitted)
+        m.choose(.next)
+        await typeIt(m, "lift twice a week")
+        m.choose(.next)
+        await typeIt(m, "book the gym induction")
+        m.choose(.next)
+        await typeIt(m, "gym induction, today")
+        m.choose(.next)
+        #expect(m.state.step == 5)
+        let weekFlag = try #require(task(ctx, "Gym induction"))
+        #expect(m.state.focus[.today] == weekFlag.id)
+        await typeIt(m, "find the trainers")
+        m.choose(.next)
+        #expect(m.state.step == 6)
+        #expect(listener.starts == 1)                          // never asked to listen again
+
+        let goals = fetch(ctx, Goal.self)
+        #expect(goals.count == 1)
+        let goal = try #require(goals.first)
+        #expect(goal.name == "Feel strong again")
+        #expect(goal.year == 2027)
+        #expect(goal.context == "personal")
+        #expect(goal.areaId == area(m, "Health"))
+        #expect(fetch(ctx, GoalArea.self).map(\.name) == ["Health"])
+
+        let season = try #require(task(ctx, "Lift twice a week"))
+        #expect(season.goalId == goal.id)
+        #expect(season.sourceId == nil)
+        let month = try #require(task(ctx, "Book the gym induction"))
+        #expect(month.sourceId == season.id)
+        #expect(month.goalId == goal.id)
+        #expect(PlanCalendar.sameDay(weekFlag.scheduledFor, now))
+        #expect(weekFlag.sourceId == month.id)
+        #expect(weekFlag.goalId == goal.id)
+        let first = try #require(task(ctx, "Find the trainers"))
+        #expect(PlanCalendar.sameDay(first.scheduledFor, now))
+        #expect(first.sourceId == month.id)                     // the month line, not the week flag
+        #expect(first.goalId == goal.id)
+        #expect(m.state.firstThing == first.id)
+        let focusToday = fetch(ctx, TaskFocus.self).filter { PlanCalendar.sameDay($0.date, now) }
+        #expect(focusToday.map(\.taskId) == [first.id])
+
+        let tasks = fetch(ctx, SymphonyTask.self)
+        #expect(tasks.count == 4)
+        #expect(tasks.allSatisfy { !$0.isGoal && $0.goalTaskId == nil && $0.context == "personal" })
+        #expect(try childrenAheadOfParents(ctx) == [])
+    }
+
     // MARK: The whole year
 
     @Test func theWholeYearVisitsEveryAreaAndEveryGoal() async throws {

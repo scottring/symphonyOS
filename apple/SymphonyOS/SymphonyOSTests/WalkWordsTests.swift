@@ -61,6 +61,26 @@ struct WalkWordsTests {
         }
     }
 
+    /// "The weekend" is a day only when it clearly is one: after a comma, or as this /
+    /// on the / at the / over the weekend. Otherwise the words stay whole, on the week.
+    @Test func theWeekendIsADayOnlyWhenItClearlyIsOne() {
+        let saturday = d(2026, 11, 14)
+        let cases: [(String, String, Date?)] = [
+            ("Plan the weekend", "Plan the weekend", nil),
+            ("a quiet weekend", "A quiet weekend", nil),
+            ("finish it by the weekend", "Finish it by the weekend", nil),
+            ("Tidy the garage this weekend", "Tidy the garage", saturday),
+            ("walk the dog on the weekend", "Walk the dog", saturday),
+            ("see Gran at the weekend", "See Gran", saturday),
+            ("paint the fence over the weekend", "Paint the fence", saturday),
+            ("tidy the garage, weekend", "Tidy the garage", saturday),
+            ("tidy the garage, the weekend", "Tidy the garage", saturday),
+        ]
+        for (said, title, day) in cases {
+            #expect(week(said) == WalkWords.Said(title: title, day: day), "\(said)")
+        }
+    }
+
     @Test func aDayInTheMiddleStays() {
         #expect(week("Friday night dinner with Sam") == WalkWords.Said(title: "Friday night dinner with Sam", day: nil))
         #expect(week("plan Saturday breakfast out") == WalkWords.Said(title: "Plan Saturday breakfast out", day: nil))

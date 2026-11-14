@@ -123,6 +123,28 @@ struct WalkLoadTests {
         #expect(!WalkLoad.items(goals: g3, tasks: t3, periods: periods, me: me, planted: []).contains { $0.title == "Stray" })
     }
 
+    /// A first thing said under a week flag names the month line, as any week task does:
+    /// read back, planted here or not, it is a week item dated today under that line.
+    @Test func aFirstThingUnderAWeekFlagReadsBackAsAWeekItem() throws {
+        let ctx = try makeContext()
+        let w = WalkWriter(context: ctx, userId: me, periods: periods)
+        let season = item(.season, "Lift twice a week"), month = item(.month, "Book the gym induction")
+        let week = item(.week, "Gym induction", day: periods.today)
+        let first = item(.week, "Find the trainers", day: periods.today)
+        w.create(season, parent: nil); w.create(month, parent: season); w.create(week, parent: month)
+        w.create(first, parent: week)
+        w.setFirstThing(first.id, previous: nil)
+
+        let (g, t) = all(ctx)
+        for planted in [Set([season.id, month.id, week.id, first.id]), []] {
+            let items = WalkLoad.items(goals: g, tasks: t, periods: periods, me: me, planted: planted)
+            let loaded = try #require(items.first { $0.id == first.id })
+            #expect(loaded.level == .week)
+            #expect(loaded.parentId == month.id)
+            #expect(PlanCalendar.sameDay(loaded.day, periods.today))
+        }
+    }
+
     @Test func aTaskSaidForNextWeekIsStillThere() throws {
         let ctx = try makeContext()
         let w = WalkWriter(context: ctx, userId: me, periods: periods)
