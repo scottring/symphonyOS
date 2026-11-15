@@ -24,7 +24,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.question(y, p) == "What would make the year ahead a good one?")
         #expect(WalkCopy.why(y, p) == "Something that would feel true twelve months from now. Big or small.")
         #expect(WalkCopy.eyebrow(y, p) == "The year ahead")
-        #expect(WalkCopy.eyebrow(state(step: 1, depth: .full), p) == "The year ahead · area by area")
+        #expect(WalkCopy.eyebrow(state(step: 1, depth: .full), p) == "The year ahead")
         let se = state(step: 2)
         #expect(WalkCopy.eyebrow(se, p) == "Winter · Dec 1 to Feb 28")
         #expect(WalkCopy.question(se, p) == "And this winter? What’s it about?")
@@ -72,11 +72,11 @@ struct WalkCopyTests {
         let p = nov13
         let home = WalkArea(id: UUID(), name: "Home"), people = WalkArea(id: UUID(), name: "People")
         let own = WalkArea(id: UUID(), name: "Creative work")
-        var y = state(step: 1); y.areas = [home, people, own]
+        var y = state(step: 1); y.areas = [home, people, own]; y.kept = [home.id, people.id, own.id]
         y.focusArea = people.id
-        #expect(WalkCopy.question(y, p) == "What about the people in your life, this year?")
+        #expect(WalkCopy.question(y, p) == "What would make this a good year for the people in your life?")
         y.focusArea = own.id
-        #expect(WalkCopy.question(y, p) == "What about creative work, this year?")
+        #expect(WalkCopy.question(y, p) == "What would make this a good year for creative work?")
         for (name, phrase) in [("Health", "your health"), ("Home", "home"), ("Work", "work"), ("Money", "money"), ("Fun", "fun")] {
             #expect(WalkCopy.phrase(for: name) == phrase)
         }
@@ -92,19 +92,26 @@ struct WalkCopyTests {
         #expect(WalkCopy.question(t, p) == "Start the day with “Gym induction”?")
     }
 
-    @Test func theTapFlagsSentence() {
+    /// F3: the why line says a tap on the goal above switches only when there is another one here.
+    @Test func theWhyLineOffersTheSwitchOnlyWithSeveral() {
         let p = nov13
-        var s = state(step: 3); s.items = [item(.season, "Get fit")]
-        #expect(WalkCopy.why(s, p) == "Small enough to finish by the 31st. Tap one above to focus on it.")
-        s.focus[.month] = s.items[0].id
-        #expect(WalkCopy.why(s, p) == "Small enough to finish by the 31st.")
-        #expect(WalkCopy.why(state(step: 3), p) == "Small enough to finish by the 31st.")
+        let work = WalkArea(id: UUID(), name: "Work"), health = WalkArea(id: UUID(), name: "Health")
+        let launch = WalkItem(id: UUID(), level: .season, title: "Launch the shop", areaId: work.id)
+        let hire = WalkItem(id: UUID(), level: .season, title: "Hire a helper", areaId: work.id)
+        let lift = WalkItem(id: UUID(), level: .season, title: "Lift twice a week", areaId: health.id)
+        var s = state(step: 3)
+        s.areas = [health, work]; s.kept = [health.id, work.id]
+        s.items = [launch, lift]; s.focusArea = work.id; s.focus[.month] = launch.id
+        let base = "Small enough to finish by the 31st."
+        #expect(WalkCopy.focusAbove == " Tap the goal above to switch.")
+        #expect(WalkCopy.why(s, p) == base)                     // one here (another area’s does not count)
+        s.items.append(hire)
+        #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAbove)
+        s.focus[.month] = hire.id
+        #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAbove)
     }
 
-    @Test func placedAndExamples() {
-        #expect(WalkCopy.placed("Home") == "That went under Home.")
-        #expect(WalkCopy.placed("A very long area of my own") == "That went under A very long area…")
-        #expect(WalkCopy.placed(String(repeating: "x", count: 18)) == "That went under \(String(repeating: "x", count: 18)).")
+    @Test func theExamples() {
         #expect(WalkCopy.examples(.year) == ["Run a 5K", "Read a book a month", "Pay off the car"])
         #expect(WalkCopy.examples(.season) == ["Clear out the garage", "Get outside every weekend"])
         #expect(WalkCopy.examples(.month) == ["Book the plumber", "Two early nights a week"])
@@ -192,18 +199,15 @@ struct WalkCopyTests {
 
     @Test func stepPoints() {
         let y = WalkCopy.points(state(step: 1), nov13)
-        #expect(y.map(\.label) == ["Back to your areas", "Switch to another area", "Show examples", "Skip this step",
-                                   "Type it", "Leave for now"])
-        #expect(y.map(\.at) == [.n, .ne, .e, .s, .w, .nw])
-        #expect(y.map(\.action) == [.back, .nudge, .examples, .next, .type, .leave])
-        #expect(y.map(\.symbol) == ["arrow.up", "arrow.left.arrow.right", "lightbulb", "arrow.down", "keyboard", "pause"])
-        #expect(y.map(\.detail) == [nil, nil, nil, nil, nil, "Your place is kept."])
+        #expect(y.map(\.label) == ["Back to your areas", "Show examples", "Skip this step", "Type it", "Leave for now"])
+        #expect(y.map(\.at) == [.n, .e, .s, .w, .nw])
+        #expect(y.map(\.action) == [.back, .examples, .next, .type, .leave])
+        #expect(y.map(\.symbol) == ["arrow.up", "lightbulb", "arrow.down", "keyboard", "pause"])
+        #expect(y.map(\.detail) == [nil, nil, nil, nil, "Your place is kept."])
         var s = state(step: 3)
-        #expect(labels(s) == ["Back to this winter", "Switch to another goal", "Show examples", "Skip this step",
-                              "Type it", "Leave for now"])
+        #expect(labels(s) == ["Back to this winter", "Show examples", "Skip this step", "Type it", "Leave for now"])
         s.items = [item(.month, "x")]; s.examplesOn = [3]
-        #expect(labels(s) == ["Back to this winter", "Switch to another goal", "Hide examples", "Next: this week",
-                              "Type it", "Leave for now"])
+        #expect(labels(s) == ["Back to this winter", "Hide examples", "Next: this week", "Type it", "Leave for now"])
         s.undo = [.plant(UUID())]
         #expect(WalkCopy.points(s, nov13).first { $0.at == .se }
                 == WalkCopy.Point(at: .se, label: "Undo", action: .undo, symbol: "arrow.uturn.backward"))
@@ -212,7 +216,7 @@ struct WalkCopyTests {
 
     @Test func todayPoints() {
         var t = state(step: 5)
-        #expect(labels(t) == ["Back to this week", "Switch to another goal", "Skip this step", "Type it", "Leave for now"])
+        #expect(labels(t) == ["Back to this week", "Skip this step", "Type it", "Leave for now"])
         t.calendarOffer = true
         #expect(WalkCopy.points(t, nov13).contains(WalkCopy.Point(at: .e, label: "Show my calendar on Today",
                                                                   action: .calendar, symbol: "calendar")))
@@ -328,7 +332,6 @@ struct WalkCopyTests {
             }
         }
         let areas = WalkLoad.areas([], me: UUID()).map(\.name) + ["A very long area of my own"]
-        said += areas.map(WalkCopy.placed)
         said += areas.map(WalkCopy.phrase(for:))
         said += WalkLevel.allCases.flatMap(WalkCopy.examples) + WalkLevel.allCases.map(WalkCopy.levelName)
         said += [WalkCopy.wordmark, WalkCopy.welcomeSub, WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard,
@@ -350,7 +353,7 @@ struct WalkCopyTests {
                  WalkCopy.rowLabel("Lift", forGoal: "Run a 5K"), WalkCopy.areaHint(ground: true, kept: false, focused: false),
                  WalkCopy.areaHint(ground: true, kept: true, focused: false), WalkCopy.areaHint(ground: false, kept: true, focused: false),
                  WalkCopy.areaHint(ground: false, kept: true, focused: true)]
-        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focusable, .focused, .firstThing, .firstThingMine,
+        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .firstThing, .firstThingMine,
                                             .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
         said += roles.map { WalkCopy.bannerLabel("Run a 5K", level: .week, tag: "TODAY", role: $0) }
         return said
@@ -388,8 +391,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.hintMaxLength == 46)
         var hints: Set<String> = []
         let notes = [WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard, WalkCopy.speakNow,
-                     WalkCopy.ridgeFull, WalkCopy.calendarLine] + (WalkLoad.areas([], me: UUID()).map(\.name)
-                     + ["A very long area of my own"]).map(WalkCopy.placed)
+                     WalkCopy.ridgeFull, WalkCopy.calendarLine]
         for base in Generated.states() {
             for note in [nil] + notes {
                 for orb: WalkState.Orb in [.idle, .open, .speaking(live: "x")] {
@@ -517,8 +519,10 @@ struct WalkCopyTests {
         #expect(b("Gym", .week, "TUESDAY", .mine) == "Week: Gym, Tuesday, tap to move or remove")
         #expect(b("Gym", .week, "MON 23", .plain) == "Week: Gym, Mon 23")
         #expect(b("Run a 5K", .year, nil, .plain) == "Year: Run a 5K")
-        #expect(b("Run a 5K", .year, nil, .focusable) == "Year: Run a 5K, tap to focus")
-        #expect(b("Run a 5K", .year, nil, .focused) == "Year: Run a 5K, focused, tap to let go")
+        #expect(b("Run a 5K", .year, nil, .focused) == "Year: Run a 5K, the goal this step is about")
+        #expect(b("Run a 5K", .year, nil, .focusedOfSeveral)
+                == "Year: Run a 5K, the goal this step is about, tap for the next one here")
+        #expect(!WalkCopy.BannerRole.focused.taps && WalkCopy.BannerRole.focusedOfSeveral.taps)
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThing) == "Today: Gym induction, first thing")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingMine)
                 == "Today: Gym induction, first thing, tap to remove")
@@ -530,8 +534,8 @@ struct WalkCopyTests {
         #expect(b("", .year, nil, .stub(3)) == "3 more, tap to show")
         #expect(WalkCopy.areaHint(ground: true, kept: false, focused: false) == "Tap to keep")
         #expect(WalkCopy.areaHint(ground: true, kept: true, focused: false) == "Tap to let go")
-        #expect(WalkCopy.areaHint(ground: false, kept: true, focused: false) == "Tap to look closer")
-        #expect(WalkCopy.areaHint(ground: false, kept: true, focused: true) == "Tap to step back")
+        #expect(WalkCopy.areaHint(ground: false, kept: true, focused: false) == "Tap to walk there")
+        #expect(WalkCopy.areaHint(ground: false, kept: true, focused: true) == "You are here")
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: "Feel strong again") == "Lift, 30 minutes, for Feel strong again")
         #expect(WalkCopy.rowLabel("Lift, 30 minutes", forGoal: nil) == "Lift, 30 minutes")
         #expect(WalkCopy.typeFieldLabel == "Your words")         // the one-line field, once it holds text
@@ -539,11 +543,11 @@ struct WalkCopyTests {
 
     /// Only a banner whose label says what a tap does takes a tap; the rest are read as plain text.
     @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
-        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focusable, .focused, .firstThing, .firstThingMine,
+        let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .firstThing, .firstThingMine,
                                             .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
         for role in roles {
             let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
-            #expect(role.taps == label.contains("tap to"), "\(role)")
+            #expect(role.taps == label.contains(", tap "), "\(role)")
         }
         #expect(!WalkCopy.BannerRole.plain.taps)
         #expect(!WalkCopy.BannerRole.firstThing.taps)

@@ -50,7 +50,7 @@ enum CompassPoint: String, CaseIterable {
 }
 
 enum WalkAction: Equatable {
-    case quick, full, notNow, back, next, type, examples, nudge, undo, calendar, startThere, leave
+    case quick, full, notNow, back, next, type, examples, undo, calendar, startThere, leave
 }
 
 enum WalkSoundName: String, CaseIterable { case bag, poles, unfurl, plant, tick }

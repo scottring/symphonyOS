@@ -519,6 +519,36 @@ private struct Saved {
         #expect(fresh.focus[.year] == id)
     }
 
+    /// Review Focus 3: a walk saved by the build before the walk stood in one area (no
+    /// `focusArea` on a lower step, a tour half done) opens standing where its focused goal is.
+    @Test func anOlderSavedWalkFindsItsFooting() throws {
+        let work = WalkArea(id: UUID(), name: "Work"), health = WalkArea(id: UUID(), name: "Health")
+        let ship = WalkItem(id: UUID(), level: .year, title: "Ship the app", areaId: work.id)
+        let launch = WalkItem(id: UUID(), level: .season, title: "Launch the beta", areaId: work.id, parentId: ship.id)
+        let strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
+        let json = """
+        {"version":1,"status":"inProgress","depth":"full","step":3,"ground":false,
+         "areas":[{"id":"\(health.id)","name":"Health"},{"id":"\(work.id)","name":"Work"}],
+         "kept":["\(health.id)","\(work.id)"],
+         "focus":{"2":"\(ship.id)","3":"\(launch.id)"},
+         "tour":["\(strong.id)"],"planted":["\(ship.id)","\(launch.id)"],"firstThing":null,
+         "lastPlanted":{"1":"\(ship.id)","2":"\(launch.id)"},"taught":true,
+         "year":2027,"seasonStart":"2026-12-01","monthStart":"2026-12-01","weekStart":"2026-11-08",
+         "day":"2026-11-13","savedAt":"2026-11-13T09:00:00Z"}
+        """
+        let position = try JSONDecoder.walk.decode(WalkPosition.self, from: Data(json.utf8))
+        #expect(position.focusArea == nil)
+        var fresh = WalkState()
+        fresh.items = [strong, ship, launch]
+        position.apply(to: &fresh)
+        let p = periods(2026, 11, 13)
+        _ = fresh.apply(.noteExpired, WalkEnv(periods: p, now: p.today))
+        #expect(fresh.step == 3)
+        #expect(fresh.standing == work.id)
+        #expect(fresh.focus[.month] == launch.id)
+        #expect(fresh.tour == [strong.id])
+    }
+
     @Test func anOutOfRangeStepRestoresToOneTheWalkCanLeave() {
         let p = periods(2026, 11, 13)
         let env = WalkEnv(periods: p, now: p.today)

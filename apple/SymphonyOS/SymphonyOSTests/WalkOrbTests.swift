@@ -6,7 +6,7 @@ import CoreGraphics
 private let now = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 13))!
 private var env: WalkEnv { WalkEnv(periods: WalkPeriods.pick(now: now, weekStartsOn: 0), now: now) }
 
-/// Health, Home kept; off the ground on a step; optionally one planted year flag.
+/// Health, Home kept; off the ground on a step, standing in Health; optionally one planted year flag.
 private func state(step: Int, planted: Bool = false) -> WalkState {
     let health = WalkArea(id: UUID(), name: "Health")
     let home = WalkArea(id: UUID(), name: "Home")
@@ -14,7 +14,12 @@ private func state(step: Int, planted: Bool = false) -> WalkState {
     s.areas = [health, home]
     s.kept = [health.id, home.id]
     s.step = step
-    if planted { s.items = [WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)] }
+    s.focusArea = health.id
+    if planted {
+        let strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
+        s.items = [strong]
+        if step == 2 { s.focus[.season] = strong.id }       // the goal the Season step is about
+    }
     return s
 }
 
@@ -650,7 +655,7 @@ struct WalkOrbTests {
     private func waitingOnSeason() -> (state: WalkState, focused: WalkItem, other: WalkItem) {
         var s = state(step: 2)
         let strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: s.kept[0])
-        let bathroom = WalkItem(id: UUID(), level: .year, title: "Finish the bathroom", areaId: s.kept[1])
+        let bathroom = WalkItem(id: UUID(), level: .year, title: "Sleep by ten", areaId: s.kept[0])   // both in Health
         s.items = [strong, bathroom]
         s.focus[.season] = strong.id
         speak(&s, "lift twice a week")
@@ -663,7 +668,7 @@ struct WalkOrbTests {
         var s = waiting.state
         let (strong, bathroom) = (waiting.focused, waiting.other)
         #expect(s.orb == .finishing(live: "lift twice a week"))
-        let fx = s.apply(.bannerTapped(bathroom.id), env)
+        let fx = s.apply(.bannerTapped(strong.id), env)          // the goal above: a tap switches to the next one here
         let planted = try #require(s.items.last)
         #expect(planted.title == "Lift twice a week")
         #expect(planted.parentId == strong.id)

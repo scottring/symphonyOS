@@ -783,7 +783,9 @@ private struct Builder {
         }
         guard s.step < 6, !s.ground, let level else { return .plain }
         if item.level == level { return item.mine ? .mine : .plain }
-        if item.level.rawValue == level.rawValue - 1 { return s.focus[level] == item.id ? .focused : .focusable }
+        if item.level.rawValue == level.rawValue - 1, s.focus[level] == item.id {
+            return s.parentsHere().count > 1 ? .focusedOfSeveral : .focused
+        }
         return .plain
     }
 

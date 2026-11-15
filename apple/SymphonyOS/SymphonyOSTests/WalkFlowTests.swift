@@ -419,18 +419,6 @@ final class WalkFlowTests {
         #expect(try childrenAheadOfParents(ctx) == [])
     }
 
-    @Test func aGoalSaidOnTheWrongPeakMoves() async throws {
-        let ctx = try walkTestContext()
-        let m = model(ctx)
-        quickStart(m, keeping: ["Health", "Home"])
-        m.send(.areaTapped(area(m, "Health")))
-        #expect(m.state.focusArea == area(m, "Health"))
-        await say(m, "finish the bathroom")
-        let goal = try #require(fetch(ctx, Goal.self).first)
-        #expect(goal.areaId == area(m, "Home"))
-        #expect(m.state.note == WalkCopy.placed("Home"))
-    }
-
     @Test func everyStepCanBeSkipped() throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
@@ -511,7 +499,8 @@ final class WalkFlowTests {
         let (strong, bathroom) = (goals[0], goals[1])
 
         m.choose(.next)
-        m.send(.bannerTapped(strong.id))                       // the chain goes under the first goal
+        #expect(m.state.focus[.season] == bathroom.id)         // the one planted last, in Health
+        m.send(.bannerTapped(bathroom.id))                     // switched: the chain goes under the first goal
         #expect(m.state.focus[.season] == strong.id)
         let focusBefore = m.state.focus
         let savedBefore = store.load(for: me)
@@ -558,31 +547,34 @@ final class WalkFlowTests {
         #expect(store.load(for: me) == endSaved)
     }
 
-    /// A second walk down that skips Season: the Month line is not hung under the
-    /// first chain's season line, nor filed under the first goal.
-    @Test func aSecondWalkDownThatSkipsSeasonLinksToNothingOfTheFirst() async throws {
+    /// A second walk down that skips Season stands in the same area: the Month step is
+    /// about that area's goal above (the first chain's season line), and the question names it.
+    @Test func aSecondWalkDownThatSkipsSeasonTakesTheAreasGoalAbove() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
         quickStart(m, keeping: ["Health", "Home"])
         await say(m, "feel strong again")
         await say(m, "finish the bathroom")
-        let strong = m.state.items(on: .year)[0]
+        let (strong, bathroom) = (m.state.items(on: .year)[0], m.state.items(on: .year)[1])
         m.choose(.next)
-        m.send(.bannerTapped(strong.id))
+        m.send(.bannerTapped(bathroom.id))                     // switch to the first goal
         await say(m, "lift twice a week")
+        let lift = try #require(task(ctx, "Lift twice a week"))
         m.choose(.next)
         await say(m, "book the gym induction")
         for _ in 0..<3 { m.choose(.next) }
         #expect(m.state.step == 6)
 
         m.send(.walkAnother)
+        #expect(m.state.focus[.season] == bathroom.id)
         m.choose(.next)                                        // Season skipped
         #expect(m.state.step == 3)
-        #expect(m.state.focus[.month] == nil)
+        #expect(m.state.focus[.month] == lift.id)
+        #expect(WalkCopy.question(m.state, m.periods).contains("“Lift twice a week”"))
         await say(m, "call the tiler")
         let tiler = try #require(task(ctx, "Call the tiler"))
-        #expect(tiler.sourceId == nil)
-        #expect(tiler.goalId != strong.id)
+        #expect(tiler.sourceId == lift.id)
+        #expect(tiler.goalId == strong.id)
         #expect(try childrenAheadOfParents(ctx) == [])
     }
 

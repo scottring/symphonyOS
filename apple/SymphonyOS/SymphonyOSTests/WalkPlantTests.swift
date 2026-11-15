@@ -59,29 +59,7 @@ private struct Hill {
 struct WalkPlantTests {
     private let m = Hill()
 
-    // MARK: Year: placed by what it says
-
-    @Test func aGoalGoesToItsAreaEvenWhenAnotherPeakIsFocused() {
-        var s = m.on(1)
-        s.focusArea = m.health.id
-        let effects = s.plant("finish the bathroom.", m.env)
-
-        #expect(s.items.count == 1)
-        let item = s.items[0]
-        #expect(item.title == "Finish the bathroom")
-        #expect(item.level == .year)
-        #expect(item.areaId == m.home.id)
-        #expect(item.parentId == nil)
-        #expect(item.mine)
-        #expect(s.note == WalkCopy.placed("Home"))
-        #expect(effects == [
-            .write(.area(m.home)), .write(.create(item, parent: nil)), .sound(.plant, afterMs: 0),
-            .timer(.undo, ms: WalkState.undoMs), .timer(.note, ms: WalkState.noteMs), .save,
-        ])
-        #expect(s.undo == [.plant(item.id)])
-        #expect(s.lastPlanted[.year] == item.id)
-        #expect(s.undoShowing)
-    }
+    // MARK: Year: in the area the walk stands in
 
     @Test func theFocusedPeakCatchesAnUnclearGoal() {
         var s = m.on(1)
@@ -107,6 +85,19 @@ struct WalkPlantTests {
             .write(.create(item, parent: nil)), .sound(.plant, afterMs: 0),
             .timer(.undo, ms: WalkState.undoMs), .save,
         ])
+    }
+
+    /// F2: a goal goes where the walk stands, whatever its words; no note says where it went.
+    @Test func aGoalIsPlantedWhereYouStand() {
+        var s = m.on(1)
+        s.kept.append(m.work.id)
+        _ = s.apply(.areaTapped(m.work.id), m.env)
+        #expect(s.standing == m.work.id)
+        let effects = s.plant("Run a 5K", m.env)                // Health words, said while standing in Work
+        let item = s.items[0]
+        #expect(item.areaId == m.work.id)
+        #expect(s.note == nil)
+        #expect(!effects.contains(.timer(.note, ms: WalkState.noteMs)))
     }
 
     // MARK: Lower levels
@@ -465,7 +456,7 @@ struct WalkPlantTests {
         _ = s.plant("garden", m.env)                                     // name an area
         let garden = s.areas[6]
         _ = s.act(.next, m.env)                                           // walk on, off the ground
-        _ = s.plant("learn the cello", m.env)                            // plant (unlabeled)
+        _ = s.plant("learn the cello", m.env)                            // plant, in Health where the walk stands
         let cello = s.items[0]
         _ = s.apply(.bannerTapped(cello.id), m.env)
         _ = s.apply(.moveTo(m.work.id), m.env)                           // move
@@ -479,9 +470,10 @@ struct WalkPlantTests {
 
         let second = s.apply(.undo, m.env)
         #expect(second == [
-            .write(.setArea(cello.id, .year, nil)), .write(.dropArea(m.work.id)), .sound(.poles, afterMs: 0), .save,
+            .write(.area(m.health)), .write(.setArea(cello.id, .year, m.health.id)), .write(.dropArea(m.work.id)),
+            .sound(.poles, afterMs: 0), .save,
         ])
-        #expect(s.items.map(\.areaId) == [nil])
+        #expect(s.items.map(\.areaId) == [m.health.id])
         #expect(s.kept == [m.health.id, m.home.id, garden.id])
 
         let third = s.act(.undo, m.env)
@@ -500,6 +492,7 @@ struct WalkPlantTests {
 
     @Test func undoIsStillThereAfterThePillHides() {
         var s = m.on(1)
+        s.focusArea = m.home.id
         _ = s.plant("finish the bathroom", m.env)
         let item = s.items[0]
         _ = s.apply(.undoExpired, m.env)
@@ -732,9 +725,10 @@ struct WalkPlantTests {
         #expect(s.selected == nil)
         #expect(s.focus[.today] == theirs.id)
 
-        _ = s.apply(.bannerTapped(mine.id), m.env)            // a week flag that is not the first thing
+        // A week flag that is not the one the step is about is not drawn: a tap on it changes nothing.
+        #expect(s.apply(.bannerTapped(mine.id), m.env).isEmpty)
         #expect(s.selected == nil)
-        #expect(s.focus[.today] == mine.id)
+        #expect(s.focus[.today] == theirs.id)
     }
 
     @Test func moveTargetsAreEveryOtherArea() {
@@ -799,7 +793,7 @@ struct WalkPlantTests {
         #expect(s.step == 2 && !s.ground && s.depth == .quick)
         #expect(s.focus == [.season: m.bathroom.id])
         #expect(s.lastPlanted.isEmpty)
-        #expect(s.focusArea == nil && s.tour.isEmpty)
+        #expect(s.focusArea == m.home.id && s.tour.isEmpty)      // standing in that goal's area
         #expect(s.undo.isEmpty && !s.undoShowing && s.pulledChildren.isEmpty)
         #expect(s.examplesOn.isEmpty && s.note == nil)
         #expect(s.selected == nil && s.expanded == nil && s.typing == nil)
@@ -816,6 +810,7 @@ struct WalkPlantTests {
         // Every year goal already has a season piece: nothing to walk.
         var walked = m.on(6, items: [m.strong, m.lift])
         walked.lastPlanted = [.season: m.lift.id]
+        walked.focusArea = m.health.id
         let before = walked
         #expect(walked.apply(.walkAnother, m.env) == [])
         #expect(walked == before)
@@ -823,6 +818,7 @@ struct WalkPlantTests {
         // Not at the ending.
         var today = m.on(5, items: [m.strong, m.bathroom, m.lift])
         today.focus = [.today: m.lift.id]
+        today.focusArea = m.health.id
         let earlier = today
         #expect(today.apply(.walkAnother, m.env) == [])
         #expect(today == earlier)

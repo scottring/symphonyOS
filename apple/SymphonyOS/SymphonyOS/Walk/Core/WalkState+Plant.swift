@@ -10,18 +10,18 @@ extension WalkState {
     // MARK: Planting
 
     /// Plants what was said on this step. On the ground it names an area; on
-    /// Year a goal goes where its words clearly belong; lower levels hang under
+    /// Year a goal goes in the area the walk stands in; lower levels hang under
     /// the focused parent; on Today it becomes the first thing. Nothing said,
     /// nothing planted.
     mutating func plant(_ raw: String, _ env: WalkEnv) -> [WalkEffect] {
         guard let level else { return [] }
         if ground { return nameArea(raw, env) }
         guard let said = WalkWords.said(raw, level: level, today: env.periods.today) else { return nothingToPlant() }
-        return plantFlag(said, on: level, classify: true, plantSoundMs: 0, env)
+        return plantFlag(said, on: level, plantSoundMs: 0, env)
     }
 
     /// An example is planted as the person's own words, only while examples are
-    /// on for this step, with the focused peak's or parent's area and no classifying.
+    /// on for this step, as anything said here is.
     /// Once it is planted (same words, and on Week the same day) another tap does nothing.
     mutating func plantExample(_ text: String, _ env: WalkEnv) -> [WalkEffect] {
         guard let level, !ground, examplesOn.contains(step), WalkCopy.examples(level).contains(text),
@@ -31,27 +31,15 @@ extension WalkState {
                 && (level != .week || $0.day.map(PlanCalendar.day) == said.day.map(PlanCalendar.day))
         }
         guard !planted else { return [] }
-        return [.sound(.poles, afterMs: 0)] + plantFlag(said, on: level, classify: false, plantSoundMs: 160, env)
+        return [.sound(.poles, afterMs: 0)] + plantFlag(said, on: level, plantSoundMs: 160, env)
     }
 
-    private mutating func plantFlag(_ said: WalkWords.Said, on level: WalkLevel, classify: Bool,
+    /// A flag goes where the walk stands (F2): on Year in the area stood in; below,
+    /// under the focused parent and in its area, or, with none, in the area stood in.
+    private mutating func plantFlag(_ said: WalkWords.Said, on level: WalkLevel,
                                     plantSoundMs: Int, _ env: WalkEnv) -> [WalkEffect] {
-        var areaId: UUID?
-        var parent: WalkItem?
-        var placedNote: String?
-        if level == .year {
-            if classify {
-                if case .area(let id, let moved) = WalkClassifier.place(said.title, kept: keptAreas, focus: focusArea) {
-                    areaId = id
-                    if moved, let a = area(id) { placedNote = WalkCopy.placed(a.name) }
-                }
-            } else {
-                areaId = focusArea.flatMap { kept.contains($0) ? $0 : nil }
-            }
-        } else {
-            parent = item(focus[level])
-            areaId = parent?.areaId
-        }
+        let parent = level == .year ? nil : item(focus[level])
+        let areaId = parent?.areaId ?? standing
         // The first thing is a week task dated today, titled with everything that was said.
         let item = WalkItem(id: env.newId(), level: level == .today ? .week : level, title: said.title,
                             areaId: areaId, parentId: parent?.id,
@@ -73,12 +61,7 @@ extension WalkState {
         selected = nil
         expanded = nil                      // the post just planted on is the open one, not one opened before
         undoShowing = true
-        effects += [.sound(.plant, afterMs: plantSoundMs), .timer(.undo, ms: WalkState.undoMs)]
-        if let placedNote {
-            note = placedNote
-            effects.append(.timer(.note, ms: WalkState.noteMs))
-        }
-        effects.append(.save)
+        effects += [.sound(.plant, afterMs: plantSoundMs), .timer(.undo, ms: WalkState.undoMs), .save]
         return effects
     }
 
@@ -176,12 +159,6 @@ extension WalkState {
             lastPlanted[key.level] = newest.id
         }
         return []
-    }
-
-    /// The post a flag stands on: its area's when that area is a column, else the unlabeled one.
-    private func column(of item: WalkItem) -> UUID? {
-        guard let id = item.areaId, area(id) != nil, ground || kept.contains(id) else { return nil }
-        return id
     }
 
     /// The selected flag goes to another area; an area not kept is kept, so its column appears.
@@ -309,9 +286,9 @@ extension WalkState {
     // MARK: The ending
 
     /// "Walk another one down": back to Season in a quick walk, focused on the
-    /// first year goal with nothing under it yet, as a clean walk down. Nothing
-    /// of the chain just walked steers the next one: no focus or last-planted
-    /// flag below (so a skipped step links to nothing of the first chain), no
+    /// first year goal with nothing under it yet (the walk stands in its area), as
+    /// a clean walk down. No focus or last-planted flag below is kept (a skipped
+    /// step takes the area's newest goal above, which the question names), no
     /// tour, no Undo, no examples, no note, no half-finished hold. The flags,
     /// the ridge, today's first thing (and the day it replaced) and a refusal
     /// of speech stay. With every goal walked, or before the ending, nothing.

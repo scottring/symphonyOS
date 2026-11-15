@@ -138,24 +138,20 @@ struct DailyWriterTests {
         #expect(!pending(ctx).contains { $0.tableName == "task_focus" })
     }
 
-    @Test func aYearGoalGoesWhereItsWordsBelong() throws {
+    /// F2: a goal from the bar on the Year page goes under the area the page stands in, whatever its words.
+    @Test func aYearGoalFromTheBarGoesWhereThePageStands() throws {
         let ctx = try walkTestContext()
         let added = writer(ctx).add(.goal(title: "Run a marathon", level: .year), kept: [health, home], focusArea: home.id)
         let g = try #require(goal(ctx, added.id))
         #expect(added.level == .year)
-        #expect(added.areaId == health.id)
-        #expect(added.placed == "Health")
-        #expect(g.areaId == health.id)
+        #expect(added.areaId == home.id)
+        #expect(g.areaId == home.id)
         #expect(g.year == periods.year)
         #expect(g.context == "personal")
-        #expect(areas(ctx).contains { $0.id == health.id && $0.userId == me })
-    }
-
-    @Test func aYearGoalOnItsOwnPeakIsNotPlaced() throws {
-        let ctx = try walkTestContext()
-        let added = writer(ctx).add(.goal(title: "Run a marathon", level: .year), kept: [health, home], focusArea: health.id)
-        #expect(added.areaId == health.id)
-        #expect(added.placed == nil)
+        #expect(areas(ctx).contains { $0.id == home.id && $0.userId == me })
+        // Standing nowhere (no area kept), it has none.
+        let loose = writer(ctx).add(.goal(title: "Run a marathon", level: .year), kept: [], focusArea: nil)
+        #expect(loose.areaId == nil)
     }
 
     @Test func aGoalUnderAFlagLinksUp() throws {
@@ -193,7 +189,7 @@ struct DailyWriterTests {
     }
 
     /// Fix round 1: a parent that is not mine (anyone else's, or mine in a family
-    /// life area) is no parent: no link to it, and the words alone place the goal.
+    /// life area) is no parent: no link to it, and no area (words never place a goal).
     @Test func aParentThatIsNotMineIsNoParent() throws {
         let ctx = try walkTestContext()
         let theirs = SymphonyTask(userId: other, title: "Their season goal", scheduledFor: nil, context: "personal")
@@ -210,7 +206,7 @@ struct DailyWriterTests {
             let t = try #require(task(ctx, added.id))
             #expect(t.sourceId == nil)
             #expect(t.goalId == nil)
-            #expect(added.areaId == home.id)
+            #expect(added.areaId == nil)
         }
     }
 
@@ -227,13 +223,13 @@ struct DailyWriterTests {
         #expect(!pending(ctx).contains { $0.tableName == "task_focus" })
     }
 
-    @Test func aGoalWithNoParentIsPlacedByItsWordsAlone() throws {
+    /// F2: below Year a goal takes its parent's area; with no parent it has none, whatever its words.
+    @Test func aGoalWithNoParentHasNoArea() throws {
         let ctx = try walkTestContext()
         let added = writer(ctx).add(.goal(title: "Fix the garden fence", level: .month), kept: [health, home],
                                     focusArea: health.id)
-        #expect(added.areaId == home.id)
-        #expect(added.placed == nil)
-        #expect(task(ctx, added.id)?.areaId == home.id)
+        #expect(added.areaId == nil)
+        #expect(task(ctx, added.id)?.areaId == nil)
     }
 
     /// Finding 1: a goal added on another period's page files into that period.
@@ -405,7 +401,7 @@ struct DailyWriterTests {
         ctx.insert(theirs)
         try ctx.save()
         try pushAll(ctx)
-        writer(ctx).takeBack(DailyWriter.Added(id: theirs.id, level: .week, areaId: nil, placed: nil))
+        writer(ctx).takeBack(DailyWriter.Added(id: theirs.id, level: .week, areaId: nil))
         #expect(task(ctx, theirs.id) != nil)
         #expect(pending(ctx).isEmpty)
     }
@@ -641,7 +637,7 @@ struct DailyWriterTests {
         w.setArea(ours.id, level: .week, to: health)
         w.setArea(ourGoal.id, level: .year, to: health)
         w.setFirst(ours.id, previous: nil)
-        w.takeBack(DailyWriter.Added(id: ours.id, level: .week, areaId: nil, placed: nil))
+        w.takeBack(DailyWriter.Added(id: ours.id, level: .week, areaId: nil))
 
         let t = try #require(task(ctx, ours.id))
         #expect(t.completed == false)

@@ -19,7 +19,7 @@ struct WalkState: Equatable {
     var depth: WalkDepth = .quick
     var areas: [WalkArea] = []; var kept: [UUID] = []     // ground labels in order; kept ids in the order kept
     var items: [WalkItem] = []             // in planting order
-    var focusArea: UUID?
+    var focusArea: UUID?                   // off the ground, the area the walk stands in (`standing`)
     var focus: [WalkLevel: UUID] = [:]     // a step's level → the focused item one level up
     var tour: [UUID] = []                  // whole-year stops still ahead on this step
     var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
@@ -67,7 +67,9 @@ struct WalkState: Equatable {
         // Any touch puts the lesson away (a press on the light does it in `orbDown`, a tap on the veil below).
         if teaching, !event.leavesAWaitingFlag, event != .orbDown, event != .moreTapped { teaching = false }
         let planted = event.leavesAWaitingFlag ? [] : plantWaitingFlag(env)
-        return planted + respond(to: event, env)
+        let effects = planted + respond(to: event, env)
+        settleStanding()
+        return effects
     }
 
     private mutating func respond(to event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
@@ -132,7 +134,9 @@ struct WalkState: Equatable {
         guard !ended else { return [] }
         teaching = false                    // a compass point chosen through VoiceOver puts the lesson away
         let planted = plantWaitingFlag(env)
-        return planted + respond(to: action, env)
+        let effects = planted + respond(to: action, env)
+        settleStanding()
+        return effects
     }
 
     private mutating func respond(to action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
@@ -144,7 +148,6 @@ struct WalkState: Equatable {
         case .leave: return (1...5).contains(step) ? end(.paused) : []
         case .next: return walkOn(env)
         case .back: return backUp(env)
-        case .nudge: return nudge()
         case .examples:
             guard (1...4).contains(step), !ground else { return [] }
             if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
@@ -229,25 +232,19 @@ struct WalkState: Equatable {
         return enter(step - 1, env) + [.save]
     }
 
-    /// Arrives on a step, from above or below. Focus per step is remembered. Year
-    /// entered from below has its tour over: no peak focused, the whole range in view.
+    /// Arrives on a step, from above or below, still standing in the same area. Focus per
+    /// step is remembered; a step with none takes the area's remembered or newest goal above
+    /// (`settleStanding`). Year entered from below has its tour over.
     /// Today, while the calendar may be asked for, offers it: one quiet line, held
     /// longer than a note, and the Calendar point. The line stays on Today.
     private mutating func enter(_ newStep: Int, _ env: WalkEnv) -> [WalkEffect] {
         step = newStep
-        focusArea = nil
         tour = []
         settle()
         teachOnce()
         if note == WalkCopy.calendarLine { note = nil }
         guard let level, level != .year else { return [] }
-        if level == .season, depth == .full {
-            resumeSeasonTour()
-        } else if focus[level] == nil, let above = WalkLevel(rawValue: level.rawValue - 1),
-                  let last = item(lastPlanted[above]) {
-            // The flag planted last on the level above, so the next flag links to it.
-            focus[level] = last.id
-        }
+        if level == .season, depth == .full { resumeSeasonTour() }
         guard level == .today else { return [] }
         calendarOffer = env.canAskCalendar
         guard calendarOffer else { return [] }
@@ -255,16 +252,11 @@ struct WalkState: Equatable {
         return [.timer(.note, ms: WalkState.calendarNoteMs)]
     }
 
-    /// Leaving the ground: in a whole-year walk the Year tour starts at the first
-    /// kept area, the rest waiting in `tour`.
+    /// Leaving the ground: the walk stands in the first kept area; in a whole-year
+    /// walk the Year tour starts there, the rest waiting in `tour`.
     private mutating func startTour() {
-        guard depth == .full else {
-            focusArea = nil
-            tour = []
-            return
-        }
         focusArea = kept.first
-        tour = Array(kept.dropFirst())
+        tour = depth == .full ? Array(kept.dropFirst()) : []
     }
 
     /// Season in a whole-year walk: the first time, the tour starts at the first
@@ -291,9 +283,8 @@ struct WalkState: Equatable {
         }
     }
 
-    /// A tap or a nudge that moves the focus during a tour moves the tour with it:
-    /// the stops left are the ones after the new focus. Releasing the focus (nil)
-    /// leaves the stops as they were.
+    /// A tap that moves the focus during a tour moves the tour with it: the stops
+    /// left are the ones after the new focus. No focus (nil) leaves the stops as they were.
     private mutating func follow(_ newFocus: UUID?) {
         guard !tour.isEmpty, let newFocus else { return }
         let stops = tourStops
@@ -329,10 +320,89 @@ struct WalkState: Equatable {
         teaching = false
     }
 
-    // MARK: Peaks, parent flags and nudge
+    // MARK: Where the walk stands
 
+    /// Off the ground, the area the walk stands in: `focusArea` when it is a kept area;
+    /// else nil (the nameless post, where flags with no kept area stand).
+    var standing: UUID? {
+        guard !ground, let id = focusArea, kept.contains(id) else { return nil }
+        return id
+    }
+
+    /// Steps 2 to 5: the flags one level above the step's that stand where the walk
+    /// stands (a flag with no kept area counts for the nameless post), in planting order.
+    func parentsHere() -> [WalkItem] {
+        let here = standing
+        return parentsAnywhere().filter { column(of: $0) == here }
+    }
+
+    /// Steps 2 to 5: every flag one level above the step's, in planting order. Today's first
+    /// thing is a week task too, but it is Today's own flag, never a goal above it.
+    private func parentsAnywhere() -> [WalkItem] {
+        guard let level, level != .year, let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
+        return items(on: above).filter { level != .today || $0.id != firstThing }
+    }
+
+    /// The post a flag stands on: its area when that area is kept, else the nameless
+    /// one (nil). On the ground every area is a column.
+    func column(of item: WalkItem) -> UUID? {
+        guard let id = item.areaId, area(id) != nil, ground || kept.contains(id) else { return nil }
+        return id
+    }
+
+    /// Of these parents, the one the walk remembers (planted last on their level) or else the newest.
+    private func rememberedOrNewest(_ parents: [WalkItem]) -> WalkItem? {
+        guard let level = parents.first?.level else { return nil }
+        return parents.first { $0.id == lastPlanted[level] } ?? parents.last
+    }
+
+    /// After every event and action the walk stands somewhere, never on a post with no way on.
+    /// Year: in a kept area. Steps 2 to 5: in the focused goal's area; with no focused goal,
+    /// on the area's remembered or newest goal above; an area with nothing above but a flag
+    /// on this step stays as it is; otherwise the newest goal above anywhere, and the walk
+    /// goes to its area; with none at all, no goal and a kept area. Look back up: a kept
+    /// area, or the first one holding a flag.
+    private mutating func settleStanding() {
+        guard !ground else { return }
+        let stands = focusArea.map(kept.contains) ?? false
+        switch step {
+        case 1:
+            if !stands, let first = kept.first { focusArea = first }
+        case 2...5:
+            guard let level else { return }
+            if let parent = item(focus[level]) {
+                focusArea = column(of: parent)
+                return
+            }
+            if let parent = rememberedOrNewest(parentsHere()) {
+                focus[level] = parent.id
+                focusArea = column(of: parent)
+                return
+            }
+            focus[level] = nil
+            let here = standing
+            if items(on: level).contains(where: { column(of: $0) == here }) { return }
+            if let newest = parentsAnywhere().last {
+                focus[level] = newest.id
+                focusArea = column(of: newest)
+                return
+            }
+            if !stands { focusArea = kept.first }
+        case 6:
+            guard !stands else { return }
+            focusArea = kept.first { id in items.contains { column(of: $0) == id } } ?? kept.first
+        default:
+            return
+        }
+    }
+
+    // MARK: Areas and the goal above
+
+    /// The ground: a tap keeps an area or lets it go. Off the ground, on steps 1 to 6, a tap
+    /// on a kept area walks there; on steps 2 to 5 the area's remembered or newest goal
+    /// above is the one the step is about (none if it has none). The area stood in: nothing.
     private mutating func tapArea(_ id: UUID) -> [WalkEffect] {
-        guard step == 1, area(id) != nil else { return [] }
+        guard area(id) != nil else { return [] }
         if ground {
             if let index = kept.firstIndex(of: id) {
                 kept.remove(at: index)
@@ -344,37 +414,30 @@ struct WalkState: Equatable {
             undoShowing = true
             return [.sound(.tick, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save]
         }
-        guard kept.contains(id) else { return [] }
-        focusArea = focusArea == id ? nil : id
-        follow(focusArea)
-        return [.save]
-    }
-
-    /// Steps 2 to 5: a flag one level above is the parent the next flag links to.
-    private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
-        guard let level, let item = item(id),
-              item.level.rawValue == level.rawValue - 1 else { return [] }
-        focus[level] = focus[level] == id ? nil : id
-        follow(focus[level])
-        return [.save]
-    }
-
-    private mutating func nudge() -> [WalkEffect] {
-        guard let level, !ground else { return [] }
-        if level == .year {
-            guard !kept.isEmpty else { return [] }
-            let next = focusArea.flatMap { kept.firstIndex(of: $0) }.map { ($0 + 1) % kept.count } ?? 0
-            focusArea = kept[next]
+        guard (1...6).contains(step), kept.contains(id), id != standing else { return [] }
+        focusArea = id
+        if let level, level != .year {
+            focus[level] = rememberedOrNewest(parentsHere())?.id
+            follow(focus[level])
+        } else {
             follow(focusArea)
+        }
+        return [.save]
+    }
+
+    /// Steps 2 to 5: a tap on the goal the step is about switches to the next goal above in
+    /// the area stood in, round again; with only one, nothing. No other goal above is drawn.
+    /// On Today a first thing the walk did not plant (drawn in its own band) is focused by a tap.
+    private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
+        guard let level else { return [] }
+        if level == .today, id == firstThing, id != focus[level], item(id) != nil {
+            focus[level] = id
             return [.save]
         }
-        guard let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
-        // Season goes through the year goals in the order its tour visits them.
-        let parents = level == .season ? yearGoalsInColumnOrder() : items(on: above)
-        guard !parents.isEmpty else { return [] }
-        let next = focus[level].flatMap { id in parents.firstIndex { $0.id == id } }
-            .map { ($0 + 1) % parents.count } ?? 0
-        focus[level] = parents[next].id
+        guard id == focus[level] else { return [] }
+        let parents = parentsHere()
+        guard parents.count > 1, let index = parents.firstIndex(where: { $0.id == id }) else { return [] }
+        focus[level] = parents[(index + 1) % parents.count].id
         follow(focus[level])
         return [.save]
     }

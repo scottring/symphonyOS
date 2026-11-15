@@ -15,7 +15,7 @@ enum WalkCopy {
         guard let level = s.level else { return "" }
         switch level {
         case .year:
-            return s.depth == .full && !s.ground ? "The year ahead · area by area" : "The year ahead"
+            return "The year ahead"
         case .season:
             if p.seasonIsCurrent {
                 return "This season · to \(format(p.season.lastDay, "MMM d"))"
@@ -27,6 +27,14 @@ enum WalkCopy {
         }
     }
 
+    /// Beside the eyebrow on the whole-year walk's Year step (F1): which kept area the walk
+    /// stands in, of how many: "1 of 3". Nil anywhere else, and with one area or none.
+    static func eyebrowCount(_ s: WalkState) -> String? {
+        guard s.step == 1, !s.ground, s.depth == .full, s.kept.count > 1,
+              let index = s.standing.flatMap({ s.kept.firstIndex(of: $0) }) else { return nil }
+        return "\(index + 1) of \(s.kept.count)"
+    }
+
     static func question(_ s: WalkState, _ p: WalkPeriods) -> String {
         if s.step == 0 { return welcomeTitle }
         guard let level = s.level else { return "" }
@@ -34,7 +42,7 @@ enum WalkCopy {
         let parent = focusedParent(s, level)
         switch level {
         case .year:
-            if let area = s.area(s.focusArea) { return "What about \(phrase(for: area.name)), this year?" }
+            if let area = s.area(s.standing) { return "What would make this a good year for \(phrase(for: area.name))?" }
             return "What would make the year ahead a good one?"
         case .season:
             if let t = parent { return "What part of “\(short(t.title))” belongs to this \(p.seasonWord)?" }
@@ -63,10 +71,7 @@ enum WalkCopy {
         case .week: line = "Say the day for each: “the deposit, today.”"
         case .today: line = "Just one. The rest of today can wait its turn."
         }
-        if let above = WalkLevel(rawValue: level.rawValue - 1),
-           !s.items(on: above).isEmpty, s.focus[level] == nil {
-            line += focusAbove
-        }
+        if s.parentsHere().count > 1 { line += focusAbove }
         return line
     }
 
@@ -210,8 +215,6 @@ enum WalkCopy {
         if s.ground {
             out.append(Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard"))
         } else {
-            out.append(Point(at: .ne, label: level == .year ? "Switch to another area" : "Switch to another goal",
-                             action: .nudge, symbol: "arrow.left.arrow.right"))
             if level == .today {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
@@ -262,11 +265,6 @@ enum WalkCopy {
 
     // MARK: Notes
 
-    /// A long area name is cut (and then takes no full stop after its ellipsis), so the note is one line.
-    static func placed(_ areaName: String) -> String {
-        let name = cut(areaName, 18)
-        return "That went under \(name)\(name.hasSuffix("…") ? "" : ".")"
-    }
     static let nothingToPlant = "Nothing added yet. Hold the light to speak."
     static let speechOff = "Speaking isn’t available here, so type it."
     /// A second hold in a row that heard nothing.
@@ -288,8 +286,8 @@ enum WalkCopy {
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
     static let groundWhy = "Tap the ones that matter to you."
-    /// Added to a step's why line while a parent one level up may still be chosen.
-    static let focusAbove = " Tap one above to focus on it."
+    /// Added to a step's why line while the area stood in has more than one goal above (F3).
+    static let focusAbove = " Tap the goal above to switch."
 
     // MARK: The ending
 
@@ -357,14 +355,17 @@ enum WalkCopy {
     }
 
     enum BannerRole: Equatable {
-        case mine, plain, focusable, focused, firstThing, firstThingMine, example, stub(Int)
+        /// `focused`: the goal above the step is about; `focusedOfSeveral`: the same, with another
+        /// one above in the area stood in, which a tap switches to.
+        case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example, stub(Int)
         /// Today's first thing, not planted by this walk, on the Today step: a tap focuses it.
         case firstThingFocusable, firstThingFocused
-        /// A tap does something: the label says what. A plain flag, or someone else's first thing, is only read.
+        /// A tap does something: the label says what. A plain flag, someone else's first thing,
+        /// or the only goal above, is only read.
         var taps: Bool {
             switch self {
-            case .plain, .firstThing: return false
-            case .mine, .focusable, .focused, .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub:
+            case .plain, .firstThing, .focused: return false
+            case .mine, .focusedOfSeveral, .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub:
                 return true
             }
         }
@@ -376,8 +377,8 @@ enum WalkCopy {
         switch role {
         case .mine: return "\(withTag), tap to move or remove"
         case .plain: return withTag
-        case .focusable: return "\(withTag), tap to focus"
-        case .focused: return "\(withTag), focused, tap to let go"
+        case .focused: return "\(withTag), the goal this step is about"
+        case .focusedOfSeveral: return "\(withTag), the goal this step is about, tap for the next one here"
         case .firstThing: return "Today: \(text), first thing"
         case .firstThingMine: return "Today: \(text), first thing, tap to remove"   // planted by the walk
         case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"
@@ -389,7 +390,7 @@ enum WalkCopy {
 
     static func areaHint(ground: Bool, kept: Bool, focused: Bool) -> String {
         if ground { return kept ? "Tap to let go" : "Tap to keep" }
-        return focused ? "Tap to step back" : "Tap to look closer"
+        return focused ? "You are here" : "Tap to walk there"
     }
 
     static func rowLabel(_ title: String, forGoal: String?) -> String {

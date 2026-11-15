@@ -33,18 +33,16 @@ import SwiftData
         let id: UUID
         let level: WalkLevel
         let areaId: UUID?
-        /// The area's name, when the words moved it off the focused peak.
-        let placed: String?
     }
 
     // MARK: Adding
 
     /// Writes what the bar read. A task is a week task (on its day when one was
     /// said, at its time when one was said, never the first thing). A year goal
-    /// goes where its words belong among `kept`, else to `focusArea`; a season or
-    /// month goal under `parent` takes the parent's area and links up as the
-    /// walk's do; with no parent it is placed by its words alone. `periods`, when
-    /// set (a page for another period), files the row into those periods.
+    /// goes under the area the page stands in (`focusArea`, when it is among `kept`);
+    /// a season or month goal under `parent` takes the parent's area and links up as
+    /// the walk's do; with no parent it has no area. Words never place a goal.
+    /// `periods`, when set (a page for another period), files the row into those periods.
     @discardableResult
     func add(_ add: DailyAdd.Add, kept: [WalkArea] = [], focusArea: UUID? = nil, parent: WalkItem? = nil,
              periods: WalkPeriods? = nil) -> Added {
@@ -59,25 +57,18 @@ import SwiftData
                 let snap = plan.move(t, to: .day(at, allDay: false))
                 if !snap.createdFocus.isEmpty { plan.undo(PlanWriter.Snapshot(createdFocus: snap.createdFocus)) }
             }
-            return Added(id: item.id, level: .week, areaId: nil, placed: nil)
+            return Added(id: item.id, level: .week, areaId: nil)
 
         case .goal(let title, let level):
             // A parent counts only when its stored row is mine, and lends its stored area.
             let parent = level == .year ? nil : parent.flatMap(storedParent)
-            var areaId: UUID?
-            var placed: String?
-            if let parent {
-                areaId = parent.areaId
-            } else if case .area(let id, let moved) = WalkClassifier.place(title, kept: kept,
-                                                                           focus: level == .year ? focusArea : nil) {
-                areaId = id
-                if moved { placed = kept.first { $0.id == id }?.name }
-            }
+            let standing = level == .year ? focusArea.flatMap { id in kept.contains { $0.id == id } ? id : nil } : nil
+            let areaId = parent?.areaId ?? standing
             if let areaId, let area = kept.first(where: { $0.id == areaId }) { walk.ensureArea(area) }
             let item = WalkItem(id: UUID(), level: level, title: title, areaId: areaId,
                                 parentId: level == .year ? nil : parent?.id)
             creator.create(item, parent: level == .year ? nil : parent)
-            return Added(id: item.id, level: level, areaId: areaId, placed: placed)
+            return Added(id: item.id, level: level, areaId: areaId)
         }
     }
 

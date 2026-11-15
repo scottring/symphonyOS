@@ -380,8 +380,6 @@ import Observation
         let note: String?
         if case .task(_, let day?, _, false) = read {
             note = DailyCopy.itsOn(day, today: today)
-        } else if let placed = added.placed {
-            note = WalkCopy.placed(placed)
         } else {
             note = nil
         }

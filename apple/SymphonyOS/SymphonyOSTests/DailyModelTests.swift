@@ -258,15 +258,6 @@ struct DailyModelTests {
         #expect(task(ctx, titled: "Build to ten miles") != nil)
     }
 
-    @Test func aGoalAddedByWordsSaysWhereItWent() throws {
-        let ctx = try walkTestContext()
-        let m = model(ctx)
-        m.page = .goal(.year)
-        m.hanging = (kept: [health, home], focusArea: health.id, parent: nil, periods: m.periods)
-        type(m, "Fix the garden fence")
-        #expect(m.bar.note == WalkCopy.placed("Home"))
-    }
-
     // MARK: Undo
 
     @Test func undoTakesItBackAndOnlyIt() throws {

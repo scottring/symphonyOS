@@ -827,8 +827,7 @@ struct WalkLayoutTests {
     /// below the question and above the home-indicator zone; the hint is always one line.
     @Test(arguments: [WalkFooting.natural, .level]) func theControlsUnderTheLightKeepClear(_ footing: WalkFooting) {
         let insetTop = art.stage.height - WalkLayout.homeIndicator
-        let notes = [WalkCopy.nothingToPlant, WalkCopy.ridgeFull, WalkCopy.speechOff, WalkCopy.placed("People"),
-                     WalkCopy.placed("A very long area of my own")]
+        let notes = [WalkCopy.nothingToPlant, WalkCopy.ridgeFull, WalkCopy.speechOff]
         let periods = WalkPeriods.pick(now: today)
         let states = Generated.all, layouts = Generated.layouts(footing)
         let bases = states.indices.filter { (0...5).contains(states[$0].step) }
