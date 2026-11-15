@@ -51,6 +51,8 @@ struct WalkOrbTests {
 
     @Test func pointsSitOnTheCompass() {
         #expect(WalkOrb.position(of: .s) == CGPoint(x: 195, y: 794))
+        // Undo's word sits under its disc, between the disc and the ring; Welcome's two stay above theirs.
+        #expect(!WalkOrb.wordsAbove(.n) && WalkOrb.wordsAbove(.nw) && WalkOrb.wordsAbove(.ne))
         #expect(WalkOrb.position(of: .n) == CGPoint(x: 195, y: 562))
         #expect(WalkOrb.position(of: .w) == CGPoint(x: 79, y: 678))
         let ne = WalkOrb.position(of: .ne)
@@ -117,9 +119,9 @@ struct WalkOrbTests {
         var s = state(step: 1, planted: true)
         _ = s.apply(.orbDown, env); _ = s.apply(.orbHeld, env)
         _ = s.apply(.heard("something"), env)
-        let fx = s.apply(.orbMoved(WalkOrb.position(of: .n)), env)
+        let fx = s.apply(.orbMoved(WalkOrb.position(of: .w)), env)
         #expect(fx.contains(.listen(false)))
-        #expect(s.orb == .holding(hover: .n))
+        #expect(s.orb == .holding(hover: .w))
         let up = s.apply(.orbUp(heldMs: 900), env)
         #expect(s.items.count == 1)
         #expect(!up.contains(.write(.create(s.items[0], parent: nil))))
@@ -128,16 +130,16 @@ struct WalkOrbTests {
     @Test func enteringAPointTicksOnce() {
         var s = state(step: 1, planted: true)
         _ = s.apply(.orbDown, env)
-        #expect(s.apply(.orbMoved(WalkOrb.position(of: .s)), env) == [.sound(.tick, afterMs: 0)])
-        #expect(s.apply(.orbMoved(WalkOrb.position(of: .s)), env) == [])
+        #expect(s.apply(.orbMoved(WalkOrb.position(of: .w)), env) == [.sound(.tick, afterMs: 0)])
+        #expect(s.apply(.orbMoved(WalkOrb.position(of: .w)), env) == [])
         #expect(s.apply(.orbMoved(WalkOrb.centre), env) == [])
         #expect(s.orb == .holding(hover: nil))
     }
 
     @Test func aDirectionWithNoPointChoosesNothing() {
-        var s = state(step: 1, planted: true)   // no Undo yet, so SE is not offered
+        var s = state(step: 1, planted: true)   // no Undo yet, so the top is not offered; nothing is below
         _ = s.apply(.orbDown, env)
-        _ = s.apply(.orbMoved(polar(45, 100)), env)
+        _ = s.apply(.orbMoved(polar(-90, 100)), env)
         #expect(s.orb == .holding(hover: nil))
         _ = s.apply(.orbUp(heldMs: 900), env)
         #expect(s.step == 1 && s.orb == .idle)
@@ -146,11 +148,10 @@ struct WalkOrbTests {
     @Test func lettingGoOnAPointChoosesIt() {
         var s = state(step: 1, planted: true)
         _ = s.apply(.orbDown, env)
-        _ = s.apply(.orbMoved(WalkOrb.position(of: .s)), env)
-        let fx = s.apply(.orbUp(heldMs: 900), env)
-        #expect(s.step == 2)
+        _ = s.apply(.orbMoved(WalkOrb.position(of: .e)), env)
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.examplesOn.contains(1))
         #expect(s.orb == .idle)
-        #expect(fx.contains(.save))
     }
 
     @Test func speechOffOpensTyping() {
@@ -234,11 +235,11 @@ struct WalkOrbTests {
     @Test func aPointChosenWhileOpenActsAndCloses() {
         var s = state(step: 1, planted: true)
         s.orb = .open
-        _ = s.apply(.point(.s), env)
-        #expect(s.step == 2 && s.orb == .idle)
+        _ = s.apply(.point(.w), env)
+        #expect(s.typing == "" && s.orb == .idle)
         var t = state(step: 1, planted: true)
         t.orb = .open
-        _ = t.apply(.point(.se), env)       // not offered (Undo, with nothing to undo)
+        _ = t.apply(.point(.n), env)        // not offered (Undo, with nothing to undo)
         #expect(t.step == 1 && t.orb == .open)
     }
 
@@ -284,7 +285,7 @@ struct WalkOrbTests {
     }
 
     /// "More" opens the compass exactly as a tap on the light does (the light's press also
-    /// sounds and times its hold); not on Welcome, while open, typing or being taught.
+    /// sounds and times its hold); not on Welcome or while typing.
     @Test func moreOpensTheCompassAsATapOnTheLight() {
         var byLight = state(step: 2, planted: true)
         var byMore = byLight
@@ -292,7 +293,7 @@ struct WalkOrbTests {
         _ = byLight.apply(.orbDown, env); _ = byLight.apply(.orbUp(heldMs: 80), env)
         #expect(byMore.apply(.moreTapped, env) == [])
         #expect(byMore == byLight && byMore.orb == .open)
-        #expect(!byMore.showsMore)
+        #expect(byMore.showsMore)                               // still there, to close them again
         // With speech off a tap on the light types; More still opens the choices.
         var off = state(step: 2); off.speechIsOff = true
         _ = off.apply(.moreTapped, env)
@@ -317,8 +318,8 @@ struct WalkOrbTests {
         }
     }
 
-    /// The Next line does exactly what the south point does, in every state where either shows.
-    @Test func theNextLineIsTheSouthPoint() throws {
+    /// Next at the foot does exactly what its own action does, in every state where it shows.
+    @Test func theNextLineDoesWhatItSays() throws {
         let health = WalkArea(id: UUID(), name: "Health"), home = WalkArea(id: UUID(), name: "Home")
         let goal = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
         let week = WalkItem(id: UUID(), level: .week, title: "Gym", areaId: health.id)
@@ -340,19 +341,26 @@ struct WalkOrbTests {
         states.append(tour)
         for s in states {
             let line = try #require(WalkCopy.nextLine(s, env.periods))
-            let south = try #require(WalkCopy.points(s, env.periods).first { $0.at == .s })
-            #expect(line.text == south.label && line.action == south.action)
             var byLine = s
-            var byPoint = s
-            byPoint.orb = .open
+            var byAct = s
             let lineEffects = byLine.apply(.nextTapped, env)
-            let pointEffects = byPoint.apply(.point(.s), env)
-            #expect(byLine == byPoint, "step \(s.step) ground \(s.ground)")
-            #expect(lineEffects == pointEffects, "step \(s.step) ground \(s.ground)")
+            let actEffects = byAct.act(line.action, env)
+            #expect(byLine == byAct, "step \(s.step) ground \(s.ground)")
+            #expect(lineEffects == actEffects, "step \(s.step) ground \(s.ground)")
+            #expect(!WalkCopy.points(s, env.periods).contains { $0.action == line.action })   // never on the light
         }
         // Where the line is not shown (the compass open, typing), a stray tap does nothing.
         var open = states[1]; open.orb = .open
         #expect(open.apply(.nextTapped, env) == [] && open.step == states[1].step)
+    }
+
+    /// Undo waits in the choices on the light (at the top) once there is something to undo.
+    @Test func undoWaitsInTheChoicesOnceThereIsSomethingToUndo() {
+        var s = state(step: 1)
+        #expect(!WalkCopy.points(s, env.periods).contains { $0.at == .n || $0.action == .undo })
+        _ = s.plant("feel strong again", env)
+        let undo = WalkCopy.points(s, env.periods).filter { $0.action == .undo }
+        #expect(undo.map(\.at) == [.n])
     }
 
     /// With the compass open, a tap on the veil closes it and changes nothing else.
@@ -368,24 +376,89 @@ struct WalkOrbTests {
         #expect(s.apply(.veilTapped, env) == [] && s == expected)
     }
 
-    /// Leave for now, on every step after Welcome: the walk ends, paused where it is; nothing
-    /// is written (the position is saved by the end). Not on Welcome or Look back up.
-    @Test func leaveForNowEndsTheWalkPaused() {
+    /// Leave for now in the top row, on every step after Welcome: the walk ends, paused where it is;
+    /// nothing is written (the position is saved by the end). Not on Welcome or Look back up.
+    @Test func leaveTappedPausesTheWalk() {
+        #expect(!WalkEvent.leaveTapped.leavesAWaitingFlag)
         var ground = state(step: 1); ground.ground = true
         for var s in [ground] + (1...5).map({ state(step: $0, planted: true) }) {
-            #expect(WalkCopy.points(s, env.periods).contains {
-                $0.at == .nw && $0.action == .leave && $0.label == WalkCopy.leaveForNow && $0.detail == WalkCopy.leaveDetail
-            })
             let step = s.step
             s.orb = .open
-            #expect(s.apply(.point(.nw), env) == [.timer(.finish, ms: nil), .end(.paused)])
+            #expect(s.apply(.leaveTapped, env) == [.timer(.finish, ms: nil), .end(.paused)])
             #expect(s.ended && s.step == step && s.orb == .idle)
         }
         for step in [0, 6] {
             var s = state(step: step)
-            #expect(s.act(.leave, env) == [])
+            #expect(s.apply(.leaveTapped, env) == [])
             #expect(!s.ended)
         }
+    }
+
+    /// Back in the top row does exactly what backing up does: one step up, the ground from Year,
+    /// Welcome from the ground.
+    @Test func backTappedGoesBackOneStep() {
+        #expect(!WalkEvent.backTapped.leavesAWaitingFlag)
+        var ground = state(step: 1); ground.ground = true
+        for s in [ground] + (1...5).map({ state(step: $0, planted: true) }) {
+            var byTap = s, byAct = s
+            let tapped = byTap.apply(.backTapped, env), acted = byAct.act(.back, env)
+            #expect(byTap == byAct && tapped == acted, "step \(s.step) ground \(s.ground)")
+            #expect(!tapped.isEmpty)
+        }
+        var season = state(step: 2, planted: true)
+        _ = season.apply(.backTapped, env)
+        #expect(season.step == 1 && !season.ground)
+        var year = state(step: 1)
+        _ = year.apply(.backTapped, env)
+        #expect(year.step == 1 && year.ground)
+        _ = year.apply(.backTapped, env)
+        #expect(year.step == 0)
+    }
+
+    /// More opens the choices when they are closed and closes them when they are open; while the
+    /// light is held or speaking it does nothing.
+    @Test func moreTogglesTheChoices() {
+        var s = state(step: 2, planted: true)
+        #expect(!s.choicesOpen)
+        #expect(s.apply(.moreTapped, env) == [])
+        #expect(s.orb == .open && s.choicesOpen && s.showsMore)
+        #expect(s.apply(.moreTapped, env) == [])
+        #expect(s.orb == .idle && !s.choicesOpen)
+        var speaking = state(step: 2, planted: true)
+        speak(&speaking, "lift")
+        let before = speaking
+        #expect(speaking.apply(.moreTapped, env) == [] && speaking == before)
+    }
+
+    /// Review Focus 5: Back or Leave for now tapped in the second after a spoken flag is let go
+    /// plants the flag first, then moves.
+    @Test func backPlantsAWaitingFlagFirst() throws {
+        var s = state(step: 2, planted: true)
+        speak(&s, "Book the plumber")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.orb == .finishing(live: "Book the plumber"))
+        let effects = s.apply(.backTapped, env)
+        let create = try #require(effects.firstIndex { Self.creates($0, "Book the plumber") })
+        let save = try #require(effects.lastIndex(of: .save))
+        #expect(create < save)
+        #expect(s.step == 1 && s.items.contains { $0.title == "Book the plumber" })
+    }
+
+    @Test func leavingPlantsAWaitingFlagFirst() throws {
+        var s = state(step: 2, planted: true)
+        speak(&s, "Book the plumber")
+        _ = s.apply(.orbUp(heldMs: 900), env)
+        #expect(s.orb == .finishing(live: "Book the plumber"))
+        let effects = s.apply(.leaveTapped, env)
+        let create = try #require(effects.firstIndex { Self.creates($0, "Book the plumber") })
+        let end = try #require(effects.firstIndex(of: .end(.paused)))
+        #expect(create < end)
+        #expect(s.ended && s.items.contains { $0.title == "Book the plumber" })
+    }
+
+    private static func creates(_ effect: WalkEffect, _ title: String) -> Bool {
+        if case .write(.create(let item, _)) = effect { return item.title == title }
+        return false
     }
 
     // MARK: The light, taught once

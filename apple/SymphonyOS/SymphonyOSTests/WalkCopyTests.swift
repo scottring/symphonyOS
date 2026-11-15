@@ -154,7 +154,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.hint(g) == "Tap the ones that matter, then Next.")
         #expect(WalkCopy.hint(state(step: 2)) == "Hold the light and speak.")
         var planted = state(step: 2); planted.items = [item(.season, "Get fit")]
-        #expect(WalkCopy.hint(planted) == "Hold to add another, or tap Next.")
+        #expect(WalkCopy.hint(planted) == "Hold the light to add another.")
         // The light being taught: its own two lines say it, so the hint is blank.
         var taught = state(step: 1); taught.teaching = true
         #expect(WalkCopy.hint(taught) == "")
@@ -172,8 +172,8 @@ struct WalkCopyTests {
     }
 
     private func labels(_ s: WalkState, _ p: WalkPeriods = nov13) -> [String] { WalkCopy.points(s, p).map(\.label) }
-    private func south(_ s: WalkState, _ p: WalkPeriods = nov13) -> WalkCopy.Point? { WalkCopy.points(s, p).first { $0.at == .s } }
-    private func north(_ s: WalkState, _ p: WalkPeriods = nov13) -> String? { WalkCopy.points(s, p).first { $0.at == .n }?.label }
+    /// Where Back goes, in words: the top row's VoiceOver label.
+    private func north(_ s: WalkState, _ p: WalkPeriods = nov13) -> String { WalkCopy.back(s, p) }
 
     @Test func welcomePoints() {
         let pts = WalkCopy.points(state(step: 0), nov13)
@@ -188,43 +188,61 @@ struct WalkCopyTests {
         #expect(WalkCopy.points(s, nov13).count == 2)
     }
 
+    /// The light offers at most three choices on steps 1 to 5, and only these: Type it, examples or
+    /// the calendar, Undo. Back, Next, Leave for now and the switch are never on it.
+    @Test func theLightOffersAtMostThree() {
+        let allowed: Set<WalkAction> = [.type, .examples, .calendar, .undo]
+        var checked = 0
+        for base in Generated.all where (1...5).contains(base.step) {
+            for undo in [false, true] {
+                var s = base; s.calendarOffer = true
+                if undo { s.undo = [.plant(UUID())] }
+                let points = WalkCopy.points(s, nov13)
+                #expect(points.count <= 3, "\(Generated.describe(s))")
+                #expect(points.allSatisfy { allowed.contains($0.action) }, "\(Generated.describe(s)): \(points.map(\.action))")
+                checked += 1
+            }
+        }
+        #expect(checked > 1000)
+    }
+
     @Test func groundPoints() {
         var g = state(step: 1); g.ground = true
-        #expect(WalkCopy.points(g, nov13).map(\.at) == [.n, .s, .w, .nw])
-        #expect(labels(g) == ["Back to the start", "Skip this step", "Type your own", "Leave for now"])
-        #expect(WalkCopy.points(g, nov13).map(\.action) == [.back, .next, .type, .leave])
-        g.kept = [UUID()]
-        #expect(labels(g) == ["Back to the start", "Next: your goals", "Type your own", "Leave for now"])
+        #expect(WalkCopy.points(g, nov13) == [WalkCopy.Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard")])
+        g.kept = [UUID()]; g.undo = [.keep(g.kept[0])]
+        #expect(WalkCopy.points(g, nov13).map(\.at) == [.w, .n])
+        #expect(labels(g) == ["Type your own", "Undo"])
     }
 
     @Test func stepPoints() {
         let y = WalkCopy.points(state(step: 1), nov13)
-        #expect(y.map(\.label) == ["Back to your areas", "Show examples", "Skip this step", "Type it", "Leave for now"])
-        #expect(y.map(\.at) == [.n, .e, .s, .w, .nw])
-        #expect(y.map(\.action) == [.back, .examples, .next, .type, .leave])
-        #expect(y.map(\.symbol) == ["arrow.up", "lightbulb", "arrow.down", "keyboard", "pause"])
-        #expect(y.map(\.detail) == [nil, nil, nil, nil, "Your place is kept."])
+        #expect(y.map(\.label) == ["Type it", "Show examples"])
+        #expect(y.map(\.at) == [.w, .e])
+        #expect(y.map(\.action) == [.type, .examples])
+        #expect(y.map(\.symbol) == ["keyboard", "lightbulb"])
+        #expect(y.map(\.detail) == [nil, nil])
         var s = state(step: 3)
-        #expect(labels(s) == ["Back to this winter", "Show examples", "Skip this step", "Type it", "Leave for now"])
+        #expect(labels(s) == ["Type it", "Show examples"])
         s.items = [item(.month, "x")]; s.examplesOn = [3]
-        #expect(labels(s) == ["Back to this winter", "Hide examples", "Next: this week", "Type it", "Leave for now"])
+        #expect(labels(s) == ["Type it", "Hide examples"])
         s.undo = [.plant(UUID())]
-        #expect(WalkCopy.points(s, nov13).first { $0.at == .se }
-                == WalkCopy.Point(at: .se, label: "Undo", action: .undo, symbol: "arrow.uturn.backward"))
+        #expect(WalkCopy.points(s, nov13).map(\.at) == [.w, .e, .n])
+        #expect(WalkCopy.points(s, nov13).last == WalkCopy.Point(at: .n, label: "Undo", action: .undo, symbol: "arrow.uturn.backward"))
         #expect(WalkCopy.points(state(step: 6), nov13).isEmpty)
     }
 
     @Test func todayPoints() {
         var t = state(step: 5)
-        #expect(labels(t) == ["Back to this week", "Skip this step", "Type it", "Leave for now"])
+        #expect(labels(t) == ["Type it"])
         t.calendarOffer = true
-        #expect(WalkCopy.points(t, nov13).contains(WalkCopy.Point(at: .e, label: "Show my calendar on Today",
-                                                                  action: .calendar, symbol: "calendar")))
+        #expect(WalkCopy.points(t, nov13) == [WalkCopy.Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"),
+                                            WalkCopy.Point(at: .e, label: "Show my calendar on Today", action: .calendar,
+                                                           symbol: "calendar")])
         let wg = item(.week, "Gym induction")
         t.items = [wg]; t.focus[.today] = wg.id
-        #expect(south(t) == WalkCopy.Point(at: .s, label: "Start with this one", action: .startThere, symbol: "arrow.down"))
+        #expect(WalkCopy.nextLine(t, nov13) == WalkCopy.NextLine(text: "Start with this one", action: .startThere, skip: false))
         t.firstThing = wg.id
-        #expect(south(t)?.label == "Finish")
+        #expect(WalkCopy.nextLine(t, nov13)?.text == WalkCopy.finish)
     }
 
     /// Every step's way forward and way back, by the place it goes, in the walk's own period words.
@@ -239,7 +257,6 @@ struct WalkCopyTests {
         let expected = [1: "Next: this winter", 2: "Next: December", 3: "Next: this week", 4: "Next: today", 5: "Finish"]
         for (step, words) in expected {
             #expect(WalkCopy.nextLine(added(step), p) == WalkCopy.NextLine(text: words, action: .next, skip: false), "step \(step)")
-            #expect(south(added(step))?.label == words)
             // Nothing added yet: quieter, and it says it skips.
             #expect(WalkCopy.nextLine(state(step: step), p) == WalkCopy.NextLine(text: "Skip this step", action: .next, skip: true))
         }
@@ -261,7 +278,7 @@ struct WalkCopyTests {
         let goal = item(.year, "Fix the roof"), second = item(.year, "See friends")
         season.items = [goal, second, item(.season, "Get quotes")]; season.focus[.season] = goal.id; season.tour = [second.id]
         #expect(WalkCopy.nextLine(season, p)?.text == "Next goal")
-        // A long area name is cut, so the line under the light and the bottom point stay one line.
+        // A long area name is cut, so Next stays one line.
         let long = WalkArea(id: UUID(), name: "Creative work and play")
         tour.areas.append(long); tour.kept.append(long.id); tour.tour = [long.id]
         #expect(WalkCopy.nextLine(tour, p)?.text == "Next: Creative work…")
@@ -278,6 +295,7 @@ struct WalkCopyTests {
         #expect(north(state(step: 1)) == "Back to your areas")
         var ground = state(step: 1); ground.ground = true
         #expect(north(ground) == "Back to the start")
+        #expect(WalkCopy.backWord == "Back")
     }
 
     /// A walk taken in another month and season reads its own: July, summer.
@@ -446,7 +464,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.ringLabel(done: 1, total: 3) == "1 of 3 done")
         #expect(WalkCopy.ring(done: 1, total: 3) == "1/3")
         #expect(WalkCopy.replayButton == "Walk the mountain again")
-        #expect(WalkCopy.replayFooter == "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap the light and choose Leave for now.")
+        #expect(WalkCopy.replayFooter == "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap Leave for now at the top.")
         #expect(WalkCopy.resumeButton == "Pick the walk back up")
         #expect(WalkCopy.walkWaiting == "Your walk is waiting. Pick it back up.")
         #expect(WalkCopy.orbLabelWelcome == "Quick start. One goal, down to today. About 3 minutes.")
@@ -465,7 +483,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.orbAccessibilityLabel(ground) == "Double tap for other choices.")
         #expect(WalkCopy.nextGoal == "Next goal")
         #expect(WalkCopy.hintFirst == "Hold the light and speak.")
-        #expect(WalkCopy.hintAnother == "Hold to add another, or tap Next.")
+        #expect(WalkCopy.hintAnother == "Hold the light to add another.")
         #expect(WalkCopy.hintGround == "Tap the ones that matter, then Next.")
         #expect(WalkCopy.hintGroundNone == "Tap the ones that matter.")
         // It names the Next line's own words there (final review 2, minor).

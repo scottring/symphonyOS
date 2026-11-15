@@ -254,6 +254,7 @@
 		E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F45CDE5093407A022589D06 /* ListsView.swift */; };
 		E72C310BA42CB9659F4A1B2E /* DemoLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930161C7A23CA025DB6279D3 /* DemoLaunch.swift */; };
 		E7C7EB89D64D38D5E4C1844A /* WalkTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A62F7A67123AF40218075F3 /* WalkTypes.swift */; };
+		E831A1A838CE47BB996920D6 /* WalkLayout+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFB66294E59DCCBA1FCD5D9 /* WalkLayout+Controls.swift */; };
 		E8B5EA11D41BBF3272A9E57F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99D77B01B73C4E9753A3494 /* ContentView.swift */; };
 		E9931F907BB03878B9C2E2D4 /* SyncOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F10C1B10246EDA085A4AAEB /* SyncOrderTests.swift */; };
 		EBC854E2F35C05C5F2210BEC /* WalkLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28540258912D55610F1131C4 /* WalkLayout.swift */; };
@@ -435,6 +436,7 @@
 		6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesHTMLTests.swift; sourceTree = "<group>"; };
 		6BC4EC7581B16A756929F754 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
 		6BD95A959DE58FFA206B8F70 /* NextUpCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextUpCard.swift; sourceTree = "<group>"; };
+		6BFB66294E59DCCBA1FCD5D9 /* WalkLayout+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WalkLayout+Controls.swift"; sourceTree = "<group>"; };
 		6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockLayoutTests.swift; sourceTree = "<group>"; };
 		6D0E0B44FF0171B957F8A6E8 /* PageIngest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIngest.swift; sourceTree = "<group>"; };
 		6D38EDCE2DD84715A97BA245 /* AppleCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleCalendar.swift; sourceTree = "<group>"; };
@@ -1234,6 +1236,7 @@
 				9CF4F2A50CFDC9B5E80D18AF /* WalkCopy.swift */,
 				24C040B5436200C01B873086 /* WalkFooting.swift */,
 				28540258912D55610F1131C4 /* WalkLayout.swift */,
+				6BFB66294E59DCCBA1FCD5D9 /* WalkLayout+Controls.swift */,
 				B1105AF4CFEBB15EE2FA9752 /* WalkOrb.swift */,
 				7090D3ED9CC051D67543EED2 /* WalkPeriods.swift */,
 				8F4C326BCC8EE9A0B6507F51 /* WalkPosition.swift */,
@@ -1652,6 +1655,7 @@
 				CC468BA93FF33887034B30EF /* WalkEndingSheet.swift in Sources */,
 				A60F71C74257F7D72AA14494 /* WalkFooting.swift in Sources */,
 				08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */,
+				E831A1A838CE47BB996920D6 /* WalkLayout+Controls.swift in Sources */,
 				EBC854E2F35C05C5F2210BEC /* WalkLayout.swift in Sources */,
 				EE599002146DDAF319E7E450 /* WalkLoad.swift in Sources */,
 				0D1B77E1A046D40EA4C380C2 /* WalkModel.swift in Sources */,

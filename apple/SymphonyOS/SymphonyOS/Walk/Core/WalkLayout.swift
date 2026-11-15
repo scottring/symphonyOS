@@ -58,13 +58,16 @@ struct WalkLayout: Equatable {
         /// Drawn on the ground, where it is a choice: a plus while not kept, a checkmark once kept.
         var ground: Bool = false }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let needleDown: Bool
-    /// Under the light: the Next line's frame (nil while it is not shown) and the hint line's
-    /// (nil while it is blank). See "The controls under the light" at the end of this file.
+    /// The controls (`WalkLayout+Controls.swift`), each nil while it is not shown: Next at the foot,
+    /// the hint, the Undo pill, the lesson, the top row's More, Back and Leave for now, and the Move row.
     var nextLine: CGRect? = nil
     var hintLine: CGRect? = nil
     var undoPill: CGRect? = nil
     var lesson: CGRect? = nil
     var more: CGRect? = nil
+    var back: CGRect? = nil
+    var leave: CGRect? = nil
+    var moveRow: CGRect? = nil
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`)
 
@@ -73,7 +76,11 @@ struct WalkLayout: Equatable {
     static let centreX: CGFloat = 195           // a zoomed column, and a lone one
     static let zoomK: CGFloat = 0.8
     static let zoomBaseY: CGFloat = 520         // where a zoomed column's post stands
-    static let question: CGFloat = 250          // the ceiling for the step's own level and for Year
+    /// The question's foot on the board: no flag or pill rises above it ("The board as numbers").
+    static let question: CGFloat = 282
+    /// The ceiling this pass still keeps for the step's own level and for Year (the question's old
+    /// foot), until the standing layout is planted under `question`.
+    static let flagCeiling: CGFloat = 250
     static let pole: CGFloat = 24               // bare pole under the lowest banner
     static let edges: ClosedRange<CGFloat> = 4...386
     static let narrowColumns: ClosedRange<CGFloat> = 87...302     // up to four columns off the ground
@@ -83,7 +90,7 @@ struct WalkLayout: Equatable {
     static let narrowest: CGFloat = 44          // a banner narrowed between neighbouring stubs
 
     /// `footing`: `.natural` plants the posts by hand (the app); `.level` is the contract's ruled geometry.
-    /// `wing`: the room beside the board on a wider window (`WalkStage.wing`); nothing reads it yet.
+    /// `wing`: the room beside the board on a wider window (`WalkStage.wing`); only Back and Leave for now read it.
     static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare,
                      footing: WalkFooting = .natural, wing: CGFloat = 0) -> WalkLayout {
         var made = Builder(state, today: today, art: art, footing: footing).layout()
@@ -92,6 +99,9 @@ struct WalkLayout: Equatable {
         made.undoPill = undoFrame(state)
         made.lesson = teachFrame(state)
         made.more = moreFrame(state)
+        made.back = backFrame(state, wing: wing)
+        made.leave = leaveFrame(state, wing: wing)
+        made.moveRow = moveRowFrame(state)
         if state.step >= 6 { made = headings(made) }
         return made
     }
@@ -416,7 +426,7 @@ private struct Builder {
         for (i, column) in columns.enumerated() where column.area != nil {
             let row = rows ? abs(i - centre) % 2 : 0
             let top = yearY + 3 + CGFloat(row) * 34
-            guard top >= L.question else { continue }        // zoomed low, the peaks are in the question
+            guard top >= L.flagCeiling else { continue }        // zoomed low, the peaks are in the question
             out[i] = (slid(CGRect(x: stageX(column.worldX) - width * scale / 2, y: top, width: width * scale, height: 30 * scale)),
                       row, scale)
         }
@@ -476,7 +486,7 @@ private struct Builder {
         for i in 0..<n {
             guard let mine = slots[i] else { continue }
             hi[i] = min(hi[i], max(0, orbRoom(mine.frame)))
-            lo[i] = max(lo[i], min(0, L.question - mine.frame.minY))
+            lo[i] = max(lo[i], min(0, L.flagCeiling - mine.frame.minY))
             for j in [i - 1, i + 1] where (0..<n).contains(j) {
                 guard stubsBesideLabels, let other = slots[j], other.row != mine.row else { continue }
                 let upper = mine.row == 0 ? mine : other
@@ -725,9 +735,9 @@ private struct Builder {
     /// The step's own level and Year rise to the question line; any other level to the
     /// band above plus 6, and never past the question line either.
     func ceiling(_ lvl: WalkLevel) -> CGFloat {
-        if lvl == .year || (s.step < 6 && lvl == level) { return L.question }
-        guard let above = WalkLevel(rawValue: lvl.rawValue - 1) else { return L.question }
-        return max(L.question, stageY(above) + 6)
+        if lvl == .year || (s.step < 6 && lvl == level) { return L.flagCeiling }
+        guard let above = WalkLevel(rawValue: lvl.rawValue - 1) else { return L.flagCeiling }
+        return max(L.flagCeiling, stageY(above) + 6)
     }
 
     /// The flags of a level, by column, in planting order. Today holds only the first thing.
@@ -870,14 +880,14 @@ private struct Builder {
             // The step's own flags stop 4 pt under a flag risen from the level above: it is never covered.
             let cap = lvl == level ? risenAbove.filter { meets($0, span) }.map { $0.maxY + 4 }.max() : nil
             let postCeiling = max(ceiling + reserve, cap ?? -.infinity)
-            let hard: CGFloat? = lvl == level ? nil : L.question + reserve
+            let hard: CGFloat? = lvl == level ? nil : L.flagCeiling + reserve
             let reals = items.reversed().map { entry($0, on: lvl, kind: drawKind) }
             var banners: [L.Banner]
             if !(room || open == i) {
                 banners = items.isEmpty ? [] : [stub(id, lvl, base: base, count: items.count, scale: scale, below: nil)]
             } else if lookBack && expanded {
                 // Opened on Look back up: as many as fit under the flags above in this column; the top one counts the rest.
-                let roof = max(L.question, framesAbove.filter { meets($0, span) }.map { $0.maxY + 4 }.max() ?? L.question)
+                let roof = max(L.flagCeiling, framesAbove.filter { meets($0, span) }.map { $0.maxY + 4 }.max() ?? L.flagCeiling)
                 banners = stack(id, lvl, base: base, ghosts: [], reals: reals, ceiling: roof, hard: roof,
                                 scale: scale, moreOnTop: true, avoid: stubs)
             } else if lookBack {
@@ -1002,7 +1012,7 @@ private struct Builder {
                     && piles(l.frame, p.drawn, ruledA: ruledLabels[l.id], ruledB: ruledFrames[p.banner.id])) { bad.insert(labelKey(l)); bad.insert(p.post.key) }
             }
             if (s.step <= 5 && orbDistance(l.frame) < 74) || orbDistance(l.frame) <= WalkOrb.radius
-                || l.frame.minY < L.question - e || (!zoomed && (l.frame.minX < L.edges.lowerBound - e || l.frame.maxX > L.edges.upperBound + e)) {
+                || l.frame.minY < L.flagCeiling - e || (!zoomed && (l.frame.minX < L.edges.lowerBound - e || l.frame.maxX > L.edges.upperBound + e)) {
                 bad.insert(labelKey(l))
             }
         }
@@ -1011,7 +1021,7 @@ private struct Builder {
             let world = CGRect(x: d.minX / camera.k + camera.x, y: d.minY / camera.k + camera.y,
                                width: d.width / camera.k, height: d.height / camera.k)
             let outside = !zoomed && p.banner.kind != .tip && (d.minX < L.edges.lowerBound - e || d.maxX > L.edges.upperBound + e)
-            let question = !(p.post.key.level == level && p.post.banners.count == 1) && d.minY < L.question - e
+            let question = !(p.post.key.level == level && p.post.banners.count == 1) && d.minY < L.flagCeiling - e
             var stubHigh = false
             if case .stub = p.banner.kind { stubHigh = d.minY < ceiling(p.post.key.level) - e }
             if orbDistance(d) <= WalkOrb.radius || outside || question || stubHigh
@@ -1243,187 +1253,9 @@ private struct Builder {
     }
 }
 
-// MARK: - The controls under the light
+// MARK: - Look back up: the peaks as column headings
 
-/// The Next line, the hint line, the compass points' words and the lines that teach the light,
-/// in stage points. They are placed from the light alone, never from the flags: the flags already
-/// keep clear of the light's ring and labels of the ring and its ticks (`orbRoom`), so what sits
-/// under the ring meets neither.
 extension WalkLayout {
-    /// The dial's ring around the light (contract §7: 132 across).
-    static let ring: CGFloat = 66
-    /// The home-indicator zone at the foot of the stage: the bottom safe-area inset of a phone
-    /// with a home indicator, kept clear of every control and every point's words.
-    static let homeIndicator: CGFloat = 34
-    /// The Next line: a 44-point tap target directly under the ring.
-    static let nextHeight: CGFloat = 44
-    /// One line of the 15-point hint (DM Sans: 1.3 × 15).
-    static let hintLineHeight: CGFloat = 19.5
-    /// The hint's width (the stage less 10 on each side) and, by estimate, the characters that fit on one line.
-    static let hintWidth: CGFloat = 370
-    static let hintCharsPerLine = 48
-    /// Between the open compass's top point's words and the hint above them.
-    static let openHintGap: CGFloat = 6
-
-    /// How many lines the hint takes: an estimate, so the core needs no fonts (the view allows the same).
-    static func hintLines(_ text: String) -> Int {
-        min(3, max(1, Int((Double(text.count) / Double(hintCharsPerLine)).rounded(.up))))
-    }
-
-    static let nextWidth: CGFloat = 220
-
-    /// Welcome's line (the quick start and what it is) is wider: its second line is a sentence.
-    static let welcomeLineWidth: CGFloat = 300
-
-    static func nextFrame(_ s: WalkState) -> CGRect? {
-        guard s.showsNextLine else { return nil }
-        let width = s.step == 0 ? welcomeLineWidth : nextWidth
-        return CGRect(x: WalkOrb.centre.x - width / 2, y: WalkOrb.centre.y + ring + 2, width: width, height: nextHeight)
-    }
-
-    /// "More", on the Next line's row to the left of it (clear of its words), while the compass is closed.
-    static let moreWidth: CGFloat = 69
-    static func moreFrame(_ s: WalkState) -> CGRect? {
-        guard s.showsMore else { return nil }
-        return CGRect(x: WalkOrb.centre.x - nextWidth / 2 - 4 - moreWidth, y: WalkOrb.centre.y + ring + 2,
-                      width: moreWidth, height: nextHeight)
-    }
-
-    /// The quiet Undo pill, beside the Next line on the right, while it shows (`showsUndoPill`).
-    static func undoFrame(_ s: WalkState) -> CGRect? {
-        guard s.showsUndoPill, (1...5).contains(s.step) else { return nil }
-        let line = WalkOrb.centre.y + ring + 2
-        return CGRect(x: WalkOrb.centre.x + nextWidth / 2 + 4, y: line + (nextHeight - 34) / 2, width: 76, height: 34)
-    }
-
-    /// Closed (and on Welcome, whose choices are the light and the line under it): under the Next
-    /// line's place (taken or not), so it never moves when the line comes and goes.
-    /// Open: above the compass's top point and its words (two lines, as Welcome's has), on the veil.
-    static func hintFrame(_ s: WalkState) -> CGRect? {
-        let text = WalkCopy.hint(s)
-        guard !text.isEmpty else { return nil }
-        let height = CGFloat(hintLines(text)) * hintLineHeight
-        let x = WalkOrb.centre.x - hintWidth / 2
-        if s.showsPoints && s.step != 0 {
-            let top = WalkOrb.position(of: .n).y - WalkOrb.pointDisc / 2 - wordsGap - labelLine - detailGap - detailLine - openHintGap
-            return CGRect(x: x, y: top - height, width: hintWidth, height: height)
-        }
-        let y = WalkOrb.centre.y + ring + 2 + nextHeight + 0.5
-        return CGRect(x: x, y: y, width: hintWidth, height: height)
-    }
-
-    // MARK: The lines that teach the light
-
-    /// Where the lines that teach the light stand: above the ring, across the stage, on the veil.
-    static let teachHeight: CGFloat = 104
-    static func teachFrame(_ s: WalkState) -> CGRect? {
-        guard s.teaching else { return nil }
-        return CGRect(x: 10, y: WalkOrb.centre.y - ring - 8 - teachHeight, width: 370, height: teachHeight)
-    }
-
-    // MARK: Example tags
-
-    /// The banner width the long example tag needs (8.5 pt, by estimate, inside the cloth's padding).
-    static let exampleTagRoom: CGFloat = 116
-    static func exampleTag(forWidth width: CGFloat) -> String {
-        width >= exampleTagRoom ? WalkCopy.exampleTag : WalkCopy.exampleTagShort
-    }
-
-    // MARK: The compass points' words
-
-    /// One line of a point's words: its label (12 pt) or its second line (13 pt), and where it stands.
-    struct PointLine: Equatable { let text: String; let detail: Bool; let frame: CGRect }
-
-    /// Character widths by estimate (measured near 6.1 for both faces, with room to spare), line
-    /// heights, the gaps (disc to words, label to second line), the widest a label or second line
-    /// wraps at, and the stage margin the words keep.
-    static let labelChar: CGFloat = 6.4, detailChar: CGFloat = 6.4
-    static let labelLine: CGFloat = 16, detailLine: CGFloat = 17
-    static let wordsGap: CGFloat = 4, detailGap: CGFloat = 2
-    static let labelWidth: CGFloat = 132, detailWidth: CGFloat = 152, wordsMargin: CGFloat = 12
-    /// The bottom point's label stands alone between the ring and its disc: one line, at most this wide.
-    static let southLabelWidth: CGFloat = 112
-
-    /// Greedy wrapping by words at `width`, by the character estimate.
-    static func wrap(_ text: String, width: CGFloat, char: CGFloat) -> [String] {
-        var lines: [String] = []
-        var line = ""
-        for word in text.split(separator: " ").map(String.init) {
-            let candidate = line.isEmpty ? word : line + " " + word
-            if line.isEmpty || CGFloat(candidate.count) * char + 4 <= width {
-                line = candidate
-            } else {
-                lines.append(line)
-                line = word
-            }
-        }
-        if !line.isEmpty { lines.append(line) }
-        return lines
-    }
-
-    /// Where a point's words stand, line by line. Above its disc for the top, upper-right,
-    /// upper-left and bottom points (under them they would meet the ring, the next point or, for
-    /// the bottom one, the home-indicator zone), under it for the rest. The words are centred on
-    /// their disc, inside the stage's margin, and move outward, away from the light, until no
-    /// line meets the ring or another offered point's disc (`among`); pressed against the margin,
-    /// the lines read from it. Each line is as wide as its words by estimate; the view draws exactly these lines.
-    static func pointWords(_ p: WalkCopy.Point, among offered: [CompassPoint]) -> [PointLine] {
-        let disc = WalkOrb.position(of: p.at)
-        // The right point's words sit beside the ring's widest part: they wrap narrower.
-        let labels = p.at == .s ? [p.label] : wrap(p.label, width: p.at == .e ? 120 : labelWidth, char: labelChar)
-        let details = p.detail.map { wrap($0, width: detailWidth, char: detailChar) } ?? []
-        let rows: [(text: String, detail: Bool, width: CGFloat)] =
-            labels.map { ($0, false, min(CGFloat($0.count) * labelChar + 4, p.at == .s ? southLabelWidth : .infinity)) }
-            + details.map { ($0, true, CGFloat($0.count) * detailChar + 4) }
-        let height = CGFloat(labels.count) * labelLine + (details.isEmpty ? 0 : detailGap + CGFloat(details.count) * detailLine)
-        let top = WalkOrb.wordsAbove(p.at) ? disc.y - WalkOrb.pointDisc / 2 - wordsGap - height
-                                           : disc.y + WalkOrb.pointDisc / 2 + wordsGap
-        let blockWidth = rows.map(\.width).max() ?? 0
-        let stage = WalkArt.stageSize.width
-        let lowest = wordsMargin, highest = stage - wordsMargin - blockWidth
-        let outward: CGFloat = disc.x < WalkOrb.centre.x - 1 ? -1 : (disc.x > WalkOrb.centre.x + 1 ? 1 : 0)
-        var discs = offered.filter { $0 != p.at }.map { at -> CGRect in
-            let c = WalkOrb.position(of: at)
-            return CGRect(x: c.x - WalkOrb.pointDisc / 2, y: c.y - WalkOrb.pointDisc / 2, width: WalkOrb.pointDisc, height: WalkOrb.pointDisc)
-        }
-        // The top point's words (up to two lines, above its disc) are kept clear the same way.
-        if p.at != .n, offered.contains(.n) {
-            let n = WalkOrb.position(of: .n), words = labelLine + detailGap + detailLine
-            discs.append(CGRect(x: n.x - 70, y: n.y - WalkOrb.pointDisc / 2 - wordsGap - words, width: 140, height: words))
-        }
-        func lines(at x: CGFloat, pressed: Bool) -> [PointLine] {
-            var y = top
-            var out: [PointLine] = []
-            for (i, row) in rows.enumerated() {
-                if i == labels.count, !details.isEmpty { y += detailGap }
-                let lineX = pressed ? (outward < 0 ? x : x + blockWidth - row.width) : x + (blockWidth - row.width) / 2
-                let h = row.detail ? detailLine : labelLine
-                out.append(PointLine(text: row.text, detail: row.detail, frame: CGRect(x: lineX, y: y, width: row.width, height: h)))
-                y += h
-            }
-            return out
-        }
-        func clashes(_ ls: [PointLine]) -> Bool {
-            ls.contains { line in
-                let f = line.frame
-                let c = WalkOrb.centre
-                let onRing = hypot(c.x - min(max(c.x, f.minX), f.maxX), c.y - min(max(c.y, f.minY), f.maxY)) <= WalkLayout.ring + 2
-                return onRing || discs.contains { $0.intersects(f) }
-            }
-        }
-        var x = min(max(disc.x - blockWidth / 2, lowest), highest)
-        var placed = lines(at: x, pressed: false)
-        guard outward != 0 else { return placed }
-        while clashes(placed) {
-            let next = x + outward
-            guard next >= lowest, next <= highest else { return lines(at: x, pressed: true) }
-            x = next
-            placed = lines(at: x, pressed: false)
-        }
-        return placed
-    }
-
-    // MARK: Look back up: the peaks as column headings
 
     /// The bottom of the Look back up header line ("Look back up: that’s your plan."): nothing stands above it.
     static let lookBackHeader: CGFloat = 92
@@ -1459,6 +1291,7 @@ extension WalkLayout {
         }
         return WalkLayout(camera: made.camera, labels: labels, posts: made.posts, needleDown: made.needleDown,
                           nextLine: made.nextLine, hintLine: made.hintLine, undoPill: made.undoPill,
-                          lesson: made.lesson, more: made.more)
+                          lesson: made.lesson, more: made.more, back: made.back, leave: made.leave,
+                          moveRow: made.moveRow)
     }
 }

@@ -159,7 +159,7 @@ struct MountainPageTests {
                         && b.drawn.maxX <= WalkLayout.edges.upperBound + 0.01, "\(level) \(b.id) \(b.drawn)")
             }
             for b in banners {
-                #expect(b.drawn.minY >= WalkLayout.question - 0.01, "\(level) \(b.id) at \(b.drawn.minY)")
+                #expect(b.drawn.minY >= WalkLayout.flagCeiling - 0.01, "\(level) \(b.id) at \(b.drawn.minY)")
             }
             let own = banners.filter { $0.level == level }
             for i in own.indices { for j in own.indices where j > i {

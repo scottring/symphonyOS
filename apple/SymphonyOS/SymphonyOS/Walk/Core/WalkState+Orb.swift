@@ -28,9 +28,16 @@ extension WalkState {
         return (1...5).contains(step) && orb == .idle && typing == nil && !teaching
     }
 
-    /// "More" beside the Next line: the way to the other choices while the compass is closed, after
-    /// Welcome; shown while the light is taught too, since the lesson points to it.
-    var showsMore: Bool { (1...5).contains(step) && orb == .idle && typing == nil }
+    /// The top row (Back, More, Leave for now) on every step after Welcome but Look back up; hidden
+    /// while typing (F10: there is no Back with unsent words).
+    var showsTopRow: Bool { (1...5).contains(step) && typing == nil }
+
+    /// "More", in the middle of the top row: it opens the choices on the light and closes them again;
+    /// shown while the light is taught too, since the lesson points to it.
+    var showsMore: Bool { showsTopRow }
+
+    /// The choices on the light are open (More is drawn gold then).
+    var choicesOpen: Bool { orb == .open }
 
     /// The quiet Undo pill beside the hint; it gives way while the points show,
     /// where Undo is the up-left point instead.
@@ -288,7 +295,7 @@ extension WalkEvent {
             return true
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
-             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped:
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped, .backTapped, .leaveTapped:
             return false
         }
     }

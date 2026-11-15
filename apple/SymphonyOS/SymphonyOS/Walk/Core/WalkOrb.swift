@@ -11,9 +11,10 @@ enum WalkOrb {
     /// A point's disc. Its words stand under it, or above it (`wordsAbove`); `WalkLayout.pointWords` places them.
     static let pointDisc: CGFloat = 46
 
-    /// The top, upper-right, upper-left and bottom points' words sit above their discs: under
-    /// them they would meet the ring, the next point, or (the bottom one) the home-indicator zone.
-    static func wordsAbove(_ point: CompassPoint) -> Bool { [.n, .ne, .nw, .s].contains(point) }
+    /// Welcome's upper-right and upper-left points' words sit above their discs (under them they would
+    /// meet the ring). Every other point's words sit under its disc: Undo's, at the top, between its
+    /// disc and the ring.
+    static func wordsAbove(_ point: CompassPoint) -> Bool { [.ne, .nw].contains(point) }
 
     /// Where a compass point stands, in stage coordinates.
     static func position(of point: CompassPoint) -> CGPoint {

@@ -115,12 +115,16 @@ struct WalkState: Equatable {
         case .nextTapped:
             guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
             return respond(to: line.action, env)
-        // "More": the compass opens, as a tap on the light opens it (with speech off too, where a tap types).
-        // While the light is taught, More (which the lesson points to) puts the lesson away and opens them too.
+        // The top row: Back and Leave for now do what backing up and leaving do.
+        case .backTapped: return respond(to: WalkAction.back, env)
+        case .leaveTapped: return respond(to: WalkAction.leave, env)
+        // "More" opens the choices when they are closed (as a tap on the light opens them, with speech
+        // off too, where a tap types) and closes them when they are open. While the light is taught,
+        // More (which the lesson points to) puts the lesson away and opens them. Not while the light is held.
         case .moreTapped:
-            guard showsMore else { return [] }
+            guard showsMore, orb == .idle || orb == .open else { return [] }
             teaching = false
-            orb = .open
+            orb = orb == .open ? .idle : .open
             return []
         // A tap on the veil around the open compass closes it; on Welcome the choices stay.
         case .veilTapped:
@@ -519,8 +523,9 @@ enum WalkEvent: Equatable {
     case areaTapped(UUID), bannerTapped(UUID), stubTapped(WalkPostKey), exampleTapped(String)
     case moveTo(UUID), pullUp, undo, undoExpired, noteExpired, calendarAnswered
     case sheetHandle, rowToggled(UUID), walkAnother, goToToday             // rowToggled carries a task id
-    /// A tap on the Next line under the light; a tap on the veil behind the open compass.
-    case nextTapped, veilTapped, moreTapped
+    /// A tap on the Next line at the foot; a tap on the veil behind the open compass; the top row's
+    /// More, Back and Leave for now.
+    case nextTapped, veilTapped, moreTapped, backTapped, leaveTapped
 }
 
 enum WalkTimer: Equatable { case hold, undo, note, finish }

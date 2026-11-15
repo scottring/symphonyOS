@@ -408,9 +408,10 @@ struct WalkModelTests {
         var s = WalkState(); s.step = 3; s.depth = .quick
         let p = WalkPeriods.pick(now: now)
         s.placeKept = true
-        #expect(WalkCopy.points(s, p).first { $0.action == .leave }?.detail == WalkCopy.leaveDetail)
+        #expect(WalkCopy.leaveHint(s) == WalkCopy.leaveDetail)
         s.placeKept = false
-        #expect(WalkCopy.points(s, p).first { $0.action == .leave }?.detail == nil)
+        #expect(WalkCopy.leaveHint(s) == nil)
+        #expect(!WalkCopy.points(s, p).contains { $0.action == .leave })      // Leave for now is in the top row
     }
 
     /// The first hold asks for permission and the prompt takes the touch away.
@@ -556,8 +557,7 @@ struct WalkModelTests {
         let areas = fetch(ctx, GoalArea.self).count
         var ended: WalkStatus?
         m.onEnd = { ended = $0 }
-        m.send(.orbDown); m.send(.orbUp(heldMs: 0))           // the compass
-        m.send(.point(.nw))                                    // Leave for now
+        m.send(.leaveTapped)                                   // Leave for now, in the top row
         #expect(ended == .paused)
         let position = try #require(saved.load(for: me))
         #expect(position.status == .paused && position.step == 2)

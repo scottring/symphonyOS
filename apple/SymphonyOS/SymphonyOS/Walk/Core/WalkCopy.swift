@@ -101,7 +101,7 @@ enum WalkCopy {
     static let hintChoose = "Tap the light for a quick start"
     static let hintOpen = "Tap one, or tap the light to close"
     static let hintFirst = "Hold the light and speak."
-    static let hintAnother = "Hold to add another, or tap Next."
+    static let hintAnother = "Hold the light to add another."
     static let hintGround = "Tap the ones that matter, then Next."
     /// The ground with nothing kept yet: the Next line says "Skip this step", so the hint does not say Next.
     static let hintGroundNone = "Tap the ones that matter."
@@ -170,8 +170,11 @@ enum WalkCopy {
         }
     }
 
-    /// Where backing up goes, in words (the north point).
-    private static func back(_ s: WalkState, _ p: WalkPeriods) -> String {
+    /// The top row's Back, as drawn; `back(_:_:)` is its VoiceOver label.
+    static let backWord = "Back"
+
+    /// Where backing up goes, in words: the top row's Back, to VoiceOver.
+    static func back(_ s: WalkState, _ p: WalkPeriods) -> String {
         if s.ground { return "Back to the start" }
         switch s.level {
         case .year?: return "Back to your areas"
@@ -185,7 +188,7 @@ enum WalkCopy {
 
     // MARK: The compass
 
-    /// One compass point. `detail` is a second line under the label (Welcome's choices, Leave for now).
+    /// One compass point. `detail` is a second line under the label (Welcome's choices).
     struct Point: Equatable {
         let at: CompassPoint; let label: String; let action: WalkAction; let symbol: String; let detail: String?
         init(at: CompassPoint, label: String, action: WalkAction, symbol: String, detail: String? = nil) {
@@ -198,23 +201,28 @@ enum WalkCopy {
     static let notNow = "Not now", notNowDetail = "Go straight to Today."
     static let leaveForNow = "Leave for now", leaveDetail = "Your place is kept."
 
-    /// Each point names what it does or where it goes. Welcome's three sit left, right and
-    /// above the light, with room under each for its second line.
+    /// The top row's Leave for now, to VoiceOver: "Your place is kept." only where it is (a walk-down
+    /// is never stored, `placeKept`).
+    static func leaveHint(_ s: WalkState) -> String? { s.placeKept ? leaveDetail : nil }
+
+    /// The choices on the light. Welcome's two sit upper-left and upper-right, with room under each
+    /// for its second line (the light itself is the quick start). On steps 1 to 5 at most three, in
+    /// this order: Type it on the left ("Type your own" on the ground), the examples (steps 1 to 4 off
+    /// the ground) or, on Today while it is offered, the calendar on the right, and Undo at the top
+    /// once there is something to undo. Back, Next and Leave for now have their own controls.
     static func points(_ s: WalkState, _ p: WalkPeriods) -> [Point] {
-        var out: [Point] = []
         if s.step == 0 {
-            // The light itself is the quick start (and the line under it); the other two stand above it.
             return [
                 Point(at: .nw, label: wholeYear, action: .full, symbol: "mountain.2", detail: wholeDetail),
                 Point(at: .ne, label: notNow, action: .notNow, symbol: "xmark", detail: notNowDetail),
             ].sorted { order($0.at) < order($1.at) }
         }
-        guard let level = s.level, let ahead = forward(s, p) else { return [] }
-        out.append(Point(at: .n, label: back(s, p), action: .back, symbol: "arrow.up"))
-        out.append(Point(at: .s, label: ahead.label, action: ahead.action, symbol: "arrow.down"))
+        guard let level = s.level else { return [] }
+        var out: [Point] = []
         if s.ground {
             out.append(Point(at: .w, label: "Type your own", action: .type, symbol: "keyboard"))
         } else {
+            out.append(Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"))
             if level == .today {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
@@ -223,14 +231,11 @@ enum WalkCopy {
                 out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
                                  action: .examples, symbol: "lightbulb"))
             }
-            out.append(Point(at: .w, label: "Type it", action: .type, symbol: "keyboard"))
         }
         if !s.undo.isEmpty {
-            out.append(Point(at: .se, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
+            out.append(Point(at: .n, label: undo, action: .undo, symbol: "arrow.uturn.backward"))
         }
-        // "Your place is kept." only where it is: a walk-down is never stored (`placeKept`).
-        out.append(Point(at: .nw, label: leaveForNow, action: .leave, symbol: "pause", detail: s.placeKept ? leaveDetail : nil))
-        return out.sorted { order($0.at) < order($1.at) }
+        return out
     }
 
     private static func order(_ p: CompassPoint) -> Int { CompassPoint.allCases.firstIndex(of: p) ?? 0 }
@@ -309,7 +314,7 @@ enum WalkCopy {
     // MARK: Settings
 
     static let replayButton = "Walk the mountain again"
-    static let replayFooter = "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap the light and choose Leave for now."
+    static let replayFooter = "Start at the top and walk down to today. What you already planned stays. To stop part-way, tap Leave for now at the top."
     /// Shown above `replayButton` while a walk left with Leave for now is waiting.
     static let resumeButton = "Pick the walk back up"
     /// The one quiet line on the light edition's Today while a walk is waiting.

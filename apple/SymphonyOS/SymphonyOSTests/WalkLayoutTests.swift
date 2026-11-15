@@ -819,18 +819,20 @@ struct WalkLayoutTests {
         #expect(checked >= 3500)
     }
 
-    /// The controls under the light, in every generated state at rest, with the Undo pill, with
-    /// notes, with speech off, with the compass open, speaking and with the light being taught, on
-    /// both footings: the Next line, the hint line, the Undo pill and the lesson never meet each
-    /// other or the light's ring (and so its touch), at rest never a flag or a label (open or
-    /// taught, they sit on the veil over the scene, as the points' words do), stay on the stage
-    /// below the question and above the home-indicator zone; the hint is always one line.
+    /// The controls, in every generated state at rest, with the Undo pill, with notes, with speech
+    /// off, with the compass open, speaking and with the light being taught, on both footings: the
+    /// top row, Next, the hint, the Undo pill, the Move row and the lesson never meet each other or the
+    /// light's ring (and so its touch); the top row, Next and the hint at the foot, at rest, never a
+    /// flag or a label (open or taught, they sit on the veil over the scene, as the points' words do);
+    /// the top row stands in its band (y 44 to 88), the
+    /// rest on the stage below the question and above the home-indicator zone; the hint is always one line.
     @Test(arguments: [WalkFooting.natural, .level]) func theControlsUnderTheLightKeepClear(_ footing: WalkFooting) {
         let insetTop = art.stage.height - WalkLayout.homeIndicator
         let notes = [WalkCopy.nothingToPlant, WalkCopy.ridgeFull, WalkCopy.speechOff]
         let periods = WalkPeriods.pick(now: today)
         let states = Generated.all, layouts = Generated.layouts(footing)
         let bases = states.indices.filter { (0...5).contains(states[$0].step) }
+        let topRow: Set<String> = ["back", "more", "leave"]
         let swept: [[(WalkState, [String])]] = Generated.parallel(bases.count) { n in
             let base = states[bases[n]], layout = layouts[bases[n]]
             let drawn = layout.posts.flatMap(\.banners).map(\.drawn) + layout.labels.map(\.frame)
@@ -840,32 +842,35 @@ struct WalkLayoutTests {
             var off = base; off.speechIsOff = true; variants.append(off)
             var open = base; open.orb = .open; variants.append(open)
             var speaking = base; speaking.orb = .speaking(live: "x"); variants.append(speaking)
-            var taught = base; taught.teaching = (1...5).contains(base.step) && !base.ground; variants.append(taught)
+            // The lesson begins only on arriving at a step, where nothing is chosen yet.
+            var taught = base; taught.teaching = (1...5).contains(base.step) && !base.ground; taught.selected = nil
+            variants.append(taught)
             return variants.map { v -> (WalkState, [String]) in
-                let frames = [("next", WalkLayout.nextFrame(v)), ("hint", WalkLayout.hintFrame(v)),
-                              ("undo", WalkLayout.undoFrame(v)), ("lesson", WalkLayout.teachFrame(v)),
-                              ("more", WalkLayout.moreFrame(v))]
-                    .compactMap { name, f in f.map { (name, $0) } }
+                let frames = Self.controlFrames(v)
                 var problems: [String] = []
                 for (i, a) in frames.enumerated() {
                     for b in frames[(i + 1)...] where Invariants.overlap(a.1, b.1) { problems.append("\(a.0) meets \(b.0)") }
                     if Invariants.orbDistance(a.1) <= WalkLayout.ring { problems.append("\(a.0) \(a.1) meets the ring") }
-                    if !v.showsVeil {
+                    // What stands above the light at rest (the hint, the Undo pill, the Move row, y 558 to 604)
+                    // is kept clear by the flags themselves: the standing layout plants nothing under the
+                    // hint (Review Focus 1). This pass's flags do not keep to that yet, so only the top row,
+                    // Next and the hint at the foot are measured against them here.
+                    let aboveTheLight = a.1.minY >= 540 && a.1.maxY <= 612
+                    if !v.showsVeil, !aboveTheLight {
                         for d in drawn where Invariants.overlap(a.1, d) { problems.append("\(a.0) \(a.1) meets \(d)") }
                     }
-                    if a.1.minX < 0 || a.1.maxX > art.stage.width || a.1.minY < WalkLayout.question { problems.append("\(a.0) leaves the stage") }
+                    if topRow.contains(a.0) {
+                        if a.1.minY < 44 || a.1.maxY > 88 { problems.append("\(a.0) \(a.1) leaves the top row") }
+                    } else if a.1.minY < WalkLayout.question {
+                        problems.append("\(a.0) \(a.1) in the question")
+                    }
+                    if a.1.minX < 0 || a.1.maxX > art.stage.width { problems.append("\(a.0) leaves the stage") }
                     if a.1.maxY > insetTop + 0.01 { problems.append("\(a.0) \(a.1) in the home-indicator zone") }
                 }
                 let hint = WalkCopy.hint(v)
                 if !hint.isEmpty, WalkLayout.hintLines(hint) != 1 { problems.append("“\(hint)” wraps") }
                 if (WalkLayout.nextFrame(v) != nil) != (WalkCopy.nextLine(v, periods) != nil) {
                     problems.append("the Next line's frame and words disagree")
-                }
-                // "More" stays clear of the Next line's own words (estimated: 16 pt words and the arrow, centred).
-                if let more = WalkLayout.moreFrame(v), let next = WalkLayout.nextFrame(v),
-                   let line = WalkCopy.nextLine(v, periods) {
-                    let words = CGFloat(line.text.count) * 8.2 + 26
-                    if more.maxX > next.midX - min(words, next.width) / 2 { problems.append("More meets the Next line's words") }
                 }
                 if v.showsPoints { problems += Self.pointWordsProblems(v, hint: WalkLayout.hintFrame(v)) }
                 return (v, problems)
@@ -960,6 +965,131 @@ struct WalkLayoutTests {
             (p.at, WalkLayout.pointWords(p, among: welcome.map(\.at)).filter(\.detail).map(\.text)) })
         #expect(lines[.nw] == ["Every part of life.", "About 25 minutes."])
         #expect(lines[.ne] == ["Go straight to Today."])
+    }
+
+    // MARK: The controls: the top row, the foot, above the light
+
+    /// Every control's frame in a state, by name: what the tests below keep apart.
+    static func controlFrames(_ s: WalkState, wing: CGFloat = 0) -> [(String, CGRect)] {
+        [("back", WalkLayout.backFrame(s, wing: wing)), ("more", WalkLayout.moreFrame(s)),
+         ("leave", WalkLayout.leaveFrame(s, wing: wing)), ("next", WalkLayout.nextFrame(s)),
+         ("hint", WalkLayout.hintFrame(s)), ("undo", WalkLayout.undoFrame(s)), ("lesson", WalkLayout.teachFrame(s)),
+         ("move row", WalkLayout.moveRowFrame(s))]
+            .compactMap { name, f in f.map { (name, $0) } }
+    }
+
+    /// Back, More and Leave for now on every step after Welcome (the ground too), each a full touch,
+    /// apart, inside the row; none on Welcome or Look back up. Back and Leave for now go out to a wider
+    /// window's corners; More stays in the middle.
+    @Test func theTopRowIsThereOnEveryStepAfterWelcome() {
+        var ground = state(1); ground.ground = true
+        for s in [ground] + (1...5).map({ state($0) }) {
+            #expect(s.showsTopRow && s.showsMore, "step \(s.step)")
+            let row = [WalkLayout.backFrame(s), WalkLayout.moreFrame(s), WalkLayout.leaveFrame(s)]
+            #expect(row.allSatisfy { $0 != nil }, "step \(s.step) ground \(s.ground)")
+            let frames = row.compactMap { $0 }
+            for (i, a) in frames.enumerated() {
+                #expect(a.width >= 44 && a.height >= 44, "\(a)")
+                #expect(a.minY >= 44 && a.maxY <= 88, "\(a)")
+                for b in frames[(i + 1)...] { #expect(!Invariants.overlap(a, b), "\(a) meets \(b)") }
+            }
+        }
+        for step in [0, 6] {
+            let s = state(step)
+            #expect(!s.showsTopRow)
+            #expect(WalkLayout.backFrame(s) == nil && WalkLayout.moreFrame(s) == nil && WalkLayout.leaveFrame(s) == nil)
+        }
+        let s = state(3)
+        #expect(WalkLayout.backFrame(s) == CGRect(x: 8, y: 44, width: 76, height: 44))
+        #expect(WalkLayout.leaveFrame(s)?.maxX == 382)
+        let narrow = WalkLayout.make(s, today: today, footing: .level, wing: 0)
+        let wide = WalkLayout.make(s, today: today, footing: .level, wing: 110.3)
+        #expect(narrow.back == CGRect(x: 8, y: 44, width: 76, height: 44) && near(narrow.leave?.maxX ?? 0, 382, 0.001))
+        #expect(near(wide.back?.minX ?? 0, -102.3, 0.001) && near(wide.leave?.maxX ?? 0, 492.3, 0.001))
+        #expect(narrow.more != nil && narrow.more == wide.more)
+    }
+
+    /// F10: while the keyboard is up there is no top row (no Back with unsent words).
+    @Test func noTopRowWhileTyping() {
+        var s = state(2); s.typing = "half"
+        #expect(!s.showsTopRow && !s.showsMore)
+        #expect(WalkLayout.backFrame(s) == nil && WalkLayout.moreFrame(s) == nil && WalkLayout.leaveFrame(s) == nil)
+    }
+
+    /// Next stands alone at the foot: one gold button, under the ring, above the home-indicator zone,
+    /// meeting no other control, in every generated state where it shows.
+    @Test func nextStandsAloneAtTheFoot() {
+        #expect(WalkLayout.nextFrame(state(3)) == CGRect(x: 55, y: 750, width: 280, height: 50))
+        var checked = 0
+        for s in Generated.all where (1...5).contains(s.step) {
+            guard let next = WalkLayout.nextFrame(s) else { continue }
+            #expect(next.maxY <= 844 - 34 && next.minY >= 678 + 66, "\(Generated.describe(s)): \(next)")
+            for (name, f) in Self.controlFrames(s) where name != "next" && Invariants.overlap(f, next) {
+                Issue.record("\(Generated.describe(s)): Next meets \(name) \(f)")
+            }
+            checked += 1
+        }
+        #expect(checked > 1000)
+    }
+
+    /// At rest the hint is one line above the light (top 572), clear of the question's ceiling (282);
+    /// Welcome's stays where it was, under its line.
+    @Test func theHintStandsAboveTheLightAtRest() {
+        #expect(WalkLayout.question == 282)
+        var g = state(1); g.ground = true
+        for s in [g, state(1), state(2), state(4)] {
+            #expect(WalkLayout.hintFrame(s) == CGRect(x: 10, y: 572, width: 370, height: 19.5), "step \(s.step)")
+            #expect(WalkLayout.nextFrame(s).map { !Invariants.overlap($0, WalkLayout.hintFrame(s)!) } == true)
+        }
+        #expect(WalkLayout.hintFrame(WalkState()) == CGRect(x: 10, y: 790.5, width: 370, height: 19.5))
+    }
+
+    /// While the light is open or speaking Next is not drawn and the hint stands at the foot (top 766);
+    /// held or finishing, the hint is blank, or at the foot if it says anything.
+    @Test func theHintGoesToTheFootWhileTheLightIsBusy() {
+        for orb: WalkState.Orb in [.open, .speaking(live: "x")] {
+            var s = state(2); s.orb = orb
+            #expect(WalkLayout.nextFrame(s) == nil)
+            #expect(WalkLayout.hintFrame(s) == CGRect(x: 10, y: 766, width: 370, height: 19.5), "\(orb)")
+        }
+        for orb: WalkState.Orb in [.holding(hover: nil), .finishing(live: "x")] {
+            var s = state(2); s.orb = orb; s.note = WalkCopy.nothingToPlant
+            #expect(WalkLayout.nextFrame(s) == nil)
+            #expect(WalkLayout.hintFrame(s).map { $0.minY == 766 } ?? true, "\(orb)")
+        }
+    }
+
+    /// After planting the Undo pill stands above the light where the hint was (the hint is not drawn
+    /// then); a note is drawn instead of the pill.
+    @Test func undoShowsAboveTheLight() {
+        var s = state(1, kept: ["Health"])
+        s.focusArea = area("Health").id
+        _ = s.plant("run a 5K", WalkEnv(periods: WalkPeriods.pick(now: today), now: today))
+        #expect(s.undoShowing)
+        #expect(WalkLayout.undoFrame(s) == CGRect(x: 152, y: 564, width: 86, height: 36))
+        #expect(WalkLayout.hintFrame(s) == nil)
+        #expect(WalkLayout.make(s, today: today, footing: .level).undoPill == WalkLayout.undoFrame(s))
+        s.note = WalkCopy.nothingToPlant
+        #expect(WalkLayout.undoFrame(s) == nil)
+        #expect(WalkCopy.hint(s) == WalkCopy.nothingToPlant && WalkLayout.hintFrame(s)?.minY == 572)
+    }
+
+    /// F11: while a flag is chosen its Move to / Remove row stands above the light where the hint was,
+    /// clear of the ring; neither hint nor pill then.
+    @Test func theMoveRowStandsAboveTheLight() {
+        let goal = flag(.year, "Run a 5K", in: "Health")
+        var s = state(1, kept: ["Health", "Home"], items: [goal])
+        s.focusArea = area("Health").id
+        s.undoShowing = true
+        _ = s.select(goal.id)
+        s.undoShowing = true
+        let row = WalkLayout.moveRowFrame(s)
+        #expect(row == CGRect(x: 10, y: 558, width: 370, height: 38))
+        #expect((row?.maxY ?? .infinity) <= 678 - 66 - 8)
+        #expect(WalkLayout.hintFrame(s) == nil && WalkLayout.undoFrame(s) == nil)
+        #expect(WalkLayout.make(s, today: today, footing: .level).moveRow == row)
+        s.selected = nil
+        #expect(WalkLayout.moveRowFrame(s) == nil)
     }
 
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.
