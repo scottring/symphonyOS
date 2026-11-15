@@ -494,3 +494,12 @@ if wrong is given in the plan's rulings (F1 onward).
 - Welcome is unchanged (its quick start stays the light and the line under it).
 - A title longer than about 55 characters is cut on its flag at three lines; the paper
   shows it whole.
+
+### Added the same afternoon: his tenth comment, and the cold read
+
+Scott, on the preview: "i'm not sure why you have the content inside of a blue colored area instead of filling the whole screen?" The walk was one fixed 390 x 844 stage scaled to fit, with navy filling the rest of any wider window. The rule now: the board keeps its 390 x 844 numbers and its midline on every window; a wider window gives it wings; the painting, shades and sheets run edge to edge; side posts spread and flags widen into the room; nothing paints the ground colour beside the board. On a phone nothing changes from the approved board. Not cured, and each wanting a board of its own before it is built: the walk at 79% size on windows about 670 points high (the Duo's outside screen, the half window, opened flat, the narrow phone), and opened flat as one column on the fold.
+
+Five readers with no context then read 946 screenshots of the build cold. Of 69 distinct findings the plan already cured 12 and half-cured 16; the rest that belong in this pass were added to it (typing has a way out, Undo stays on its step, Remove stays in sight, long goal and area names stand whole, examples answer the question asked, light phones stay upright, Today and Week tasks take two lines). Three of these depart from the approved board's numbers so the person's own words can be read: the goal-above flag and a Look back up cloth take up to three lines (the board drew two), and a long area name takes two (the board drew one).
+
+Calls Claude made for these (check these): F13 to F29 in the plan, `docs/superpowers/plans/2026-11-15-iphone-light-hand-walk-fixes.md`, each with its cost if wrong. The full list of findings, and which were left out and why, is in the plan's header and the build worktree's `.superpowers/sdd/2026-11-15-hand-walk-fix/sweep/review/findings-consolidated.md`.
+
