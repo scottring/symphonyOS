@@ -2,16 +2,21 @@
 import SwiftUI
 import UIKit
 
-/// The walk, full screen: the 390 × 844 stage scaled to fit the device and
-/// centred on the deep sky colour, over the safe areas (D21). The orb and the
-/// hint row sit on the stage, over the scene, on every step but Look back up,
-/// where the header and the ending sheet take their place.
+/// The walk, full screen: the 390 × 844 board scaled to fit the window between
+/// its side insets and centred there, over the safe areas (D21). The painting,
+/// the shades, the veil and the sheets run past the board to the window's edges
+/// (`WalkStage.bleed`); the window clips them, the board clips nothing. The orb
+/// and the hint row sit on the board, over the scene, on every step but Look
+/// back up, where the header and the ending sheet take their place.
 /// The full-bleed root is the `"walk.device"` coordinate space every touch is
 /// measured in before `WalkStage` turns it into stage points.
 struct WalkView: View {
     let model: WalkModel
     /// The keyboard's top edge in screen points, while it is up.
     @State private var keyboardTop: CGFloat?
+    /// The window's own safe-area insets (`WindowInsetsReader`). Only the sides are read: the
+    /// board stands clear of a system column (the Duo's outside screen) and the painting runs under it.
+    @State private var insets = UIEdgeInsets.zero
 
     init(model: WalkModel) {
         self.model = model
@@ -19,6 +24,8 @@ struct WalkView: View {
 
     // `-WalkSize 669x951` pins the walk to a window of that size (a Duo's
     // inside screen on a phone simulator), scaled down to the room there is, as `-TodaySize` does for the pages.
+    // `-WalkSafe 0,84` with it gives that pinned window side insets, left then right (`466x678` with
+    // `0,84` is the Duo's outside screen); without it the pinned window has none.
     #if DEBUG
     static let pinnedSize: CGSize? = {
         let args = ProcessInfo.processInfo.arguments
@@ -27,11 +34,18 @@ struct WalkView: View {
         return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
     }()
 
+    static let pinnedSafe: (left: CGFloat, right: CGFloat) = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-WalkSafe"), i + 1 < args.count else { return (0, 0) }
+        let parts = args[i + 1].split(separator: ",").compactMap { Double($0) }
+        return parts.count == 2 ? (CGFloat(parts[0]), CGFloat(parts[1])) : (0, 0)
+    }()
+
     var body: some View {
         if let pinned = Self.pinnedSize {
             GeometryReader { room in
                 let k = min(1, room.size.width / pinned.width, room.size.height / pinned.height)
-                walkBody
+                walkBody(left: Self.pinnedSafe.left, right: Self.pinnedSafe.right)
                     .frame(width: pinned.width, height: pinned.height)
                     .scaleEffect(k, anchor: .topLeading)
                     .offset(x: (room.size.width - pinned.width * k) / 2, y: (room.size.height - pinned.height * k) / 2)
@@ -39,18 +53,24 @@ struct WalkView: View {
             .background(Color.black)
             .ignoresSafeArea()
         } else {
-            walkBody
+            inTheWindow
         }
     }
     #else
-    var body: some View { walkBody }
+    var body: some View { inTheWindow }
     #endif
 
-    private var walkBody: some View {
+    /// The walk on the real window, between that window's own side insets.
+    private var inTheWindow: some View {
+        walkBody(left: insets.left, right: insets.right)
+            .background { WindowInsetsReader { insets = $0 } }
+    }
+
+    /// `left`, `right`: the window's side insets, in its own points.
+    private func walkBody(left: CGFloat, right: CGFloat) -> some View {
         GeometryReader { geo in
-            let stage = WalkStage(device: geo.size, stage: model.art.stage)
+            let stage = WalkStage(device: geo.size, stage: model.art.stage, left: left, right: right)
             ZStack(alignment: .topLeading) {
-                WalkPalette.ground
                 // VoiceOver reads the scene (the words, then the peaks and flags), then the light, then the hint row.
                 ZStack(alignment: .topLeading) {
                     WalkSceneView(model: model)
@@ -77,6 +97,7 @@ struct WalkView: View {
                 .environment(\.walkKeyboardLift, lift(stage, root: geo.frame(in: .global)))
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .clipped()                                   // at the window: nothing is clipped at the board
             .coordinateSpace(.named("walk.device"))
         }
         .ignoresSafeArea()

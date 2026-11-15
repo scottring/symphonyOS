@@ -300,21 +300,22 @@ struct DailyHandoverTests {
         }
     }
 
-    /// The outside screen: the walk fills the whole 466 × 678 window, its stage letterboxed there,
-    /// while the page stands clear of the system's 84-point column. The light starts where the walk
-    /// drew it, in the page's points, inside the page, and lands on the bar this window draws
-    /// (the short shape's, on the page's 382 width), 34 above the foot.
+    /// The outside screen: the walk fills the whole 466 × 678 window, its board centred in the room
+    /// beside the system's 84-point column, as the page is. The light starts where the walk drew it,
+    /// at the page's own middle (x 191 of 382, not the window's 233), and lands on the bar this
+    /// window draws (the short shape's, on the page's 382 width), 34 above the foot.
     @Test func onTheOutsideScreenItTravelsFromTheWalksLightToTheShortBar() {
-        let window = CGSize(width: 466, height: 678), page = CGRect(x: 0, y: 0, width: 382, height: 678)
-        let stage = WalkStage(device: window)
-        let start = DailyHandover.start(window: window, page: page.origin)
+        let page = CGRect(x: 0, y: 0, width: 382, height: 678)
+        let stage = WalkStage(device: CGSize(width: 466, height: 678), right: 84)
+        let start = DailyHandover.start(page: page.size, left: 0, right: 84)
         #expect(start.centre == stage.toDevice(WalkOrb.centre))
+        #expect(abs(start.centre.x - 191) < 0.001)
         #expect(start.diameter == 2 * WalkOrb.radius * stage.scale)
         #expect(page.contains(start.centre))
 
-        // With the column on the left the page stands in by it, and the same light is that much to its left.
-        let left = DailyHandover.start(window: window, page: CGPoint(x: 84, y: 0))
-        #expect(left.centre == CGPoint(x: stage.toDevice(WalkOrb.centre).x - 84, y: stage.toDevice(WalkOrb.centre).y))
+        // With the column on the left the page stands in by it, and the light is at the page's middle still.
+        let left = DailyHandover.start(page: page.size, left: 84, right: 0)
+        #expect(abs(left.centre.x - 191) < 0.001 && left.centre.y == start.centre.y)
 
         let bar = DailyMetrics.today(size: page.size, safeTop: 0, safeBottom: 34,
                                      shape: DailyMetrics.shape(for: .glance, height: 678, safeTop: 0, safeBottom: 34,
@@ -330,15 +331,19 @@ struct DailyHandoverTests {
     }
 
     /// Where the walk's light stood, from the page's own size and its side insets: on the Duo's outside
-    /// screen (a 382-wide page with the system's 84-point column on its right, the walk on the whole
-    /// 466-wide window) and on an ordinary phone (no side insets: the stage itself, unscaled).
+    /// screen (a 382-wide page with the system's 84-point column on its right; the walk's board is
+    /// centred on that page, so the light is at the page's middle, x 191, whichever side the column
+    /// is on) and on an ordinary phone (no side insets: the stage itself, unscaled).
     @Test func theStartComesFromThePageAndItsSideInsets() {
         let outside = DailyHandover.start(page: CGSize(width: 382, height: 678), left: 0, right: 84)
-        let stage = WalkStage(device: CGSize(width: 466, height: 678))
+        let stage = WalkStage(device: CGSize(width: 466, height: 678), right: 84)
         #expect(outside.centre == stage.toDevice(WalkOrb.centre))
+        #expect(abs(outside.centre.x - 191) < 0.001)
         #expect(outside.diameter == 2 * WalkOrb.radius * stage.scale)
         let mirrored = DailyHandover.start(page: CGSize(width: 382, height: 678), left: 84, right: 0)
-        #expect(mirrored.centre == CGPoint(x: stage.toDevice(WalkOrb.centre).x - 84, y: stage.toDevice(WalkOrb.centre).y))
+        let stageMirrored = WalkStage(device: CGSize(width: 466, height: 678), left: 84)
+        #expect(mirrored.centre == CGPoint(x: stageMirrored.toDevice(WalkOrb.centre).x - 84, y: outside.centre.y))
+        #expect(abs(mirrored.centre.x - 191) < 0.001)
         let phone = DailyHandover.start(page: CGSize(width: 390, height: 844), left: 0, right: 0)
         #expect(phone.centre == WalkOrb.centre)
         #expect(phone.diameter == 2 * WalkOrb.radius)

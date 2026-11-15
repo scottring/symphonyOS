@@ -1,11 +1,14 @@
 #if os(iOS)
 import SwiftUI
 
-/// The walk's scene on the 390 × 844 stage: the mountain (`WalkWorldView`),
+/// The walk's scene on the 390 × 844 board: the mountain (`WalkWorldView`),
 /// the veil while the compass is open, and the words. It draws what the model's
 /// layout returns and sends taps to the model; it decides nothing about the walk.
+/// The mountain's picture and the veil run past the board over its bleed, to the
+/// window's edges; nothing here is clipped at the board (the window clips: `WalkView`).
 struct WalkSceneView: View {
     let model: WalkModel
+    @Environment(\.walkStage) private var stage
 
     /// The camera's glide and the Reduce Motion cross-fade, kept here for the walk's other views.
     static let glide = WalkWorldView.glide
@@ -14,7 +17,7 @@ struct WalkSceneView: View {
     var body: some View {
         let art = model.art
         ZStack(alignment: .topLeading) {
-            WalkWorldView(layout: model.layout, art: art, step: model.state.step,
+            WalkWorldView(layout: model.layout(wing: stage.wing), art: art, step: model.state.step, stage: stage,
                           onLabel: { model.send(.areaTapped($0.id)) },
                           onBanner: { banner, post in
                               if let event = WalkLayout.tapEvent(banner, on: post) { model.send(event) }
@@ -23,18 +26,19 @@ struct WalkSceneView: View {
             // so every point reads on an even dark ground; the words above stay bright. A tap on
             // it closes the compass (on Welcome the choices stay); flags and peaks take no tap.
             if model.state.showsVeil {
+                // Over the whole window, and it takes its tap there too.
                 WalkPalette.ground.opacity(0.8)
-                    .frame(width: art.stage.width, height: art.stage.height)
+                    .frame(width: stage.window.width, height: stage.window.height)
                     .contentShape(Rectangle())
                     .onTapGesture { model.send(.veilTapped) }
                     .accessibilityHidden(true)
+                    .walkOverTheWindow(stage)
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
             words
                 .accessibilitySortPriority(1)       // read before the peaks and flags
         }
         .frame(width: art.stage.width, height: art.stage.height)
-        .clipped()
         .accessibilityElement(children: .contain)
     }
 
@@ -96,10 +100,12 @@ struct WalkSceneView: View {
     }
 }
 
-/// The mountain on the 390 × 844 stage, back to front: the stage's sky, the
+/// The mountain on the 390 × 844 board, back to front: the stage's sky, the
 /// painting (the art's backdrop, by its own camera for the step), the dark band at its top, the world (the
 /// peak labels and the posts with their banners), over the band so it dims none of them. No words. It draws the layout it is given and
 /// hands taps to its callbacks, so a page can draw it without the walk's model.
+/// The sky, the painting and the band cover the board plus its bleed (`WalkStage.window`: the
+/// whole window it stands on); it clips nothing, so whoever draws it clips at the window.
 /// It makes no accessibility container of its own: whoever draws it does
 /// (`WalkSceneView` does), so its peaks and flags sit beside that page's words.
 ///
@@ -113,6 +119,8 @@ struct WalkWorldView: View {
     let art: WalkArt
     /// The walk's step: which of the picture's stops (`WalkArt.backdropCamera`) stands behind the layout.
     let step: Int
+    /// The window the board stands on: how far the sky, the painting and the band run past the board.
+    let stage: WalkStage
     /// Whether banners that arrive after the world first draws drop in; those present at first stand still.
     let dropsIn: Bool
     /// VoiceOver's custom actions on a banner (none by default).
@@ -127,13 +135,14 @@ struct WalkWorldView: View {
     /// With Reduce Motion the camera does not glide: the whole view cross-fades to its new framing.
     static let crossFade = Animation.easeInOut(duration: 0.25)
 
-    init(layout: WalkLayout, art: WalkArt, step: Int, dropsIn: Bool = true,
+    init(layout: WalkLayout, art: WalkArt, step: Int, stage: WalkStage, dropsIn: Bool = true,
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void) {
         self.layout = layout
         self.art = art
         self.step = step
+        self.stage = stage
         self.dropsIn = dropsIn
         self.actions = actions
         self.onLabel = onLabel
@@ -146,6 +155,8 @@ struct WalkWorldView: View {
                                    .init(color: Color(hex: 0x0A2A7A), location: 0.6),
                                    .init(color: Color(hex: 0x142430), location: 1)],
                            startPoint: .top, endPoint: .bottom)
+                .frame(width: stage.window.width, height: stage.window.height)
+                .walkOverTheWindow(stage)
             Group {
                 if reduceMotion {
                     // A new framing is a new view, faded in over the old one.
@@ -160,7 +171,6 @@ struct WalkWorldView: View {
             .animation(reduceMotion ? Self.crossFade : nil, value: layout.camera)
         }
         .frame(width: art.stage.width, height: art.stage.height)
-        .clipped()
         .onAppear { arrived = true }
     }
 
@@ -171,15 +181,25 @@ struct WalkWorldView: View {
     private var scene: some View {
         ZStack(alignment: .topLeading) {
             picture
-            band
-                .frame(width: art.stage.width, alignment: .top)
+            // From the window's top edge (the band's top strength held over the bleed above the board), side to side.
+            VStack(spacing: 0) {
+                WalkPalette.navyBand.opacity(bandTop)
+                    .frame(height: stage.bleed.top)
+                band
+            }
+            .frame(width: stage.window.width)
+            .offset(x: stage.window.minX, y: stage.window.minY)
+            .frame(width: art.stage.width, alignment: .leading)
+            .allowsHitTesting(false)
             world
         }
     }
 
-    /// The backdrop (`WalkBackdrop`): the tall painting by its own camera, which glides with the layout's.
+    /// The backdrop (`WalkBackdrop`): the tall painting by its own camera for this window, which
+    /// glides with the layout's. It glides when the walk moves (a step, a zoom), not when the
+    /// window changes (a turn, a fold): there it stands at once where the new window puts it.
     @ViewBuilder private var picture: some View {
-        if let backdrop = art.backdrop, let camera = art.backdropCamera(step: step, layout: layout.camera) {
+        if let backdrop = art.backdrop, let camera = art.backdropCamera(step: step, layout: layout.camera, stage: stage) {
             Image(backdrop.imageName)
                 .resizable()
                 .interpolation(.high)
@@ -187,7 +207,7 @@ struct WalkWorldView: View {
                 .frame(width: backdrop.size.width, height: backdrop.size.height)
                 .scaleEffect(camera.k, anchor: .topLeading)
                 .offset(x: -camera.x * camera.k, y: -camera.y * camera.k)
-                .animation(reduceMotion ? nil : Self.glide, value: camera)
+                .animation(reduceMotion ? nil : Self.glide, value: [CGFloat(step), layout.camera.x, layout.camera.y, layout.camera.k])
                 .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
                 .accessibilityHidden(true)
         }
@@ -238,10 +258,14 @@ struct WalkWorldView: View {
 
     // MARK: The band
 
+    /// The band's strength at its top edge, which the bleed above the board carries on to the window's top.
+    private var bandTop: Double { art.topShade(step: step, stage: stage) ?? 0.55 }
+
     /// A faint dark band at the top, so white words read over a pale sky (contract §14); where the
-    /// step's painting behind the words is bright, a held shade to the question's foot (`WalkBackdrop.shade`).
+    /// step's painting behind the words is bright, a held shade to the question's foot (`WalkBackdrop.shade`,
+    /// or the step's `stretchedShade` on a stage with wings).
     @ViewBuilder private var band: some View {
-        if let strength = art.topShade(step: step) {
+        if let strength = art.topShade(step: step, stage: stage) {
             let held = WalkLayout.question, length = WalkLayout.question + WalkBackdrop.shadeFade
             LinearGradient(stops: [.init(color: WalkPalette.navyBand.opacity(strength), location: 0),
                                    .init(color: WalkPalette.navyBand.opacity(strength), location: held / length),
@@ -288,6 +312,16 @@ extension View {
     func walkReadOnly(_ readOnly: Bool) -> some View {
         accessibilityRemoveTraits(readOnly ? .isButton : [])
             .accessibilityAddTraits(readOnly ? .isStaticText : [])
+    }
+}
+
+extension View {
+    /// Places a view sized to a stage's window (`WalkStage.window`: the board plus its bleed) over
+    /// that window, from inside a container laid out on the board: it runs past the board to the
+    /// window's edges and takes only the board's room, so nothing around it moves.
+    func walkOverTheWindow(_ stage: WalkStage) -> some View {
+        offset(x: stage.window.minX, y: stage.window.minY)
+            .frame(width: stage.board.width, height: stage.board.height, alignment: .topLeading)
     }
 }
 

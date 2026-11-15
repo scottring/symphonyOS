@@ -83,8 +83,9 @@ struct WalkLayout: Equatable {
     static let narrowest: CGFloat = 44          // a banner narrowed between neighbouring stubs
 
     /// `footing`: `.natural` plants the posts by hand (the app); `.level` is the contract's ruled geometry.
+    /// `wing`: the room beside the board on a wider window (`WalkStage.wing`); nothing reads it yet.
     static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare,
-                     footing: WalkFooting = .natural) -> WalkLayout {
+                     footing: WalkFooting = .natural, wing: CGFloat = 0) -> WalkLayout {
         var made = Builder(state, today: today, art: art, footing: footing).layout()
         made.nextLine = nextFrame(state)
         made.hintLine = hintFrame(state)

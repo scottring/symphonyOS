@@ -299,7 +299,8 @@ extension DailyModel.Scene {
 
 /// Reports the window's own safe-area insets, now and whenever they change (a turn, a
 /// fold). The dock's inset is SwiftUI's, not the window's, so it is never counted.
-private struct WindowInsetsReader: UIViewRepresentable {
+/// The light pages read it here, and the walk for its side insets (`WalkView`).
+struct WindowInsetsReader: UIViewRepresentable {
     let onChange: (UIEdgeInsets) -> Void
 
     func makeUIView(context: Context) -> ReaderView {

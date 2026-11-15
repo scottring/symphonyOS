@@ -29,7 +29,7 @@ struct WalkOrbView: View {
         let points = WalkCopy.points(s, model.periods)
         let showsPoints = s.showsPoints
         ZStack(alignment: .topLeading) {
-            dial(needleDown: model.layout.needleDown, pulses: s.teaching && !reduceMotion)
+            dial(needleDown: model.layout(wing: stage.wing).needleDown, pulses: s.teaching && !reduceMotion)
                 .frame(width: Self.dial.width, height: Self.dial.height)
                 .offset(x: Self.dial.minX, y: Self.dial.minY)
                 .allowsHitTesting(false)

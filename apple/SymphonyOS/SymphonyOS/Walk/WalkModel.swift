@@ -24,13 +24,14 @@ extension Dictation: WalkListening {}
 /// The walk's one observable object. It holds the state, runs the reducer on
 /// every event and compass point, and carries out what the reducer asks for:
 /// rows through one `WalkWriter`, waits through the scheduler, the saved
-/// position. Views read `state` and `layout` and send events; nothing else.
+/// position. Views read `state` and `layout(wing:)` and send events; nothing else.
 @MainActor @Observable final class WalkModel {
     private(set) var state: WalkState
     private(set) var periods: WalkPeriods
     /// The painting the scene draws and the layout measures against.
     let art: WalkArt = .overlookSquare
-    var layout: WalkLayout { WalkLayout.make(state, today: periods.today, art: art) }
+    /// The layout on a stage with this much room beside the board (`WalkStage.wing`, from `\.walkStage`).
+    func layout(wing: CGFloat) -> WalkLayout { WalkLayout.make(state, today: periods.today, art: art, wing: wing) }
     var onEnd: ((WalkStatus) -> Void)?
 
     @ObservationIgnored private let userId: UUID

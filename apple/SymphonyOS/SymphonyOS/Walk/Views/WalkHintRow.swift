@@ -8,6 +8,7 @@ import SwiftUI
 /// (a note) kept as a line above it. While the keyboard is up the field rises to sit just above it.
 struct WalkHintRow: View {
     let model: WalkModel
+    @Environment(\.walkStage) private var device
     @Environment(\.walkKeyboardLift) private var lift
     @FocusState private var fieldFocused: Bool
     /// Return was pressed: the reducer's submit closes the field, so the blur that follows is not a dismiss.
@@ -22,7 +23,7 @@ struct WalkHintRow: View {
 
     var body: some View {
         let s = model.state
-        let layout = model.layout
+        let layout = model.layout(wing: device.wing)
         let stage = WalkArt.stageSize
         ZStack(alignment: .topLeading) {
             // The lesson: two lines above the light, on the veil (any tap puts it away; they take none).
@@ -267,23 +268,32 @@ struct WalkHintRow: View {
 }
 
 /// Under the light's own layer, so nothing on the compass is dimmed: the scrim at the foot of
-/// the stage (the ground colour from 0 to 80% over the last 120 points), and soft bands of the
+/// the stage (the ground colour from 0 to 80% over the board's last 120 points), and soft bands of the
 /// ground colour behind the open compass's hint, the points' words and the lines that teach
-/// the light, where they stand over the veiled mountain.
+/// the light, where they stand over the veiled mountain. The scrim and the bands run from side
+/// to side of the window (the board plus its bleed), and the scrim on down to the window's foot.
 struct WalkUnderlay: View {
     let model: WalkModel
+    @Environment(\.walkStage) private var device
     static let scrimHeight: CGFloat = 120
 
     var body: some View {
-        let layout = model.layout
+        let layout = model.layout(wing: device.wing)
         let stage = WalkArt.stageSize
+        let window = device.window
         ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(width: stage.width, height: Self.scrimHeight)
-                .offset(y: stage.height - Self.scrimHeight)
+            VStack(spacing: 0) {
+                LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: Self.scrimHeight)
+                WalkPalette.ground.opacity(0.8)
+                    .frame(height: device.bleed.bottom)
+            }
+            .frame(width: window.width)
+            .offset(x: window.minX, y: stage.height - Self.scrimHeight)
+            .frame(width: stage.width, height: stage.height, alignment: .topLeading)
             if model.state.showsPoints, let hint = layout.hintLine {
-                band(height: hint.height + 20).position(x: stage.width / 2, y: hint.midY)
+                band(height: hint.height + 20, width: window.width).position(x: window.midX, y: hint.midY)
             }
             // Behind each point's words, a soft blot of the ground colour (no edge, no panel): a
             // kept area's pill or a flag under the veil does not show through the words.
@@ -303,7 +313,7 @@ struct WalkUnderlay: View {
                 }
             }
             if let teach = layout.lesson {
-                band(height: teach.height + 40).position(x: stage.width / 2, y: teach.midY)
+                band(height: teach.height + 40, width: window.width).position(x: window.midX, y: teach.midY)
             }
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
@@ -311,13 +321,13 @@ struct WalkUnderlay: View {
         .accessibilityHidden(true)
     }
 
-    private func band(height: CGFloat) -> some View {
+    private func band(height: CGFloat, width: CGFloat) -> some View {
         LinearGradient(stops: [.init(color: WalkPalette.ground.opacity(0), location: 0),
                                .init(color: WalkPalette.ground.opacity(0.8), location: 0.3),
                                .init(color: WalkPalette.ground.opacity(0.8), location: 0.7),
                                .init(color: WalkPalette.ground.opacity(0), location: 1)],
                        startPoint: .top, endPoint: .bottom)
-            .frame(width: WalkArt.stageSize.width, height: height)
+            .frame(width: width, height: height)
     }
 }
 

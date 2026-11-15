@@ -482,7 +482,7 @@ final class WalkFlowTests {
         #expect(m.state.step == 4)
         let item = try #require(m.state.items(on: .week).first { $0.title == "Gym" })
         #expect(PlanCalendar.sameDay(item.day, day(2026, 11, 17)))
-        let banner = m.layout.posts.flatMap(\.banners).first { $0.level == .week && $0.itemId == item.id }
+        let banner = m.layout(wing: 0).posts.flatMap(\.banners).first { $0.level == .week && $0.itemId == item.id }
         #expect(banner?.tag == "TUESDAY")
     }
 

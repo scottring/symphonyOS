@@ -66,7 +66,7 @@ enum DailyHandover {
         return reduceMotion || slotTaken || !travels ? .still : .travel
     }
 
-    /// Opened flat (`.journal`) the light does not travel: the walk stands letterboxed across the
+    /// Opened flat (`.journal`) the light does not travel: the walk's board stands across the
     /// fold there and the spread's sheet does not rise, so the bar's light on the right page simply
     /// wears the halo, with the once-only line (`.still`). Every other window's Today travels.
     static func travels(on layout: TodayLayout) -> Bool {
@@ -90,21 +90,22 @@ enum DailyHandover {
         }
     }
 
-    /// Where the walk's light stood, and how wide, in the page's own points: the walk fills the
-    /// whole `window` (its stage letterboxed there), while the page may stand in from the window's
-    /// side, clear of a system column (the Duo's outside screen), with its top-left at `page`.
-    static func start(window: CGSize, page: CGPoint = .zero) -> (centre: CGPoint, diameter: CGFloat) {
-        let stage = WalkStage(device: window)
+    /// Where the walk's light stood, and how wide, in the page's own points. The walk fills the
+    /// whole `window`, its board centred in the room between the window's side insets (`left`,
+    /// `right`: a system column, as on the Duo's outside screen); the page stands in that same
+    /// room, its left edge `left` in from the window's.
+    static func start(window: CGSize, left: CGFloat = 0, right: CGFloat = 0) -> (centre: CGPoint, diameter: CGFloat) {
+        let stage = WalkStage(device: window, left: left, right: right)
         let centre = stage.toDevice(WalkOrb.centre)
-        return (CGPoint(x: centre.x - page.x, y: centre.y - page.y), 2 * WalkOrb.radius * stage.scale)
+        return (CGPoint(x: centre.x - left, y: centre.y), 2 * WalkOrb.radius * stage.scale)
     }
 
     /// Where the walk's light stood, in the page's own points, from the page's size and the window's
-    /// side insets: the walk fills the whole window (the page widened by both insets), and the page
-    /// stands `left` in from the window's left edge (the Duo's outside screen: a 382-wide page, the
-    /// system's 84-point column on its right; a phone upright: no side insets).
+    /// side insets: the walk fills the whole window (the page widened by both insets) with its board
+    /// centred on the page, so the light stood at the page's own middle (the Duo's outside screen: a
+    /// 382-wide page, the system's 84-point column on its right; a phone upright: no side insets).
     static func start(page: CGSize, left: CGFloat, right: CGFloat) -> (centre: CGPoint, diameter: CGFloat) {
-        start(window: CGSize(width: page.width + left + right, height: page.height), page: CGPoint(x: left, y: 0))
+        start(window: CGSize(width: page.width + left + right, height: page.height), left: left, right: right)
     }
 
     /// Where the bar's light stands (its diameter, at the field's right end, `lightInset` in).

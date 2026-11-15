@@ -6,8 +6,8 @@ import SwiftUI
 /// rises to y 130; it is not a system sheet. What it shows comes from the model
 /// (`endingRows`, `ring`, `nextUp`, `dayLine`, `nextToWalk`) and the state
 /// (`endingTitle`, `sheetRaised`, `sheetHandleLabel`); taps go back as events.
-/// The paper runs on past the stage into the device's letterbox, so it meets the
-/// screen's edges; its content stays where the stage puts it.
+/// The paper runs on past the board over its bleed (`WalkStage.bleed`), so it meets the
+/// window's edges; its content stays where the board puts it.
 struct WalkEndingView: View {
     let model: WalkModel
     @Environment(\.walkStage) private var device
@@ -25,8 +25,7 @@ struct WalkEndingView: View {
         let s = model.state
         let stage = model.art.stage
         let top = s.sheetRaised ? Self.raisedTop : Self.peekTop
-        // The letterbox around the centred stage, in stage points.
-        let bleed = CGSize(width: device.origin.x / device.scale, height: device.origin.y / device.scale)
+        let bleed = device.bleed
         ZStack(alignment: .topLeading) {
             Text(s.endingTitle)
                 .font(.custom("CrimsonPro-Regular", size: 24))
@@ -43,7 +42,7 @@ struct WalkEndingView: View {
             WalkEndingSheet(model: model, raised: s.sheetRaised, bleed: bleed)
                 .frame(width: stage.width, height: stage.height - top, alignment: .top)
                 .offset(y: top)
-                .offset(y: risen ? 0 : stage.height - top + bleed.height)
+                .offset(y: risen ? 0 : stage.height - top + bleed.bottom)
                 .animation(reduceMotion ? WalkSceneView.crossFade : Self.move, value: top)
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
@@ -56,8 +55,8 @@ struct WalkEndingView: View {
 struct WalkEndingSheet: View {
     let model: WalkModel
     let raised: Bool
-    /// How far the paper runs past the stage's sides and bottom, in stage points.
-    var bleed: CGSize = .zero
+    /// How far the paper runs past the board's sides and foot, in stage points.
+    let bleed: WalkStage.Bleed
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -99,7 +98,7 @@ struct WalkEndingSheet: View {
             UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
                 .fill(EndingPaper.sheet)
                 .shadow(color: Color(red: 30 / 255, green: 38 / 255, blue: 40 / 255).opacity(0.18), radius: 20, x: 0, y: -10)
-                .padding(EdgeInsets(top: 0, leading: -bleed.width, bottom: -bleed.height, trailing: -bleed.width))
+                .padding(EdgeInsets(top: 0, leading: -bleed.left, bottom: -bleed.bottom, trailing: -bleed.right))
         )
         .task(id: CalendarFeed.shared.readKey(for: model.periods.today)) {
             await CalendarFeed.shared.refresh(model.periods.today, maxAge: 60)

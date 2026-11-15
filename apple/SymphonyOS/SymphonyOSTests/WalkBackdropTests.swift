@@ -25,7 +25,7 @@ struct WalkBackdropTests {
     @Test func theWalkDrawsTheTallPaintingAndTheLayoutKeepsTheSquareWorld() {
         #expect(backdrop.imageName == "WalkOverlookTall")
         #expect(backdrop.size == CGSize(width: 1300, height: 3900))
-        #expect(backdrop.stops.count == 7 && backdrop.shade.count == 7)
+        #expect(backdrop.stops.count == 7 && backdrop.shade.count == 7 && backdrop.stretchedShade.count == 7)
         // The layout's numbers are the square print's, untouched.
         var plain = art
         plain.backdrop = nil
@@ -176,15 +176,136 @@ struct WalkBackdropTests {
         #expect(most <= 1.6, "the picture is enlarged \(most) times")
     }
 
+    // MARK: A window wider than the board
+
+    /// The picture's camera as it was while the stage was only ever the 390 × 844 board (commit
+    /// 1f2b138d): the step's stop, moved as the layout's camera moved, held on the board.
+    private func cameraOnTheBoardAlone(step: Int, layout camera: WalkLayout.Camera) -> WalkLayout.Camera {
+        let stop = art.stops[step], b = backdrop.stops[step]
+        let k = b.k * camera.k / stop.k
+        let x = b.x - (stop.x - camera.x) * camera.k / k, y = b.y - (stop.y - camera.y) * camera.k / k
+        let held = max(k, 390 / backdrop.size.width, 844 / backdrop.size.height)
+        return WalkLayout.Camera(x: min(max(0, x), backdrop.size.width - 390 / held),
+                                 y: min(max(0, y), backdrop.size.height - 844 / held), k: held)
+    }
+
+    /// The part of the painting a window shows: the board plus its bleed, under the picture's camera.
+    private func shown(_ stage: WalkStage, _ c: WalkLayout.Camera) -> CGRect {
+        let window = stage.window
+        return CGRect(x: c.x + window.minX / c.k, y: c.y + window.minY / c.k,
+                      width: window.width / c.k, height: window.height / c.k)
+    }
+
+    /// On the board's own window the picture stands exactly where it did: at every step's stop and on
+    /// every generated state, ruled or planted by hand. A phone a little taller for its width (no
+    /// wings, a sliver above and below the board) has the same picture, the same size and the same
+    /// way across, slid up or down by no more than that sliver.
+    @Test func onThePhoneThePictureIsUnchanged() {
+        let phone = WalkStage(device: CGSize(width: 390, height: 844))
+        for step in 0...6 {
+            #expect(art.backdropCamera(step: step, layout: art.stops[step], stage: phone)
+                    == cameraOnTheBoardAlone(step: step, layout: art.stops[step]), "step \(step)")
+            #expect(art.backdropCamera(step: step, layout: art.stops[step])
+                    == cameraOnTheBoardAlone(step: step, layout: art.stops[step]), "step \(step), no stage named")
+        }
+        for layouts in [Generated.levelLayouts, Generated.naturalLayouts] {
+            for (s, layout) in zip(Generated.all, layouts) {
+                #expect(art.backdropCamera(step: s.step, layout: layout.camera, stage: phone)
+                        == cameraOnTheBoardAlone(step: s.step, layout: layout.camera), "\(Generated.describe(s))")
+            }
+        }
+        for device in [CGSize(width: 402, height: 874), CGSize(width: 430, height: 932)] {
+            let taller = WalkStage(device: device)
+            #expect(taller.wing == 0 && taller.bleed.top > 0)
+            var cameras = (0...6).map { (step: $0, layout: art.stops[$0]) }
+            cameras += zip(Generated.all, Generated.levelLayouts).map { (step: $0.step, layout: $1.camera) }
+            for (step, layout) in cameras {
+                let c = art.backdropCamera(step: step, layout: layout, stage: taller)!
+                let before = cameraOnTheBoardAlone(step: step, layout: layout)
+                #expect(c.k == before.k && c.x == before.x && abs(c.y - before.y) <= taller.bleed.top / c.k + 0.000001,
+                        "\(device), step \(step), \(layout): \(c) for \(before)")
+            }
+        }
+    }
+
+    /// On every window the whole of it (the board plus its bleed) lies on the painting, at every
+    /// step's stop and on every generated state: no edge of the picture ever shows.
+    @Test func thePictureCoversEveryWindow() {
+        let painting = CGRect(origin: .zero, size: backdrop.size).insetBy(dx: -0.001, dy: -0.001)
+        for (name, _, stage) in WalkWindows.all {
+            for step in 0...6 {
+                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
+                #expect(painting.contains(shown(stage, c)), "\(name), step \(step): \(shown(stage, c))")
+            }
+            for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
+                let c = art.backdropCamera(step: s.step, layout: layout.camera, stage: stage)!
+                #expect(painting.contains(shown(stage, c)), "\(name), \(Generated.describe(s)): \(shown(stage, c))")
+            }
+        }
+    }
+
+    /// Never past 1.6 times its pixels on a 3x screen, on any window (the bundled picture is 2048
+    /// pixels across 1300 points), at every step's stop and on every generated state.
+    @Test func thePictureIsNeverEnlargedPastItsPixels() {
+        #expect(WalkBackdrop.sharpest == 1.6 && WalkBackdrop.pixelsAcross == 2048)
+        for (name, _, stage) in WalkWindows.all {
+            var most: CGFloat = 0
+            for step in 0...6 {
+                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
+                most = max(most, 3 * stage.scale * c.k * 1300 / 2048)
+            }
+            for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
+                let c = art.backdropCamera(step: s.step, layout: layout.camera, stage: stage)!
+                most = max(most, 3 * stage.scale * c.k * 1300 / 2048)
+            }
+            #expect(most <= 1.6 + 1e-9, "\(name): the picture is enlarged \(most) times")
+        }
+    }
+
+    /// A wider window shows the same stretch of mountain enlarged about the standing post's foot
+    /// (195, 556): on the narrow phone, the outside screen, the half window and the inside screen
+    /// upright the ground under that foot is the phone's on Year to Today. Opened flat the picture
+    /// cannot be enlarged that far, so it is slid sideways: by no more than 113 stage points, and
+    /// the foot still stands on its level's open ground.
+    @Test func aWiderWindowKeepsTheGroundUnderTheStandingFoot() {
+        let foot = CGPoint(x: 195, y: 556)
+        for step in 1...5 {
+            let level = WalkLevel(rawValue: step)!
+            let phone = onPainting(foot, art.backdropCamera(step: step, layout: art.stops[step])!)
+            for (name, stage) in [("375x667", WalkWindows.narrow), ("466x678", WalkWindows.outside),
+                                  ("484x669", WalkWindows.half), ("669x951", WalkWindows.upright)] {
+                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
+                let p = onPainting(foot, c)
+                #expect(abs(p.x - phone.x) < 0.0001 && abs(p.y - phone.y) < 0.0001, "\(name), step \(step): \(p) for \(phone)")
+                #expect(c.k > art.backdropCamera(step: step, layout: art.stops[step])!.k, "\(name), step \(step): not enlarged")
+            }
+            let c = art.backdropCamera(step: step, layout: art.stops[step], stage: WalkWindows.flat)!
+            let p = onPainting(foot, c)
+            let slid = abs(p.x - phone.x) * backdrop.size.width * c.k
+            #expect(slid <= 113, "951x669, step \(step): slid \(slid)")
+            #expect(abs(p.y - phone.y) < 0.0001, "951x669, step \(step): moved up or down")
+            #expect(backdrop.open[level]!.contains(p.x), "951x669, step \(step): the foot at x \(p.x)")
+        }
+    }
+
     @Test func theHeldShadeIsOnlyWhereThePaintingIsBright() {
         #expect((0...6).map { art.topShade(step: $0) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])
+        #expect((0...6).map { art.topShade(step: $0, stage: WalkWindows.phone) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])
         #expect(WalkArt.squarePrint.topShade(step: 3) == nil)
+        // A stage with wings enlarges the picture: on Look back up the peak's snow comes up behind the
+        // heading, so that step holds a shade there; every other step keeps the phone's.
+        for (name, _, stage) in WalkWindows.all where stage.stretch > 1 {
+            #expect((0...6).map { art.topShade(step: $0, stage: stage) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, 0.6], "\(name)")
+        }
+        // A phone a little taller for its width has no wings: the phone's shades.
+        #expect(art.topShade(step: 6, stage: WalkStage(device: CGSize(width: 402, height: 874))) == nil)
     }
 
     #if os(iOS)
     /// The words above the flags (the eyebrow, the question and its line, stage y 64 to 248, x 40 to 350)
     /// read at 4.5:1 or better, white over the painting under the step's shade, on 98 % of what lies
-    /// behind them, at every step's stop and zoomed into every column of one to three areas. The
+    /// behind them, at every step's stop and zoomed into every column of one to three areas, on each
+    /// of the six windows (a wider one enlarges the picture, so other paint stands behind them). The
     /// words' own glow is not counted.
     @Test func theWordsReadOnThePaintingAtEveryStep() throws {
         let image = try #require(UIImage(named: backdrop.imageName)?.cgImage)
@@ -196,49 +317,51 @@ struct WalkBackdropTests {
         context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
         func linear(_ v: Double) -> Double { v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
         let navy = (0.0, 18.0 / 255, 96.0 / 255)
-        for step in 0...6 {
-            var cameras = [art.stops[step]]
-            if (1...5).contains(step) {
-                for count in 1...3 {
-                    for column in 0..<count {
-                        var s = WalkState()
-                        s.areas = ridge(count)
-                        s.kept = s.areas.map(\.id)
-                        s.step = step
-                        if step == 1 {
-                            s.focusArea = s.areas[column].id
-                        } else {
-                            let parent = WalkItem(id: UUID(), level: WalkLevel(rawValue: step - 1)!, title: "Parent",
-                                                  areaId: s.areas[column].id)
-                            s.items = [parent]
-                            s.focus[WalkLevel(rawValue: step)!] = parent.id
+        for (name, _, stage) in WalkWindows.all {
+            for step in 0...6 {
+                var cameras = [art.stops[step]]
+                if (1...5).contains(step) {
+                    for count in 1...3 {
+                        for column in 0..<count {
+                            var s = WalkState()
+                            s.areas = ridge(count)
+                            s.kept = s.areas.map(\.id)
+                            s.step = step
+                            if step == 1 {
+                                s.focusArea = s.areas[column].id
+                            } else {
+                                let parent = WalkItem(id: UUID(), level: WalkLevel(rawValue: step - 1)!, title: "Parent",
+                                                      areaId: s.areas[column].id)
+                                s.items = [parent]
+                                s.focus[WalkLevel(rawValue: step)!] = parent.id
+                            }
+                            cameras.append(WalkLayout.make(s, today: Self.today, art: art, footing: .level).camera)
                         }
-                        cameras.append(WalkLayout.make(s, today: Self.today, art: art, footing: .level).camera)
                     }
                 }
-            }
-            for camera in cameras {
-                let c = art.backdropCamera(step: step, layout: camera)!
-                var behind: [Double] = []
-                for y in stride(from: CGFloat(64), through: 248, by: 4) {
-                    let a: Double
-                    if let held = art.topShade(step: step) {
-                        a = held
-                    } else {            // the faint band: 0.55 at the top, 0.25 at 156, gone by 260
-                        a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : 0.25 * Double(1 - (y - 156) / 104)
+                for camera in cameras {
+                    let c = art.backdropCamera(step: step, layout: camera, stage: stage)!
+                    var behind: [Double] = []
+                    for y in stride(from: CGFloat(64), through: 248, by: 4) {
+                        let a: Double
+                        if let held = art.topShade(step: step, stage: stage) {
+                            a = held
+                        } else {            // the faint band: 0.55 at the top, 0.25 at 156, gone by 260
+                            a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : 0.25 * Double(1 - (y - 156) / 104)
+                        }
+                        for x in stride(from: CGFloat(40), through: 350, by: 5) {
+                            let px = min(w - 1, Int((c.x + x / c.k) / backdrop.size.width * CGFloat(w)))
+                            let py = min(h - 1, Int((c.y + y / c.k) / backdrop.size.height * CGFloat(h)))
+                            let i = (py * w + px) * 4
+                            let rgb = (Double(pixels[i]) / 255, Double(pixels[i + 1]) / 255, Double(pixels[i + 2]) / 255)
+                            let mixed = (a * navy.0 + (1 - a) * rgb.0, a * navy.1 + (1 - a) * rgb.1, a * navy.2 + (1 - a) * rgb.2)
+                            behind.append(0.2126 * linear(mixed.0) + 0.7152 * linear(mixed.1) + 0.0722 * linear(mixed.2))
+                        }
                     }
-                    for x in stride(from: CGFloat(40), through: 350, by: 5) {
-                        let px = min(w - 1, Int((c.x + x / c.k) / backdrop.size.width * CGFloat(w)))
-                        let py = min(h - 1, Int((c.y + y / c.k) / backdrop.size.height * CGFloat(h)))
-                        let i = (py * w + px) * 4
-                        let rgb = (Double(pixels[i]) / 255, Double(pixels[i + 1]) / 255, Double(pixels[i + 2]) / 255)
-                        let mixed = (a * navy.0 + (1 - a) * rgb.0, a * navy.1 + (1 - a) * rgb.1, a * navy.2 + (1 - a) * rgb.2)
-                        behind.append(0.2126 * linear(mixed.0) + 0.7152 * linear(mixed.1) + 0.0722 * linear(mixed.2))
-                    }
+                    behind.sort()
+                    let contrast = 1.05 / (behind[Int(Double(behind.count) * 0.98)] + 0.05)
+                    #expect(contrast >= 4.5, "\(name), step \(step), camera \(camera): \(contrast)")
                 }
-                behind.sort()
-                let contrast = 1.05 / (behind[Int(Double(behind.count) * 0.98)] + 0.05)
-                #expect(contrast >= 4.5, "step \(step), camera \(camera): \(contrast)")
             }
         }
     }

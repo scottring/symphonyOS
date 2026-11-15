@@ -3,10 +3,11 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// The walk's own 390 × 844 stage on a light page: the mountain (`WalkWorldView`) for a
-/// state, scaled to fit the window and letterboxed in the walk's ground colour as `WalkView`
-/// does it, with `over` drawn in stage points on top. The layout is the walk's own, planted
-/// by hand (`footing: .natural`). Unlike `WalkWorldView` it is an accessibility container,
+/// The walk's own 390 × 844 board on a light page: the mountain (`WalkWorldView`) for a
+/// state, scaled to fit the page and centred as `WalkView` does it, its painting running past
+/// the board to the page's edges (clipped there), with `over` drawn in stage points on top. The
+/// layout is the walk's own, planted by hand (`footing: .natural`), made for this page's stage
+/// (its wing). Unlike `WalkWorldView` it is an accessibility container,
 /// so its peaks and flags are read together, and `over` is given the walk's stage and
 /// keyboard lift as the walk's own controls are.
 struct MountainStage<Over: View>: View {
@@ -34,23 +35,21 @@ struct MountainStage<Over: View>: View {
 
     var body: some View {
         let art = WalkArt.overlookSquare
-        let layout = WalkLayout.make(state, today: today, art: art, footing: .natural)
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: art.stage)
+            let layout = WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing)
             ZStack(alignment: .topLeading) {
-                WalkPalette.ground
-                    .accessibilityHidden(true)
-                ZStack(alignment: .topLeading) {
-                    WalkWorldView(layout: layout, art: art, step: state.step, actions: actions, onLabel: onLabel, onBanner: onBanner)
-                    over
-                }
-                .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
-                .scaleEffect(stage.scale, anchor: .topLeading)
-                .offset(x: stage.origin.x, y: stage.origin.y)
-                .environment(\.walkStage, stage)
-                .environment(\.walkKeyboardLift, lift(stage, root: geo.frame(in: .global), height: art.stage.height))
+                WalkWorldView(layout: layout, art: art, step: state.step, stage: stage, actions: actions,
+                              onLabel: onLabel, onBanner: onBanner)
+                over
             }
+            .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
+            .scaleEffect(stage.scale, anchor: .topLeading)
+            .offset(x: stage.origin.x, y: stage.origin.y)
+            .environment(\.walkStage, stage)
+            .environment(\.walkKeyboardLift, lift(stage, root: geo.frame(in: .global), height: art.stage.height))
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .clipped()                                   // at the page: nothing is clipped at the board
         }
         .accessibilityElement(children: .contain)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in

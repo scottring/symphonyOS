@@ -99,7 +99,7 @@ struct WalkModelTests {
         #expect(m.state.areas.map(\.name) == WalkClassifier.defaults)
         #expect(m.state.items.isEmpty)
         #expect(m.periods.year == 2027)
-        #expect(m.layout.camera == WalkArt.overlookSquare.stops[0])
+        #expect(m.layout(wing: 0).camera == WalkArt.overlookSquare.stops[0])
     }
 
     @Test func nothingIsSavedBeforeADepthIsChosen() throws {
@@ -127,7 +127,7 @@ struct WalkModelTests {
         #expect(goals.first?.areaId == health(m))
         let areas = fetch(ctx, GoalArea.self)
         #expect(areas.map(\.name) == ["Health"])
-        let full = m.layout.posts.flatMap(\.banners).filter { $0.kind == .full }
+        let full = m.layout(wing: 0).posts.flatMap(\.banners).filter { $0.kind == .full }
         #expect(full.map(\.text) == ["Feel strong again"])
     }
 
