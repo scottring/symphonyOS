@@ -288,7 +288,7 @@ two (`DailyMetrics.quietLines`).
 - The bar's light carries `.startsMediaSession` while a tap would start listening (`DailyBar.tapStartsListening`); the bands' painting is `Image(decorative:)`.
 - A Tell asked during a walk-down is answered only if it returns to Today (`DailyWalkDown.keepsTell`); otherwise it is dropped.
 - "‹Month› ends" shows only when that month holds a goal of mine; "It’s on …" names the month when it is not this one.
-- Every write (`add`, `move`, `setFirst`, `toggle`) reads the day first. The model keeps the seasons it was made with (it is not made again behind the person's back: the household list empties for a moment in every resync, and a remake would drop a draft, an Undo and a listen).
+- Every write (`add`, `move`, `setFirst`, `toggle`) reads the day first. The model keeps the seasons it was made with (it is not made again behind the person's back: the household list empties for a moment in every resync, and a remake would drop a draft, an Undo and a listen). Walk-downs and the pages read the live seasons; the model's own periods (what the writer files into, and "See my whole plan") follow only when the pages are next made, and on a first sign-in the model is made before the pull lands.
 - A change of horizon lets the bar go only when the page changes (`DailyGate.pageChanges`): on the spread Today and Week are one page.
 - A Tell's deferred tap is dropped if a walk opened meanwhile.
 - Before the edition is known speech stays on the phone (D25); on-device speech is decided at the first use (D23).

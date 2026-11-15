@@ -1199,7 +1199,7 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - A walk opening commits a pending Remove (its Undo is lost); so does lowering the handle.
 - A tick or a first-thing mark ends the Undo of a move before it.
 - The mountain pages cross the fold on the spread, as the walk does.
-- The light pages' model keeps the household seasons it was made with: a custom-season change in Settings reaches walk-downs only after a relaunch (re-review B-I3: remaking it dropped drafts and Undo in every resync).
+- The light pages' model keeps the household seasons it was made with (re-review B-I3: remaking it dropped drafts and Undo in every resync). Walk-downs and the pages read the live seasons; what stays stale is the model's own periods (what the writer files into, and "See my whole plan") until the pages are next made. On a first sign-in on a phone the model is made before the pull lands, so for that session it has no custom seasons, or the previous account's. It shows only where season boundaries differ.
 - A no-day add on Week in the minute after midnight at the week's turn may file into the week the page still shows (B-M5).
 - A light household on an iPad: Inbox → Today makes no "chosen for today" row (B-M6).
 - A sign's walk-down where the month and the season the signs read come from different sides of the rule (B-M8).
@@ -1229,7 +1229,7 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - **First hold of the light on a real phone** (walk and bar): the prompts appear, then it listens (D23).
 - A possible flash of the old Today when signing out of a light household (B-M9).
 - **Owed by hand after the final fix wave:** the first hold's permission sequence (two prompts, then listening;
-  and on a phone with no on-device speech, no prompt at all); the Duo's keyboard on its inside screens (the
+  and on a phone with no on-device speech, at most one speech prompt, once, then typing: ruling D23); the Duo's keyboard on its inside screens (the
   page must not flip to the old planner); a Tell from the Lock Screen while Week shows (Today, listening); text
   size above the default in the walk; signing in to a full account after a light one on the same phone (the
   old pages and the dock, never a light page); Month near a season's end with goals in both months (opens on
