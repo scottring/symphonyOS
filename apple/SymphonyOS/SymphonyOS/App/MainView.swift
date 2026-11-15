@@ -112,12 +112,18 @@ struct iOSMainView: View {
 
     /// Ruling F26: a light household's phone-sized screens stay upright (`DailyGate.holdsUpright`),
     /// decided again when the edition changes and when the window changes (a fold onto the other
-    /// screen); every other household turns as before.
-    private func holdUpright() {
+    /// screen); every other household turns as before. `signedIn` false (this view is going: a
+    /// sign-out, or anything else that takes it down) lets go, so the sign-in screen is never held;
+    /// coming back, `onAppear` decides again.
+    private func holdUpright(signedIn: Bool = true) {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
-        OrientationHold.apply(DailyGate.holdsUpright(edition: appState.edition, phone: DailyDevice.phone,
-                                                     screen: scene.screen.bounds.size), scene: scene)
+        let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        // No scene to measure: nothing is held (the mask is still let go).
+        let held = scene.map {
+            DailyGate.holdsUpright(edition: appState.edition, phone: DailyDevice.phone, screen: $0.screen.bounds.size,
+                                   signedIn: signedIn && auth.isAuthenticated)
+        } ?? false
+        OrientationHold.apply(held, scene: scene)
     }
 
     var body: some View {
@@ -191,6 +197,7 @@ struct iOSMainView: View {
         // MainView is mounted only while signed in; forget the edition, and take
         // the walk down, when it goes.
         .onDisappear {
+            holdUpright(signedIn: false)
             CalendarFeed.shared.edition = nil
             appState.dropWaitingTellIfLight()   // light: a Tell waiting behind the walk is dropped, not answered
             closeWalk()

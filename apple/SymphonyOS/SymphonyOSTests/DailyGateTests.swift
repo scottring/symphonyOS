@@ -381,6 +381,13 @@ struct DailyGateTests {
                                         screen: CGSize(width: 402, height: 874)))
     }
 
+    /// With nobody signed in (the sign-in screen, whoever was signed in before) nothing is held.
+    @Test func nobodySignedInIsNeverHeld() {
+        #expect(!DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 402, height: 874), signedIn: false))
+        #expect(!DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 466, height: 678), signedIn: false))
+        #expect(DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 402, height: 874), signedIn: true))
+    }
+
     /// An iPad is never held (ruling D17: no light page there).
     @Test func anIPadIsNeverHeld() {
         #expect(!DailyGate.holdsUpright(edition: .light, phone: false, screen: CGSize(width: 402, height: 874)))

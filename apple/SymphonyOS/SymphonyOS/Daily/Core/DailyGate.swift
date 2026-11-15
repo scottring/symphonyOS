@@ -32,9 +32,10 @@ enum DailyGate {
     /// `screen` is the window's screen in points, the same either way it is held: its short side
     /// decides. An iPhone and the Duo's outside screen are held; the Duo's inside screen (as wide as
     /// `TodayLayout.wideWidth` or wider) turns as now; an iPad and a full household (a mixed or unknown
-    /// one is full) are never held.
-    static func holdsUpright(edition: Edition, phone: Bool, screen: CGSize) -> Bool {
-        phone && edition == .light && min(screen.width, screen.height) < TodayLayout.wideWidth
+    /// one is full) are never held. With nobody signed in (`signedIn` false: the sign-in screen,
+    /// whoever was signed in before) nothing is held either.
+    static func holdsUpright(edition: Edition, phone: Bool, screen: CGSize, signedIn: Bool = true) -> Bool {
+        signedIn && phone && edition == .light && min(screen.width, screen.height) < TodayLayout.wideWidth
     }
 
     /// The dock gives way to the bar, only where the bar is built and the page on screen

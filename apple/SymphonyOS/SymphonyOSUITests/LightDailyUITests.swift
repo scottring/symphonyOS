@@ -143,5 +143,22 @@ final class LightDailyUITests: XCTestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertGreaterThan(window.height, window.width, "the window turned: \(window.size)")
     }
+
+    /// Signing out of a light household lets go of the hold: the sign-in screen turns, as it always
+    /// did, so whoever signs in next (a full household too) is never held upright there.
+    @MainActor func testTheSignInScreenTurnsAfterALightHouseholdSignsOut() throws {
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily"])
+        let more = any["daily.bar.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 60), "no More beside the bar")
+        more.tap()
+        let signOut = app.buttons["Sign Out"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 10), "no Sign Out in More")
+        for _ in 0..<4 where !signOut.isHittable { app.swipeUp() }
+        signOut.tap()
+        XCTAssertTrue(app.buttons["Sign In"].waitForExistence(timeout: 15), "not signed out")
+        turnSideways()
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, window.height, "the sign-in screen is still held upright: \(window.size)")
+    }
 }
 #endif
