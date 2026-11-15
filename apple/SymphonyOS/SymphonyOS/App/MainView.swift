@@ -107,6 +107,17 @@ struct iOSMainView: View {
             if appState.activeTab == .routines { appState.activeTab = .planner }
             appState.domainFilter = .all
         }
+        holdUpright()
+    }
+
+    /// Ruling F26: a light household's phone-sized screens stay upright (`DailyGate.holdsUpright`),
+    /// decided again when the edition changes and when the window changes (a fold onto the other
+    /// screen); every other household turns as before.
+    private func holdUpright() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+        OrientationHold.apply(DailyGate.holdsUpright(edition: appState.edition, phone: DailyDevice.phone,
+                                                     screen: scene.screen.bounds.size), scene: scene)
     }
 
     var body: some View {
@@ -393,6 +404,7 @@ extension iOSMainView {
     }
 
     private func updatePosture() {
+        holdUpright()
         let next: DuoPosture
         if let pinned = HalfOpen.pinned {
             next = pinned

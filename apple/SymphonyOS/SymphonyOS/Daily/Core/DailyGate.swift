@@ -27,6 +27,16 @@ enum DailyGate {
         phone && edition == .light && horizons.contains(horizon) && layouts.contains(layout)
     }
 
+    /// Ruling F26: a light household's phone-sized screens stay upright, so a phone on its side
+    /// (`.glanceWide`, left out of `layouts`) never puts the old screens in place of the light pages.
+    /// `screen` is the window's screen in points, the same either way it is held: its short side
+    /// decides. An iPhone and the Duo's outside screen are held; the Duo's inside screen (as wide as
+    /// `TodayLayout.wideWidth` or wider) turns as now; an iPad and a full household (a mixed or unknown
+    /// one is full) are never held.
+    static func holdsUpright(edition: Edition, phone: Bool, screen: CGSize) -> Bool {
+        phone && edition == .light && min(screen.width, screen.height) < TodayLayout.wideWidth
+    }
+
     /// The dock gives way to the bar, only where the bar is built and the page on screen
     /// (`horizon`) is a light page on this window; any other page keeps the dock.
     static func hidesDock(on horizon: Horizon, edition: Edition, layout: TodayLayout, phone: Bool,

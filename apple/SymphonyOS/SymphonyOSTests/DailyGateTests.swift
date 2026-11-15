@@ -363,4 +363,27 @@ struct DailyGateTests {
         #expect(DailyGate.pageChanges(from: .month, to: .season, layout: .oneColumn))
         #expect(!DailyGate.pageChanges(from: .month, to: .month, layout: .oneColumn))
     }
+
+    /// F26: a light household's phone-sized screens stay upright, either way the phone is held (the
+    /// screen's short side decides): an iPhone (402) and the Duo's outside screen (466) are held; the
+    /// Duo's inside screen (626) turns as it does now.
+    @Test func aLightPhoneStaysUpright() {
+        #expect(DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 402, height: 874)))
+        #expect(DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 874, height: 402)))
+        #expect(DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 466, height: 678)))
+        #expect(!DailyGate.holdsUpright(edition: .light, phone: true, screen: CGSize(width: 626, height: 890)))
+    }
+
+    /// A full household (a mixed or unknown one is full too) still turns.
+    @Test func aFullHouseholdStillTurns() {
+        #expect(!DailyGate.holdsUpright(edition: .full, phone: true, screen: CGSize(width: 402, height: 874)))
+        #expect(!DailyGate.holdsUpright(edition: Edition.resolve(["light", "full"]), phone: true,
+                                        screen: CGSize(width: 402, height: 874)))
+    }
+
+    /// An iPad is never held (ruling D17: no light page there).
+    @Test func anIPadIsNeverHeld() {
+        #expect(!DailyGate.holdsUpright(edition: .light, phone: false, screen: CGSize(width: 402, height: 874)))
+        #expect(!DailyGate.holdsUpright(edition: .light, phone: false, screen: CGSize(width: 834, height: 1194)))
+    }
 }

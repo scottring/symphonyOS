@@ -109,5 +109,39 @@ final class LightDailyUITests: XCTestCase {
         XCTAssertFalse(any.matching(NSPredicate(format: "label == %@", "TUE, 10")).firstMatch.exists,
                        "a day is still read by its short label")
     }
+
+    // MARK: Held upright (F26)
+
+    /// Turns the phone, and turns it back upright when the test ends, passed or failed, so the next
+    /// test and the simulator are left upright.
+    @MainActor private func turnSideways() {
+        addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    /// A light household's phone stays upright: turned on Month, the light page is still there, the
+    /// old Today with its Tell Symphony bar never takes its place, and the window stays tall.
+    @MainActor func testTurningThePhoneKeepsTheLightPage() throws {
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                                 "-SymphonyDailyPage", "month"])
+        XCTAssertTrue(any["daily.mountain.month"].waitForExistence(timeout: 60), "never reached Month")
+        turnSideways()
+        XCTAssertTrue(any["daily.mountain.month"].exists, "Month gave way when the phone turned")
+        XCTAssertFalse(any.matching(NSPredicate(format: "label CONTAINS %@", "Tell Symphony")).firstMatch.exists,
+                       "the old Today's Tell Symphony is up")
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.height, window.width, "the window turned: \(window.size)")
+    }
+
+    /// The walk, turned, stays upright too: its Next is still there to tap, not a strip scaled sideways.
+    @MainActor func testTurningThePhoneKeepsTheWalkUpright() throws {
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk", "-SymphonyWalkStep", "1"])
+        XCTAssertTrue(any["walk.next"].waitForExistence(timeout: 60), "the walk never showed its Next")
+        turnSideways()
+        XCTAssertTrue(any["walk.next"].isHittable, "the walk's Next cannot be tapped turned")
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.height, window.width, "the window turned: \(window.size)")
+    }
 }
 #endif

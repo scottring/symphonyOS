@@ -69,5 +69,16 @@ final class FullHouseholdUnchangedUITests: XCTestCase {
         XCTAssertFalse(any["daily.bar.field"].exists, "a light bar in a full household")
         assertNoLightPage(any, "after the walk")
     }
+
+    /// A full household's phone still turns as it always did (F26 holds only a light household's).
+    @MainActor func testAFullHouseholdStillTurns() throws {
+        let (app, _) = launch([])
+        XCTAssertTrue(app.buttons["Today. Switch horizon"].waitForExistence(timeout: 60), "not the old Today")
+        addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1)
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, window.height, "a full household's window did not turn: \(window.size)")
+    }
 }
 #endif

@@ -168,6 +168,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
         // Expected without the Push capability / paid provisioning — ignore.
     }
+    /// Every orientation, except while a light household's phone-sized screen is held upright (F26).
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        OrientationHold.mask
+    }
 }
 
 enum PushTokens {

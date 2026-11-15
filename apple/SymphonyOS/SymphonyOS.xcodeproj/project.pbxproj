@@ -142,6 +142,7 @@
 		85FD64FFD573B054E19A391F /* DailyBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB13AFD951099CA1FB80FD2 /* DailyBand.swift */; };
 		8A250C2DDE172B6ACFADEED0 /* DailyWeekList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91E7DB757E79521EF9D28609 /* DailyWeekList.swift */; };
 		8ADA67E84654AEB3019FB812 /* WalkModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E346776783AE17D6B32B20FE /* WalkModelTests.swift */; };
+		8AF4F9F3DAAF2AF03B0CCAFF /* OrientationHold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32FBAD9D4BECA1E8AF7036A0 /* OrientationHold.swift */; };
 		8B9B944F2BE32DF4693C843E /* DailyWeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = E761E8D1CDB2AB178606E6EF /* DailyWeek.swift */; };
 		8C98360DEAF146AE5D93DC8C /* UnfinishedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C187119C5CCA41423F1F668C /* UnfinishedSheet.swift */; };
 		8CC62F967B14432A0E0FCCEE /* WalkTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7272175141F27602DFD60E4 /* WalkTestSupport.swift */; };
@@ -378,6 +379,7 @@
 		2EF9B40A2619B07F7F1703C8 /* LightWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightWeekView.swift; sourceTree = "<group>"; };
 		30642091C5E45B47ECA3FA0C /* SymphonyOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		30B0FDFB0075F54C25F0A9F7 /* DailyRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyRows.swift; sourceTree = "<group>"; };
+		32FBAD9D4BECA1E8AF7036A0 /* OrientationHold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationHold.swift; sourceTree = "<group>"; };
 		34D062F44681ECA79ADFED80 /* GoalArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalArea.swift; sourceTree = "<group>"; };
 		351C3EB5DEC3A876714D6538 /* DailyBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBarTests.swift; sourceTree = "<group>"; };
 		3550614A2441567DA7ED9B00 /* NordicColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NordicColors.swift; sourceTree = "<group>"; };
@@ -973,6 +975,7 @@
 				EEB2F257FEAD38536F502CE1 /* DemoStress.swift */,
 				2D0143577802D4C6E5B36D3C /* Info.plist */,
 				0E4D95EEAD58A126302E8231 /* MainView.swift */,
+				32FBAD9D4BECA1E8AF7036A0 /* OrientationHold.swift */,
 				976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */,
 				BE9B63396EED51B4EA9EE15E /* SymphonyOS.entitlements */,
 			);
@@ -1584,6 +1587,7 @@
 				69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */,
 				1D60E707A576F8C670198484 /* NotesHTML.swift in Sources */,
 				2F1C312A65349E9A27296D0C /* OpenedItemSheet.swift in Sources */,
+				8AF4F9F3DAAF2AF03B0CCAFF /* OrientationHold.swift in Sources */,
 				A418B990FC5A297B39CEFD65 /* OutsideGlance.swift in Sources */,
 				E37FD1B1732BE60FE7357D84 /* PageIngest.swift in Sources */,
 				259AB34194126091758C9152 /* PageParse.swift in Sources */,
