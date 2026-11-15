@@ -152,9 +152,17 @@ enum DemoMode {
         s.step = step
         s.areas = WalkLoad.areas((try? context.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
         func area(_ name: String) -> UUID? { s.areas.first { $0.name == name }?.id }
-        s.kept = ["Health", "Home", "People"].compactMap(area)
+        let stress = DemoStress.walk
+        if let stress, let custom = stress.customArea {
+            if !s.areas.contains(where: { $0.name == custom }) {
+                context.insert(GoalArea(userId: userId, name: custom, sortOrder: 99, context: "personal", syncStatus: .synced))
+                try? context.save()
+                s.areas = WalkLoad.areas((try? context.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
+            }
+        }
+        s.kept = (stress?.areas ?? ["Health", "Home", "People"]).compactMap(area)
 
-        let script: [(WalkLevel, String, String)] = [
+        let script: [(WalkLevel, String, String)] = stress?.script ?? [
             (.year, "Feel strong again", "Health"), (.year, "Finish the bathroom", "Home"),
             (.year, "More slow weekends together", "People"),
             (.season, "Bathroom done by February", "Home"), (.season, "Lift twice a week", "Health"),

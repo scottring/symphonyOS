@@ -16,6 +16,7 @@
 		03A5E53758E11DAA36391C9A /* PhotoCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281A39DAC953BBEB0F5A15B /* PhotoCaptureService.swift */; };
 		0630729249000F4EC7E32774 /* AccountDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D25E6463326D082AF845C7 /* AccountDeletion.swift */; };
 		07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */; };
+		080751259D6DBCCB922E99AB /* DemoStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4DECFC23A71F581FF857180 /* DemoStressTests.swift */; };
 		08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5CFFF63F2366985E81E3414 /* WalkHintRow.swift */; };
 		08FAC3B23154783D2E60D88E /* DailyGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39CC4B0224C6FC309282FD25 /* DailyGateTests.swift */; };
 		095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E8E58E265506F189EADDEE /* WalkLoadTests.swift */; };
@@ -221,6 +222,7 @@
 		CD8B9C043925051B39B9F5E7 /* TellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394F2642EB45FC8B817CA33F /* TellSheet.swift */; };
 		CE6CA42A39088ECDC4C15871 /* WalkStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F5BE6C9CAEC48BD0D615768 /* WalkStageTests.swift */; };
 		D072E61D7068CA5497FFEBF1 /* WalkPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4C326BCC8EE9A0B6507F51 /* WalkPosition.swift */; };
+		D0F71A4EE7CB13B472769BF9 /* DemoStress.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB2F257FEAD38536F502CE1 /* DemoStress.swift */; };
 		D2CDE9C241755F754033C17E /* RoutineOccurrenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA72DC60A9EA66D9743639A /* RoutineOccurrenceTests.swift */; };
 		D354A97A4ECB2147BCF1653C /* SyncStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14F0DAE984F23F841936E31 /* SyncStatus.swift */; };
 		D35CA3A8CBDF5EFACAFB23F0 /* WeekPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFDA458A5F255F7DA3BF0386 /* WeekPlanView.swift */; };
@@ -570,6 +572,7 @@
 		E12210E8350B86DE59D6A16E /* WalkScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkScheduling.swift; sourceTree = "<group>"; };
 		E346776783AE17D6B32B20FE /* WalkModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkModelTests.swift; sourceTree = "<group>"; };
 		E4053D1678E9C1DF45E6BA6C /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		E4DECFC23A71F581FF857180 /* DemoStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoStressTests.swift; sourceTree = "<group>"; };
 		E4E218D4C9E8496B79A7A214 /* WalkLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkLayoutTests.swift; sourceTree = "<group>"; };
 		E5472D887E316ADEF911E0AF /* PageReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageReviewSheet.swift; sourceTree = "<group>"; };
 		E588D645EF487302339B0C5F /* DemoMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMode.swift; sourceTree = "<group>"; };
@@ -581,6 +584,7 @@
 		E8FDDE639E062C6E13265AC2 /* WalkBannerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkBannerViews.swift; sourceTree = "<group>"; };
 		EB47C8ACC6EC60CBB125B9C8 /* WalkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkModel.swift; sourceTree = "<group>"; };
 		ED3073060F0267E2A652763E /* DailyHandover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyHandover.swift; sourceTree = "<group>"; };
+		EEB2F257FEAD38536F502CE1 /* DemoStress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoStress.swift; sourceTree = "<group>"; };
 		F279DCFDC91023CDB005CBAE /* PeriodCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodCalendar.swift; sourceTree = "<group>"; };
 		F47FCCB2BAC393252D399DB7 /* Dinner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dinner.swift; sourceTree = "<group>"; };
 		F7272175141F27602DFD60E4 /* WalkTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkTestSupport.swift; sourceTree = "<group>"; };
@@ -966,6 +970,7 @@
 				6E12BCB3F98A56A73FBB104A /* Assets.xcassets */,
 				A99D77B01B73C4E9753A3494 /* ContentView.swift */,
 				E588D645EF487302339B0C5F /* DemoMode.swift */,
+				EEB2F257FEAD38536F502CE1 /* DemoStress.swift */,
 				2D0143577802D4C6E5B36D3C /* Info.plist */,
 				0E4D95EEAD58A126302E8231 /* MainView.swift */,
 				976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */,
@@ -1055,6 +1060,7 @@
 				46E90F5C80823E0A3861209B /* DailyWriterTests.swift */,
 				169FC19A952F954EECF671DF /* DayGlanceTests.swift */,
 				056F5BF746D2B10ED8954A53 /* DayScaleTests.swift */,
+				E4DECFC23A71F581FF857180 /* DemoStressTests.swift */,
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
 				E7A9598FAC1528BAE33CC441 /* DinnerPickTests.swift */,
 				6C272C7DF4B6BF8AA2ED024E /* DockLayoutTests.swift */,
@@ -1424,6 +1430,7 @@
 				F973FA9C0CAC0DEE2A9479E9 /* DailyWriterTests.swift in Sources */,
 				9AF8FDD2B1C9DBB74ABCE747 /* DayGlanceTests.swift in Sources */,
 				9629B1BFE3138DBA463C6A9C /* DayScaleTests.swift in Sources */,
+				080751259D6DBCCB922E99AB /* DemoStressTests.swift in Sources */,
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
 				1A33ACD19D55C2BC2F3E4BAA /* DinnerPickTests.swift in Sources */,
 				307BCF9BB18ECAD6D4CEFAB8 /* DockLayoutTests.swift in Sources */,
@@ -1536,6 +1543,7 @@
 				4E48550B7C5BA7A5FDA362F5 /* DayScale.swift in Sources */,
 				85A5B920DCEB705D40F84D50 /* DeleteAccountView.swift in Sources */,
 				708959FDE7111867F169E963 /* DemoMode.swift in Sources */,
+				D0F71A4EE7CB13B472769BF9 /* DemoStress.swift in Sources */,
 				7A33D62ACF6AB04220E0F62D /* Dinner.swift in Sources */,
 				0D34C6B5FDC9D86C5A042651 /* DinnerCard.swift in Sources */,
 				FAFD767BFF267AA59D716420 /* DinnerService.swift in Sources */,

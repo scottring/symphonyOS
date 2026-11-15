@@ -17,7 +17,36 @@ struct WalkView: View {
         self.model = model
     }
 
+    // `-WalkSize 669x951` pins the walk to a window of that size (a Duo's
+    // inside screen on a phone simulator), scaled down to the room there is, as `-TodaySize` does for the pages.
+    #if DEBUG
+    static let pinnedSize: CGSize? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-WalkSize"), i + 1 < args.count else { return nil }
+        let parts = args[i + 1].lowercased().split(separator: "x").compactMap { Double($0) }
+        return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
+    }()
+    #else
+    static let pinnedSize: CGSize? = nil
+    #endif
+
     var body: some View {
+        if let pinned = Self.pinnedSize {
+            GeometryReader { room in
+                let k = min(1, room.size.width / pinned.width, room.size.height / pinned.height)
+                walkBody
+                    .frame(width: pinned.width, height: pinned.height)
+                    .scaleEffect(k, anchor: .topLeading)
+                    .offset(x: (room.size.width - pinned.width * k) / 2, y: (room.size.height - pinned.height * k) / 2)
+            }
+            .background(Color.black)
+            .ignoresSafeArea()
+        } else {
+            walkBody
+        }
+    }
+
+    private var walkBody: some View {
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: model.art.stage)
             ZStack(alignment: .topLeading) {

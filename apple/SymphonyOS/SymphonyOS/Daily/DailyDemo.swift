@@ -10,9 +10,9 @@ extension DemoMode {
     /// `-SymphonyDaily`: the light pages' demo seed and events.
     static var isDaily: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyDaily") }
 
-    static let dailySeeds = ["morning", "done", "open", "newweek", "quiet", "nopiece", "empty", "both"]
+    static let dailySeeds = ["morning", "done", "open", "newweek", "quiet", "nopiece", "empty", "both", "full", "long"]
 
-    /// `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty|both`; `morning` otherwise.
+    /// `-SymphonyDailySeed morning|done|open|newweek|quiet|nopiece|empty|both|full|long`; `morning` otherwise.
     static var dailySeed: String { dailySeed(in: ProcessInfo.processInfo.arguments) }
 
     /// `-SymphonyDailyPage today|week|month|season|year`: the page the demo opens on.
@@ -171,6 +171,7 @@ extension DemoMode {
     /// days. The other seeds change only what their sign needs.
     @MainActor static func seedDaily(_ ctx: ModelContext, seed: String, today now: Date) {
         guard seed != "empty" else { return }
+        if let plan = DemoStress.named(seed) { seedStress(ctx, plan: plan, today: now); return }
         let today = PlanCalendar.day(now)
         let writer = WalkWriter(context: ctx, userId: userId, periods: WalkPeriods.pick(now: now))
         let areas = WalkLoad.areas((try? ctx.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
@@ -258,6 +259,50 @@ extension DemoMode {
                 n += 1
             }
         }
+    }
+
+    /// A stress plan written as real rows through `WalkWriter`, as the seed above writes its own.
+    /// Each flag hangs under a flag of its area one level up (spread round-robin over that area's flags); the
+    /// week's tasks marked "today" land on today (the first is the first thing, the last one is done), the rest
+    /// on their named day or no day; done tasks stand on the week's earlier days.
+    @MainActor static func seedStress(_ ctx: ModelContext, plan: DemoStress.Plan, today now: Date) {
+        let today = PlanCalendar.day(now)
+        let periods = WalkPeriods.pick(now: now)
+        let writer = WalkWriter(context: ctx, userId: userId, periods: periods)
+        if let custom = plan.customArea {
+            ctx.insert(GoalArea(userId: userId, name: custom, sortOrder: 99, context: "personal", syncStatus: .synced))
+            try? ctx.save()
+        }
+        let areas = WalkLoad.areas((try? ctx.fetch(FetchDescriptor<GoalArea>())) ?? [], me: userId)
+        var placed: [WalkItem] = []
+        var turn: [String: Int] = [:]
+        var first: WalkItem?
+        var lastToday: WalkItem?
+        for (level, words, areaName) in plan.script {
+            guard let said = WalkWords.said(words, level: level, today: periods.today) else { continue }
+            let area = areas.first { $0.name == areaName }
+            if let area { writer.ensureArea(area) }
+            let parents = placed.filter { $0.level.rawValue == level.rawValue - 1 && $0.areaId == area?.id }
+            let key = "\(level.rawValue)-\(areaName)"
+            let parent = parents.isEmpty ? nil : parents[turn[key, default: 0] % parents.count]
+            turn[key, default: 0] += 1
+            let item = WalkItem(id: UUID(), level: level, title: said.title, areaId: area?.id, parentId: parent?.id, day: said.day)
+            writer.create(item, parent: parent)
+            placed.append(item)
+            if level == .week, let day = said.day, PlanCalendar.sameDay(day, today) {
+                if first == nil { first = item }
+                lastToday = item
+            }
+        }
+        if let first { writer.setFirstThing(first.id, previous: nil) }
+        if let lastToday, lastToday.id != first?.id { writer.toggleDone(lastToday.id) }
+        let weekStart = PlanCalendar.weekStart(today)
+        for (i, day) in PlanCalendar.weekDays(weekStart).filter({ $0 < today }).enumerated() {
+            let done = WalkItem(id: UUID(), level: .week, title: doneTitles[i % doneTitles.count], areaId: nil, parentId: nil, day: day)
+            writer.create(done, parent: nil)
+            writer.toggleDone(done.id)
+        }
+        try? ctx.save()
     }
 
     private static let doneTitles = ["Book the boiler service", "Return the library books", "Pick up the dry cleaning",
