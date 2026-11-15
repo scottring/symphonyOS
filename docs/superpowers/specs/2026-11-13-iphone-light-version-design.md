@@ -423,3 +423,74 @@ Proposed by Claude and approved by Scott on 2026-11-14:
 - What account deletion does in a shared household.
 - Proposed, not yet confirmed: a StandBy widget as the regular-iPhone
   equivalent of tent view (the app already has a widget extension).
+
+## Hand-walk fixes (2026-11-15)
+
+Scott walked the preview on his real Duo and gave nine comments (his words, with the
+screens, are in `.superpowers/sdd/2026-11-14-iphone-light-daily/owner-hand-walk-notes.md`).
+One before/after board answers them: https://claude.ai/artifact/DyFRYBe5hv32W975noDEDa
+(source beside this spec in `2026-11-15-iphone-light-hand-walk-board/`). His whole answer
+to the board: "looks much better". Everything below that he did not say himself is in
+"Calls Claude made for the fix pass"; the plan is
+`docs/superpowers/plans/2026-11-15-iphone-light-hand-walk-fixes.md`.
+
+### What he said, and what changes
+
+| # | His words | What changes |
+|---|---|---|
+| 1 | "Is there a way to undo steps?" | Back is always in the top-left corner. Undo shows above the light for a few seconds after a flag is planted, then waits in the light's choices. |
+| 2 | "if we've chosen an area, it should be specific to that, so should the messaging" | The Year step is one area at a time and its question names the area. |
+| 3 | "the orbs choices are way too busy and too numerous and too confusing" | The light offers three choices at most: Type it, Show examples, Undo. |
+| 4 | "The next this week text is so tiny and so buried" | Next is one gold button alone at the foot. |
+| 5 | Flag titles cut short | The flags of the area you stand in are wide and show their words in full. |
+| 6 | The area label far from its flags | The area's name sits on top of its own post. |
+| 7 | A lone wordless pennant above | Levels above the one the question is about are not drawn on lower steps. |
+| 8 | More competing with Next | More moves to the top row. |
+| 9 | "the hill would fill up quickly and become impossible to read" | The mountain shows how much is planted where; the paper is where you read. |
+
+### The rules
+
+**The top row.** Back (left), More (centre), Leave for now (right): plain words at the
+top of every walk step after Welcome. Nothing else sits there.
+
+**The light.** Hold it and speak. A tap (or More) opens at most three choices: Type it,
+Show examples (on Today: the calendar offer, when there is one), and Undo once there is
+something to take back. Back, Next, Leave for now and switching area are no longer
+choices on the light.
+
+**Next.** One gold button alone at the foot, clear of the home indicator. Until
+something is planted on the step it is a quiet outlined "Skip this step".
+
+**One area at a time.** On every step after the ground the walk stands in one area. The
+Year question names it ("What would make this a good year for your health?"). The other
+areas wait as small posts; a tap on one walks there. A quick start goes down after one
+goal; a whole-year walk visits each area in turn and shows a quiet "1 of 3".
+
+**A full hill.** Words show for one area at one level: at most four flags, each title in
+full. Every other area is a small post with one wordless flag per goal. Past four, the
+rest fold into "+2 more", which opens the paper: a plain list of that level's goals by
+area. On the Month, Season and Year pages a paper strip at the foot ("Read the whole
+year") opens the same list.
+
+### Calls Claude made for the fix pass (check these)
+
+Each is the controller's reading of the board's rule where the board drew nothing. Cost
+if wrong is given in the plan's rulings (F1 onward).
+
+- The count "1 of 3" shows only on the whole-year walk's Year step (the recommendation
+  Scott was shown; he did not answer it separately).
+- A goal is planted in the area you stand in. The walk no longer moves a goal to another
+  area because of its words ("That went under Health."); Move to still does.
+- On Season, Month, Week and Today the standing area shows one goal from the level above
+  (the one the question is about). A tap on it switches to the area's next goal.
+- On lower steps a small post stands only for an area that has something on this level
+  or the one above; on the Year step every kept area has one.
+- The ground (choosing areas) shows the area names only, no flags.
+- "Look back up" and "See my whole plan" follow the same rule: the area you stand in is
+  read top to bottom, one flag per level with a count of the rest; the others are small
+  posts; a tap walks there.
+- In the walk, "+2 more" opens the paper list over the mountain; a tap on a row walks to
+  that flag and chooses it, so every flag can still be moved or removed.
+- Welcome is unchanged (its quick start stays the light and the line under it).
+- A title longer than about 55 characters is cut on its flag at three lines; the paper
+  shows it whole.

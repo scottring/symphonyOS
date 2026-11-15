@@ -1,0 +1,268 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-15T11:30:00Z"
+  },
+  "title": "Walk controls: before and after",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 686,
+      "y": 0,
+      "w": 606,
+      "h": 844,
+      "title": "After: three choices at most",
+      "radius": 30
+    },
+    "RingBefore.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 606,
+      "h": 844,
+      "title": "Before: your screenshot (Duo inside screen)",
+      "radius": 30
+    },
+    "MonthBefore.dc.html": {
+      "x": 0,
+      "y": 1560,
+      "w": 606,
+      "h": 844,
+      "title": "Before: your screenshot (Duo inside screen)",
+      "radius": 30
+    },
+    "MonthAfterDuo.dc.html": {
+      "x": 686,
+      "y": 1560,
+      "w": 606,
+      "h": 844,
+      "title": "After: one clear Next (Duo inside screen)",
+      "radius": 30
+    },
+    "MonthAfterPhone.dc.html": {
+      "x": 1372,
+      "y": 1560,
+      "w": 390,
+      "h": 844,
+      "title": "After: the same on a regular iPhone",
+      "radius": 44
+    },
+    "YearBefore.dc.html": {
+      "x": 0,
+      "y": 3120,
+      "w": 390,
+      "h": 844,
+      "title": "Before: today's build, sample plan",
+      "radius": 44
+    },
+    "YearCount.dc.html": {
+      "x": 470,
+      "y": 3120,
+      "w": 390,
+      "h": 844,
+      "title": "After, choice A: with a quiet count",
+      "radius": 44
+    },
+    "YearNoCount.dc.html": {
+      "x": 940,
+      "y": 3120,
+      "w": 390,
+      "h": 844,
+      "title": "After, choice B: without a count",
+      "radius": 44
+    },
+    "Map.dc.html": {
+      "x": 0,
+      "y": 4680,
+      "w": 1040,
+      "h": 844,
+      "title": "After: where every control lives"
+    },
+    "FullBeforeWalk.dc.html": {
+      "x": 0,
+      "y": 6240,
+      "w": 390,
+      "h": 844,
+      "title": "Before: the walk's Month step, full plan",
+      "radius": 44
+    },
+    "FullBeforeYear.dc.html": {
+      "x": 470,
+      "y": 6240,
+      "w": 390,
+      "h": 844,
+      "title": "Before: the Year page, full plan",
+      "radius": 44
+    },
+    "FullBeforePlan.dc.html": {
+      "x": 940,
+      "y": 6240,
+      "w": 390,
+      "h": 844,
+      "title": "Before: the whole plan behind Today",
+      "radius": 44
+    },
+    "FullWalkMonthDuo.dc.html": {
+      "x": 1450,
+      "y": 6240,
+      "w": 606,
+      "h": 844,
+      "title": "After: the walk's Month step (Duo inside screen)",
+      "radius": 30
+    },
+    "FullYearPhone.dc.html": {
+      "x": 2136,
+      "y": 6240,
+      "w": 390,
+      "h": 844,
+      "title": "After: the Year page (regular iPhone)",
+      "radius": 44
+    },
+    "FullPaperPhone.dc.html": {
+      "x": 2606,
+      "y": 6240,
+      "w": 390,
+      "h": 844,
+      "title": "After: the paper, where you read",
+      "radius": 44
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "RingBefore.dc.html",
+    "MonthBefore.dc.html",
+    "MonthAfterDuo.dc.html",
+    "MonthAfterPhone.dc.html",
+    "YearBefore.dc.html",
+    "YearCount.dc.html",
+    "YearNoCount.dc.html",
+    "Map.dc.html",
+    "FullBeforeWalk.dc.html",
+    "FullBeforeYear.dc.html",
+    "FullBeforePlan.dc.html",
+    "FullWalkMonthDuo.dc.html",
+    "FullYearPhone.dc.html",
+    "FullPaperPhone.dc.html"
+  ],
+  "notes": {
+    "t1": {
+      "x": 0,
+      "y": -300,
+      "text": "1. The light's choices",
+      "kind": "title1",
+      "maxW": 1292
+    },
+    "q1": {
+      "x": -420,
+      "y": 0,
+      "w": 340,
+      "fill": "orange",
+      "size": "m",
+      "text": "You said:\n\"I would say that the orbs choices are way too busy and too numerous and too confusing\""
+    },
+    "c1": {
+      "x": 0,
+      "y": 900,
+      "w": 640,
+      "fill": "green",
+      "size": "m",
+      "text": "What changed: seven choices become three at most (Type it, Show examples, and Undo once something is planted). Back and Leave for now are plain words at the top. Switching area is a tap on the other area; skipping is the button at the foot. The After is shown with one goal planted, so Undo appears."
+    },
+    "t2": {
+      "x": 0,
+      "y": 1260,
+      "text": "2. Moving on",
+      "kind": "title1",
+      "maxW": 1762
+    },
+    "q2": {
+      "x": -420,
+      "y": 1560,
+      "w": 340,
+      "fill": "orange",
+      "size": "m",
+      "text": "You said:\n\"The next this week text is so tiny and so buried. near the bottom that I would say it's very difficult to know what to do at this point as a new user\"\n\nAlso agreed: titles cut short, the Work label far from its flags, a lone pennant with no words, More competing with Next."
+    },
+    "c2": {
+      "x": 0,
+      "y": 2460,
+      "w": 640,
+      "fill": "green",
+      "size": "m",
+      "text": "What changed: Next is one glowing button alone at the foot, clear of the home bar. More moved to the top. Flag titles show in full, the area name stands on its own post, and the lone pennant is gone. The right-hand screen shows the same on a regular iPhone."
+    },
+    "t3": {
+      "x": 0,
+      "y": 2820,
+      "text": "3. The Year step, one area at a time",
+      "kind": "title1",
+      "maxW": 1330
+    },
+    "q3": {
+      "x": -420,
+      "y": 3120,
+      "w": 340,
+      "fill": "orange",
+      "size": "m",
+      "text": "You said:\n\"if we've chosen an area, it should be specific to that, so should the messaging\""
+    },
+    "c3": {
+      "x": 0,
+      "y": 4020,
+      "w": 640,
+      "fill": "green",
+      "size": "m",
+      "text": "What changed: the question names the area you are in. The other areas wait as small names; tap one to switch. Quick start goes down after one goal; the whole-year walk visits each area in turn. Your choice: A shows a quiet \"1 of 3\", B does not."
+    },
+    "t4": {
+      "x": 0,
+      "y": 4380,
+      "text": "4. Going back and undoing",
+      "kind": "title1",
+      "maxW": 1040
+    },
+    "q4": {
+      "x": -420,
+      "y": 4680,
+      "w": 340,
+      "fill": "orange",
+      "size": "m",
+      "text": "You asked:\n\"Is there a way to undo steps?\""
+    },
+    "c4": {
+      "x": 0,
+      "y": 5580,
+      "w": 640,
+      "fill": "green",
+      "size": "m",
+      "text": "What changed: Back is always in the top corner. Undo shows above the light right after a flag is planted, then waits in the light's choices. No new controls were added."
+    },
+    "t5": {
+      "x": 0,
+      "y": 5940,
+      "text": "5. A full hill",
+      "kind": "title1",
+      "maxW": 2996
+    },
+    "q5": {
+      "x": -420,
+      "y": 6240,
+      "w": 340,
+      "fill": "orange",
+      "size": "m",
+      "text": "You said:\n\"the quote-unquote hill would fill up quickly and become impossible to quote-unquote read.\"\n\nThe three Before screens are real: today's build on the iPhone simulator, with the sample plan made fuller for these shots (5 areas, 3 to 6 goals each at Year, Season and Month)."
+    },
+    "c5": {
+      "x": 0,
+      "y": 7140,
+      "w": 640,
+      "fill": "green",
+      "size": "m",
+      "text": "What changed: the mountain shows how much is planted where; the paper is where you read. Words show for one area at one level, at most four flags, each title in full. Every other area is a post with small wordless flags and a count; tap a post to walk there. Past four, the rest fold into \"+2 more\", which opens the paper list of the whole plan by area."
+    }
+  },
+  "designSystems": []
+}
