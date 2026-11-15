@@ -714,21 +714,44 @@ struct WalkPlantTests {
         #expect(s.firstThing == first.id)
     }
 
-    @Test func onTodayOtherFlagsAreStillFocused() {
+    /// Fix round 1: on Today the goal above is always a week task. Started with ("Start with this
+    /// one"), a first thing the walk did not plant takes a tap back to the week tasks here; after
+    /// that a tap on it never makes it the goal above again. One kept area, so no area tap helps.
+    /// Every flag that says it takes a tap does something, and none that does says otherwise.
+    @Test func onTodayTheFirstThingNeverTrapsTheGoalAbove() {
         var theirs = m.deposit
         theirs.mine = false
-        let mine = WalkItem(id: UUID(), level: .week, title: "Choose the tile", day: m.today)
+        let mine = WalkItem(id: UUID(), level: .week, title: "Choose the tile", areaId: m.home.id, day: m.today)
         var s = m.on(5, items: [theirs, mine])
-        s.firstThing = theirs.id
-
-        _ = s.apply(.bannerTapped(theirs.id), m.env)          // a first thing the walk did not plant
-        #expect(s.selected == nil)
+        s.kept = [m.home.id]
+        s.focusArea = m.home.id
+        s.lastPlanted[.week] = theirs.id
+        _ = s.apply(.noteExpired, m.env)                       // as the reducer leaves it: about theirs
         #expect(s.focus[.today] == theirs.id)
+        _ = s.act(.startThere, m.env)
+        #expect(s.firstThing == theirs.id && s.focus[.today] == theirs.id)
+        everyTapThatSaysSoActs(s)
 
-        // A week flag that is not the one the step is about is not drawn: a tap on it changes nothing.
-        #expect(s.apply(.bannerTapped(mine.id), m.env).isEmpty)
-        #expect(s.selected == nil)
-        #expect(s.focus[.today] == theirs.id)
+        #expect(s.apply(.bannerTapped(theirs.id), m.env) == [.save])
+        #expect(s.focus[.today] == mine.id)                    // back to choosing among the week tasks
+        everyTapThatSaysSoActs(s)
+
+        #expect(s.apply(.bannerTapped(theirs.id), m.env).isEmpty)
+        #expect(s.focus[.today] == mine.id)                    // never the goal above by a tap
+        everyTapThatSaysSoActs(s)
+    }
+
+    /// Each drawn flag's tap, sent to the reducer: it acts exactly when the flag says it takes a tap.
+    private func everyTapThatSaysSoActs(_ s: WalkState, sourceLocation: SourceLocation = #_sourceLocation) {
+        let layout = WalkLayout.make(s, today: m.today, footing: .level)
+        for post in layout.posts {
+            for banner in post.banners {
+                guard let event = WalkLayout.tapEvent(banner, on: post) else { continue }
+                var after = s
+                let effects = after.apply(event, m.env)
+                #expect((after != s || !effects.isEmpty) == banner.taps, "\(banner.label)", sourceLocation: sourceLocation)
+            }
+        }
     }
 
     @Test func moveTargetsAreEveryOtherArea() {

@@ -773,18 +773,19 @@ private struct Builder {
         return groups.firstIndex { !$0.items.isEmpty }
     }
 
+    /// What a tap on the flag does, as the reducer does it. Today's first thing reads the same
+    /// on its band and on its Week post, since a tap on either is the same tap.
     func role(_ item: WalkItem, todayBand: Bool) -> WalkCopy.BannerRole {
-        if todayBand {
+        if todayBand || (s.step == 5 && item.id == s.firstThing) {
             guard s.step == 5 else { return .firstThing }
             if item.mine { return .firstThingMine }
-            // Not planted by this walk: a flag one level up is focused by a tap, as any week flag on Today.
-            guard item.level.rawValue == WalkLevel.today.rawValue - 1 else { return .firstThing }
-            return s.focus[.today] == item.id ? .firstThingFocused : .firstThingFocusable
+            // Not planted by this walk: started with, a tap goes back to the week tasks here.
+            return s.focus[.today] == item.id && s.nextGoalAbove() != nil ? .firstThingFocused : .firstThing
         }
         guard s.step < 6, !s.ground, let level else { return .plain }
         if item.level == level { return item.mine ? .mine : .plain }
         if item.level.rawValue == level.rawValue - 1, s.focus[level] == item.id {
-            return s.parentsHere().count > 1 ? .focusedOfSeveral : .focused
+            return s.nextGoalAbove() != nil ? .focusedOfSeveral : .focused
         }
         return .plain
     }

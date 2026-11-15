@@ -547,9 +547,9 @@ final class WalkFlowTests {
         #expect(store.load(for: me) == endSaved)
     }
 
-    /// A second walk down that skips Season stands in the same area: the Month step is
-    /// about that area's goal above (the first chain's season line), and the question names it.
-    @Test func aSecondWalkDownThatSkipsSeasonTakesTheAreasGoalAbove() async throws {
+    /// A second walk down that skips Season: the Month line is not hung under the
+    /// first chain's season line, nor filed under the first goal.
+    @Test func aSecondWalkDownThatSkipsSeasonLinksToNothingOfTheFirst() async throws {
         let ctx = try walkTestContext()
         let m = model(ctx)
         quickStart(m, keeping: ["Health", "Home"])
@@ -558,8 +558,8 @@ final class WalkFlowTests {
         let (strong, bathroom) = (m.state.items(on: .year)[0], m.state.items(on: .year)[1])
         m.choose(.next)
         m.send(.bannerTapped(bathroom.id))                     // switch to the first goal
+        #expect(m.state.focus[.season] == strong.id)
         await say(m, "lift twice a week")
-        let lift = try #require(task(ctx, "Lift twice a week"))
         m.choose(.next)
         await say(m, "book the gym induction")
         for _ in 0..<3 { m.choose(.next) }
@@ -569,13 +569,17 @@ final class WalkFlowTests {
         #expect(m.state.focus[.season] == bathroom.id)
         m.choose(.next)                                        // Season skipped
         #expect(m.state.step == 3)
-        #expect(m.state.focus[.month] == lift.id)
-        #expect(WalkCopy.question(m.state, m.periods).contains("“Lift twice a week”"))
+        #expect(m.state.focus[.month] == nil)
         await say(m, "call the tiler")
         let tiler = try #require(task(ctx, "Call the tiler"))
-        #expect(tiler.sourceId == lift.id)
-        #expect(tiler.goalId == strong.id)
+        #expect(tiler.sourceId == nil)
+        #expect(tiler.goalId != strong.id)
         #expect(try childrenAheadOfParents(ctx) == [])
+
+        // What this walk down said on Month is its own line: Week is about it, not the first chain's.
+        m.choose(.next)
+        #expect(m.state.step == 4)
+        #expect(m.state.focus[.week] == tiler.id)
     }
 
     // MARK: The calendar ask and the ending

@@ -22,6 +22,10 @@ struct WalkState: Equatable {
     var focusArea: UUID?                   // off the ground, the area the walk stands in (`standing`)
     var focus: [WalkLevel: UUID] = [:]     // a step's level → the focused item one level up
     var tour: [UUID] = []                  // whole-year stops still ahead on this step
+    /// A walk down one chosen goal ("Walk another one down"): that goal first, then each flag
+    /// this walk down planted with no goal above. Only lines that start at one of these give
+    /// the goal above on the lower steps. Empty on a first walk.
+    var walkingDown: [UUID] = []
     var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
     var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
     var orb: Orb = .idle; var typing: String?
@@ -185,6 +189,7 @@ struct WalkState: Equatable {
         focusArea = nil
         focus = [:]                         // a focus left from an earlier walk must not skip a first visit
         tour = []
+        walkingDown = []
         step = 1
         settle()
         return [.save]
@@ -337,10 +342,37 @@ struct WalkState: Equatable {
     }
 
     /// Steps 2 to 5: every flag one level above the step's, in planting order. Today's first
-    /// thing is a week task too, but it is Today's own flag, never a goal above it.
+    /// thing is a week task too, but it is Today's own flag, never a goal above it. On a walk
+    /// down, only the flags of its own line (`walkingDown`).
     private func parentsAnywhere() -> [WalkItem] {
         guard let level, level != .year, let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
-        return items(on: above).filter { level != .today || $0.id != firstThing }
+        return items(on: above).filter { (level != .today || $0.id != firstThing) && onWalkedLine($0) }
+    }
+
+    /// On a walk down, whether the flag's line (it, then its parents up) starts at the goal
+    /// walked or at a flag this walk down planted; any flag on a first walk.
+    private func onWalkedLine(_ item: WalkItem) -> Bool {
+        guard !walkingDown.isEmpty else { return true }
+        var at: WalkItem? = item
+        for _ in WalkLevel.allCases {
+            guard let flag = at else { return false }
+            if walkingDown.contains(flag.id) { return true }
+            at = self.item(flag.parentId)
+        }
+        return false
+    }
+
+    /// Steps 2 to 5: where a tap on the goal the step is about goes: the next goal above here,
+    /// round again (none with only one). On Today, once the first thing is the one the step is
+    /// about, back to the week tasks here. Nil: a tap does nothing.
+    func nextGoalAbove() -> UUID? {
+        guard let level, level != .year, let current = focus[level] else { return nil }
+        let parents = parentsHere()
+        if let index = parents.firstIndex(where: { $0.id == current }) {
+            return parents.count > 1 ? parents[(index + 1) % parents.count].id : nil
+        }
+        guard level == .today, current == firstThing else { return nil }
+        return rememberedOrNewest(parents)?.id
     }
 
     /// The post a flag stands on: its area when that area is kept, else the nameless
@@ -425,20 +457,12 @@ struct WalkState: Equatable {
         return [.save]
     }
 
-    /// Steps 2 to 5: a tap on the goal the step is about switches to the next goal above in
-    /// the area stood in, round again; with only one, nothing. No other goal above is drawn.
-    /// On Today a first thing the walk did not plant (drawn in its own band) is focused by a tap.
+    /// Steps 2 to 5: a tap on the goal the step is about switches (`nextGoalAbove`); with
+    /// nowhere to go, nothing. No other goal above is drawn, and no tap makes Today's first thing one.
     private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
-        guard let level else { return [] }
-        if level == .today, id == firstThing, id != focus[level], item(id) != nil {
-            focus[level] = id
-            return [.save]
-        }
-        guard id == focus[level] else { return [] }
-        let parents = parentsHere()
-        guard parents.count > 1, let index = parents.firstIndex(where: { $0.id == id }) else { return [] }
-        focus[level] = parents[(index + 1) % parents.count].id
-        follow(focus[level])
+        guard let level, id == focus[level], let next = nextGoalAbove() else { return [] }
+        focus[level] = next
+        follow(next)
         return [.save]
     }
 }

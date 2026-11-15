@@ -45,6 +45,8 @@ extension WalkState {
                             areaId: areaId, parentId: parent?.id,
                             day: level == .today ? env.periods.today : said.day, mine: true)
         items.append(item)
+        // On a walk down, a flag said with no goal above starts a line of this walk down's own.
+        if !walkingDown.isEmpty, level != .year, parent == nil { walkingDown.append(item.id) }
         emptyHolds = 0
 
         var effects: [WalkEffect] = []
@@ -274,6 +276,7 @@ extension WalkState {
     /// walk, so the next step's flags still link (nil only when none is left).
     private mutating func forget(_ id: UUID) {
         tour.removeAll { $0 == id }
+        walkingDown.removeAll { $0 == id }
         focus = focus.filter { $0.value != id }
         for (level, last) in lastPlanted where last == id {
             lastPlanted[level] = items(on: level).last(where: \.mine)?.id
@@ -287,9 +290,10 @@ extension WalkState {
 
     /// "Walk another one down": back to Season in a quick walk, focused on the
     /// first year goal with nothing under it yet (the walk stands in its area), as
-    /// a clean walk down. No focus or last-planted flag below is kept (a skipped
-    /// step takes the area's newest goal above, which the question names), no
-    /// tour, no Undo, no examples, no note, no half-finished hold. The flags,
+    /// a clean walk down. No focus or last-planted flag below is kept, and below it
+    /// only that goal's own line is a goal above (`walkingDown`): a skipped step with
+    /// none has no goal above rather than another chain's. No tour, no Undo, no
+    /// examples, no note, no half-finished hold. The flags,
     /// the ridge, today's first thing (and the day it replaced) and a refusal
     /// of speech stay. With every goal walked, or before the ending, nothing.
     mutating func walkAnother() -> [WalkEffect] {
@@ -299,6 +303,7 @@ extension WalkState {
         ground = false
         focusArea = nil
         tour = []
+        walkingDown = [next.id]
         focus = [.season: next.id]
         lastPlanted = [:]
         undo = []

@@ -709,6 +709,21 @@ struct WalkStepsTests {
         #expect(s.items.last?.areaId == m.people.id && s.items.last?.parentId == nil)
     }
 
+    /// Fix round 1: on a walk down only the walked goal's line gives a goal above, a tap on an
+    /// area included; on a first walk the same tap takes that area's goal above.
+    @Test func aWalkDownKeepsToItsOwnGoalsLine() {
+        var first = m.at(3)
+        first.focusArea = m.home.id
+        first.focus[.month] = m.bathroomByFebruary.id
+        var down = first
+        down.walkingDown = [m.bathroom.id]
+        _ = first.apply(.areaTapped(m.health.id), m.env)
+        #expect(first.focus[.month] == m.lift.id)              // a first walk: Health's own goal above
+        _ = down.apply(.areaTapped(m.health.id), m.env)
+        #expect(down.focus[.month] == m.bathroomByFebruary.id) // never another goal's line
+        #expect(down.standing == m.home.id)
+    }
+
     @Test func backUpToTheYearKeepsTheArea() {
         var s = offTheGround(.quick, keeping: [m.health, m.work])
         _ = s.apply(.areaTapped(m.work.id), m.env)

@@ -549,6 +549,32 @@ private struct Saved {
         #expect(fresh.tour == [strong.id])
     }
 
+    /// Fix round 1: a walk down's own lines survive a save and resume, a deleted one is dropped,
+    /// and a save from before they were kept loads as a first walk.
+    @Test func aWalkDownsLinesSurviveAResume() throws {
+        let p = periods(2026, 11, 13)
+        let goal = WalkItem(id: UUID(), level: .year, title: "Finish the bathroom")
+        let gone = UUID()
+        var state = WalkState()
+        state.step = 2
+        state.items = [goal]
+        state.focus[.season] = goal.id
+        state.walkingDown = [goal.id, gone]
+        let position = WalkPosition(state, status: .inProgress, planted: [], periods: p, now: p.today)
+        let data = try JSONEncoder.walk.encode(position)
+        let decoded = try JSONDecoder.walk.decode(WalkPosition.self, from: data)
+        #expect(decoded.walkingDown == [goal.id, gone])
+        var fresh = WalkState()
+        fresh.items = [goal]
+        decoded.restored(for: p, existing: [goal.id]).apply(to: &fresh)
+        #expect(fresh.walkingDown == [goal.id])
+
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "walkingDown")
+        let older = try JSONDecoder.walk.decode(WalkPosition.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(older.walkingDown.isEmpty)
+    }
+
     @Test func anOutOfRangeStepRestoresToOneTheWalkCanLeave() {
         let p = periods(2026, 11, 13)
         let env = WalkEnv(periods: p, now: p.today)
