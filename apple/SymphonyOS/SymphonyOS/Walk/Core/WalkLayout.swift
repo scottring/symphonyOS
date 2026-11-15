@@ -779,7 +779,7 @@ private struct Builder {
         if todayBand || (s.step == 5 && item.id == s.firstThing) {
             guard s.step == 5 else { return .firstThing }
             if item.mine { return .firstThingMine }
-            // Not planted by this walk: started with, a tap goes back to the week tasks here.
+            // Not planted by this walk: while it is the goal above, a tap walks on round the week tasks here.
             return s.focus[.today] == item.id && s.nextGoalAbove() != nil ? .firstThingFocused : .firstThing
         }
         guard s.step < 6, !s.ground, let level else { return .plain }

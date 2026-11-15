@@ -358,8 +358,8 @@ enum WalkCopy {
         /// `focused`: the goal above the step is about; `focusedOfSeveral`: the same, with another
         /// one above in the area stood in, which a tap switches to.
         case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example, stub(Int)
-        /// Today's first thing, not planted by this walk, started with on the Today step: a tap
-        /// goes back to the week tasks in the area stood in.
+        /// Today's first thing, not planted by this walk, the goal above on the Today step: a tap
+        /// goes on to the next week task in the area stood in.
         case firstThingFocused
         /// A tap does something: the label says what. A plain flag, someone else's first thing,
         /// or the only goal above, is only read.

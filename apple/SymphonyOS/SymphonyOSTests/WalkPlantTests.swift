@@ -714,31 +714,60 @@ struct WalkPlantTests {
         #expect(s.firstThing == first.id)
     }
 
-    /// Fix round 1: on Today the goal above is always a week task. Started with ("Start with this
-    /// one"), a first thing the walk did not plant takes a tap back to the week tasks here; after
-    /// that a tap on it never makes it the goal above again. One kept area, so no area tap helps.
-    /// Every flag that says it takes a tap does something, and none that does says otherwise.
-    @Test func onTodayTheFirstThingNeverTrapsTheGoalAbove() {
+    /// Fix round 1 (amended ruling): on Today the first thing is one of the goals a tap walks
+    /// round. Started with, a tap on it goes on to the week tasks here; tapping the goal above
+    /// comes back round to it, the same first thing, and the Next line is Finish again. A tap
+    /// never replaces or clears the first thing. One kept area, so no area tap helps. Every flag
+    /// that says it takes a tap does something, and none that does says otherwise.
+    @Test func onTodayAFirstThingIsOneOfTheGoalsATapWalksRound() throws {
         var theirs = m.deposit
         theirs.mine = false
-        let mine = WalkItem(id: UUID(), level: .week, title: "Choose the tile", areaId: m.home.id, day: m.today)
-        var s = m.on(5, items: [theirs, mine])
+        let tile = WalkItem(id: UUID(), level: .week, title: "Choose the tile", areaId: m.home.id, day: m.today)
+        let plumber = WalkItem(id: UUID(), level: .week, title: "Call the plumber", areaId: m.home.id, day: m.today)
+        var s = m.on(5, items: [theirs, tile, plumber])
         s.kept = [m.home.id]
         s.focusArea = m.home.id
         s.lastPlanted[.week] = theirs.id
         _ = s.apply(.noteExpired, m.env)                       // as the reducer leaves it: about theirs
-        #expect(s.focus[.today] == theirs.id)
         _ = s.act(.startThere, m.env)
         #expect(s.firstThing == theirs.id && s.focus[.today] == theirs.id)
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.finish)
         everyTapThatSaysSoActs(s)
 
         #expect(s.apply(.bannerTapped(theirs.id), m.env) == [.save])
-        #expect(s.focus[.today] == mine.id)                    // back to choosing among the week tasks
+        let aboveNow = try #require(s.focus[.today])
+        #expect([tile.id, plumber.id].contains(aboveNow))      // a week task is the goal above
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.startWithThis)
+        #expect(s.firstThing == theirs.id)
         everyTapThatSaysSoActs(s)
 
-        #expect(s.apply(.bannerTapped(theirs.id), m.env).isEmpty)
-        #expect(s.focus[.today] == mine.id)                    // never the goal above by a tap
-        everyTapThatSaysSoActs(s)
+        for _ in 0..<3 where s.focus[.today] != theirs.id {
+            let focused = try #require(s.focus[.today])
+            #expect(s.apply(.bannerTapped(focused), m.env) == [.save])
+            #expect(s.firstThing == theirs.id)                 // a tap never replaces the first thing
+            everyTapThatSaysSoActs(s)
+        }
+        #expect(s.focus[.today] == theirs.id)                  // round again
+        #expect(s.firstThing == theirs.id)
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.finish)
+
+        // No week task here but the first thing's own: a tap changes nothing, and it says so.
+        var alone = m.on(5, items: [theirs])
+        alone.kept = [m.home.id]
+        alone.focusArea = m.home.id
+        alone.lastPlanted[.week] = theirs.id
+        _ = alone.apply(.noteExpired, m.env)
+        _ = alone.act(.startThere, m.env)
+        #expect(alone.focus[.today] == theirs.id && alone.firstThing == theirs.id)
+        let before = alone
+        #expect(alone.apply(.bannerTapped(theirs.id), m.env).isEmpty)
+        #expect(alone == before)
+        let drawn = WalkLayout.make(alone, today: m.today, footing: .level).posts.flatMap(\.banners)
+            .filter { $0.itemId == theirs.id }
+        #expect(!drawn.isEmpty && drawn.allSatisfy { !$0.taps })
+        #expect(drawn.contains { $0.label == WalkCopy.bannerLabel(theirs.title, level: .today, tag: WalkCopy.firstThingTag,
+                                                                   role: .firstThing) })
+        everyTapThatSaysSoActs(alone)
     }
 
     /// Each drawn flag's tap, sent to the reducer: it acts exactly when the flag says it takes a tap.

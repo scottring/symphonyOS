@@ -363,16 +363,16 @@ struct WalkState: Equatable {
     }
 
     /// Steps 2 to 5: where a tap on the goal the step is about goes: the next goal above here,
-    /// round again (none with only one). On Today, once the first thing is the one the step is
-    /// about, back to the week tasks here. Nil: a tap does nothing.
+    /// round again (none with only one). On Today the first thing, when it stands here, is one
+    /// of them, first in the round. Nil: a tap does nothing.
     func nextGoalAbove() -> UUID? {
         guard let level, level != .year, let current = focus[level] else { return nil }
-        let parents = parentsHere()
-        if let index = parents.firstIndex(where: { $0.id == current }) {
-            return parents.count > 1 ? parents[(index + 1) % parents.count].id : nil
+        var round = parentsHere()
+        if level == .today, let first = item(firstThing), column(of: first) == standing, onWalkedLine(first) {
+            round.insert(first, at: 0)
         }
-        guard level == .today, current == firstThing else { return nil }
-        return rememberedOrNewest(parents)?.id
+        guard round.count > 1, let index = round.firstIndex(where: { $0.id == current }) else { return nil }
+        return round[(index + 1) % round.count].id
     }
 
     /// The post a flag stands on: its area when that area is kept, else the nameless
@@ -458,7 +458,7 @@ struct WalkState: Equatable {
     }
 
     /// Steps 2 to 5: a tap on the goal the step is about switches (`nextGoalAbove`); with
-    /// nowhere to go, nothing. No other goal above is drawn, and no tap makes Today's first thing one.
+    /// nowhere to go, nothing. No other goal above is drawn. A tap never changes the first thing.
     private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
         guard let level, id == focus[level], let next = nextGoalAbove() else { return [] }
         focus[level] = next
