@@ -26,9 +26,6 @@ struct WalkView: View {
         let parts = args[i + 1].lowercased().split(separator: "x").compactMap { Double($0) }
         return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
     }()
-    #else
-    static let pinnedSize: CGSize? = nil
-    #endif
 
     var body: some View {
         if let pinned = Self.pinnedSize {
@@ -45,6 +42,9 @@ struct WalkView: View {
             walkBody
         }
     }
+    #else
+    var body: some View { walkBody }
+    #endif
 
     private var walkBody: some View {
         GeometryReader { geo in
