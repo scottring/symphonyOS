@@ -12,9 +12,6 @@ import Observation
 /// `finish()`, or by itself (an error, an interruption).
 @MainActor protocol WalkListening: AnyObject {
     var problem: String? { get }
-    /// It can never listen on this phone (on the phone only, and none here): the walk and the bar
-    /// begin by typing, and nothing is asked.
-    var cannotListenHere: Bool { get }
     var onWords: ((String) -> Void)? { get set }
     var onEnd: (() -> Void)? { get set }
     func start() async
@@ -125,9 +122,6 @@ extension Dictation: WalkListening {}
         self.requestCalendar = requestCalendar
         self.calendarEvents = calendarEvents
         self.clock = clock
-        // A phone that can never listen here (on the phone only, and none): the walk begins by typing,
-        // its lesson teaches typing, and no permission is ever asked.
-        if self.listener.cannotListenHere { self.state.speechIsOff = true }
         // A walk with no store (a walk-down) keeps no place: Leave for now does not say it does.
         self.state.placeKept = store != nil
         readEnding()

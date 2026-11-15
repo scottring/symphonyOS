@@ -92,6 +92,11 @@ struct DailyAddTests {
                 == .task(title: "Lunch", day: today, at: day(2026, 11, 10, 12), here: true))
         #expect(read("call mum friday at midday", on: .week, parse: parsed("call mum", on: day(2026, 11, 13, 12)))
                 == .task(title: "Call mum", day: day(2026, 11, 13), at: day(2026, 11, 13, 12), here: true))
+        // "at 12" said is noon as a time, though the parser marks none; a date's "12" is not.
+        #expect(read("lunch at 12 tomorrow", on: .today, parse: parsed("lunch at 12 tomorrow", on: day(2026, 11, 11, 12)))
+                == .task(title: "Lunch at 12 tomorrow", day: day(2026, 11, 11), at: day(2026, 11, 11, 12), here: false))
+        #expect(!DailyAdd.saidATime(CaptureParser.Result(title: "dentist on", date: day(2026, 12, 12, 12), hasTime: false),
+                                    words: "dentist on December 12"))
         // "Noon" still in the title means the parser did not take it: no time.
         #expect(!DailyAdd.saidATime(CaptureParser.Result(title: "Noon run", date: day(2026, 11, 13, 12), hasTime: false),
                                     words: "Noon run friday"))
@@ -195,9 +200,17 @@ struct DailyAddRealParserTests {
     /// "dentist at 3": the detector takes nothing (a bare number is no time to it), so every word stays.
     @Test func dentistAtThreeKeepsItsWords() throws {
         let add = try #require(read("dentist at 3"))
-        // Either the words are whole, or the 3 was kept as a time: never "Dentist" at no time.
-        #expect(add.title.contains("3") || add.at != nil)
+        #expect(add.title == "Dentist at 3")
         #expect(PlanCalendar.sameDay(add.day, today))
+        #expect(add.at == nil)
+    }
+
+    /// "at 12 tomorrow": the detector reads noon and marks no time, but "at 12" was said: kept as noon.
+    @Test func atTwelveTomorrowIsKeptAsNoon() throws {
+        let add = try #require(read("lunch at 12 tomorrow"))
+        #expect(PlanCalendar.sameDay(add.day, PlanCalendar.addDays(today, 1)))
+        #expect(hour(add.at) == 12)
+        #expect(add.title.hasPrefix("Lunch"))
     }
 
     /// "call mum friday": a Friday from today on, all day; "friday" leaves the title.

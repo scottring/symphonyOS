@@ -18,6 +18,10 @@ actor SyncEngine {
     private var isSyncing = false
     private var userId: UUID?
     private var pushTask: Task<Void, Never>?
+    /// Told, once per pull, as soon as the signed-in person's `households` rows are in (signed in, the
+    /// pull and its save succeeded), before the other fifteen tables: the light edition reads its
+    /// edition from them (ruling D24). Nothing else about the pull changes.
+    private var onHouseholds: (@MainActor @Sendable () -> Void)?
 
     // Tables we sync (in dependency order)
     static let syncedTables: [(tableName: String, modelType: any PersistentModel.Type)] = [
@@ -50,8 +54,10 @@ actor SyncEngine {
     /// same answer as soon as the pull is done, before the realtime channels
     /// join (each join can wait and retry for a long time on a poor network).
     @discardableResult
-    func start(userId: UUID, onFirstPull: (@MainActor @Sendable (Bool) -> Void)? = nil) async -> Bool {
+    func start(userId: UUID, onFirstPull: (@MainActor @Sendable (Bool) -> Void)? = nil,
+               onHouseholds: (@MainActor @Sendable () -> Void)? = nil) async -> Bool {
         self.userId = userId
+        self.onHouseholds = onHouseholds
         // Diagnostic + safeguard: force the auth session to load so PostgREST
         // requests carry the user's JWT (anon requests return 0 rows under RLS).
         do {
@@ -307,6 +313,7 @@ actor SyncEngine {
         // Each table pulls + saves independently, so one bad row/table can't
         // roll back the entire sync (the previous single-shared-context save did).
         let households = await pullTable("households", as: Household.self, userId: userId)
+        if signedIn && households { await onHouseholds?() }
         adoptHouseholdWeekStart()
         await pullTable("user_profiles", as: UserProfile.self, userId: userId)
         await pullTable("family_members", as: FamilyMember.self, userId: userId)

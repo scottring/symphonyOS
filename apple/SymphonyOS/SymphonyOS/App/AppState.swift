@@ -149,6 +149,13 @@ final class AppState {
     /// `ContentView`; false again on sign-out. Demo mode sets it at once: its
     /// seeded store is all there is.
     var initialSyncFinished = false
+    /// This sign-in's `households` rows have been pulled (`SyncEngine`'s `onHouseholds`), which comes
+    /// before the rest of the first pull: the edition is read from them from then on (`Edition.current`,
+    /// ruling D24). Set by `ContentView`; false again for a new sign-in and on sign-out. Demo mode sets it at once.
+    var householdsPulled = false
+    /// The edition is known: from rows pulled for this sign-in, or remembered for this person, or the
+    /// demo's. Until it is, speech stays on the phone (`DailyGate.speechOnPhoneOnly`, ruling D25).
+    var editionKnown = false
     /// "Walk the mountain again" was tapped in Settings (the only place that
     /// asks). The main view starts the walk once the first pull has finished,
     /// and sets this back to false.
@@ -177,6 +184,8 @@ final class AppState {
     func signedOut() {
         dropWaitingTellIfLight()
         initialSyncFinished = false
+        householdsPulled = false
+        editionKnown = false
         walkReplayRequested = false
         walkPaused = false
         walkResumeRequested = false

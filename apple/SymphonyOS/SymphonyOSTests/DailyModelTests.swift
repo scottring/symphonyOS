@@ -939,17 +939,20 @@ struct DailyModelTests {
         #expect(m.today == day(2026, 11, 11))
     }
 
-    /// Final review 2 I3: a phone that cannot recognise speech on the device types from the start: the
-    /// light asks for the field and the listener is never started, so nothing is ever asked.
-    @Test func aPhoneThatCannotListenTypesFromTheStart() async throws {
+
+    /// Residual patch (D23): speech found unavailable at the first tap says so on the bar's line, and the
+    /// bar types from then on; nothing was decided before that tap.
+    @Test func speechFoundUnavailableAtTheFirstTapSaysSo() async throws {
         let ctx = try walkTestContext()
-        listener.cannotListenHere = true
         let m = model(ctx)
-        #expect(m.bar.speechOff)
+        #expect(!m.bar.speechOff)
+        listener.problemOnStart = "Speech isn't available right now — type it instead."
         m.send(.micTapped)
         await scheduler.settle()
+        #expect(listener.starts == 1)
+        #expect(m.bar.speechOff)
+        #expect(m.bar.note == WalkCopy.speechOff)
         #expect(m.bar.fieldAsked == 1)
-        #expect(listener.starts == 0)
     }
 
     /// Final review (minor): Control Centre, the app switcher or a call makes the scene inactive; the
@@ -1003,6 +1006,18 @@ struct DailyModelTests {
         #expect(m.bar.mic == .listening)
         #expect(listener.starts == 1)
         #expect(listener.stops == 0)
+    }
+
+    /// Residual patch: a walk opening between the Tell's answer and its run keeps the bar quiet under it.
+    @Test func aWalkOpeningBeforeTheTellRunsKeepsTheBarQuiet() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        let app = asked()
+        #expect(m.answerTell(app))
+        app.walkShowing = true
+        await scheduler.settle()
+        #expect(m.bar.mic == .idle)
+        #expect(listener.starts == 0)
     }
 
     /// A tap on the light between the Tell's answer and its run is not undone by it.

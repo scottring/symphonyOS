@@ -100,9 +100,12 @@ enum DailyGate {
         return speechOff ? .focusField : .listen
     }
 
-    /// Speech never leaves the phone in a light household, wherever it is heard.
-    static func speechOnPhoneOnly(edition: Edition) -> Bool {
-        edition == .light
+    /// Speech never leaves the phone in a light household, wherever it is heard; and while the edition
+    /// is not yet known (`known` false: before this sign-in's households rows, with nothing remembered)
+    /// it stays on the phone too, since the person may turn out to be light (ruling D25). Only a
+    /// household known to be full may use server recognition.
+    static func speechOnPhoneOnly(edition: Edition, known: Bool = true) -> Bool {
+        !(known && edition == .full)
     }
 
     /// A walk this person left part-way is stored and can be picked back up: Leave for now
@@ -166,6 +169,12 @@ enum DailyGate {
     /// shorter) is not a new window and is ignored: on the Duo's inside screens it would read a short
     /// wide window (`.glanceWide`), take the light page away with its field, drop the keyboard and
     /// bring the page back. Any other change (the keyboard down, a turn, a fold) is taken.
+    /// Whether a change of horizon is a change of page on this window: on the spread Today and Week are
+    /// one page, so moving between them lets nothing go (no `.left`: a pending Remove keeps its Undo).
+    static func pageChanges(from old: Horizon, to new: Horizon, layout: TodayLayout) -> Bool {
+        page(old, layout: layout) != page(new, layout: layout)
+    }
+
     static func plannerSize(measured: CGSize, kept: CGSize, keyboardUp: Bool) -> CGSize {
         let onlyTheKeyboard = keyboardUp && kept != .zero && measured.width == kept.width && measured.height < kept.height
         return onlyTheKeyboard ? kept : measured

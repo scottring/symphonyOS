@@ -62,6 +62,7 @@ struct ContentView: View {
         if DemoMode.isOn {
             // Demo data is local-only; never sync it. The seeded store is all
             // there is, so there is no pull to wait for.
+            appState.householdsPulled = true
             appState.initialSyncFinished = true
             return
         }
@@ -71,6 +72,7 @@ struct ContentView: View {
         guard syncedUserId != userId else { return }
         syncedUserId = userId
         // A new account (or someone else signing in) has not pulled yet.
+        appState.householdsPulled = false
         appState.initialSyncFinished = false
 
         let previous = syncEngine
@@ -83,7 +85,8 @@ struct ContentView: View {
             await previous?.stop()   // never leave two engines on one socket
             // Reported as soon as the pull is in, not after realtime has joined:
             // the walk waits on it, and a join can take long on a poor network.
-            await engine.start(userId: userId, onFirstPull: { pulled in if pulled { markFirstPullFinished(by: engine) } })
+            await engine.start(userId: userId, onFirstPull: { pulled in if pulled { markFirstPullFinished(by: engine) } },
+                               onHouseholds: { markHouseholdsPulled(by: engine) })
         }
         #if os(iOS)
         PushTokens.register()   // no-op until the Push capability is added
@@ -92,6 +95,15 @@ struct ContentView: View {
 
     /// Only the engine still running counts: one stopped by a sign-out (or
     /// replaced by someone else's sign-in) may finish its pull afterwards.
+    /// The households rows are in for this sign-in (ruling D24): the edition can be read. A failed
+    /// households pull leaves this false (not light); the next try is the resync when the app comes back
+    /// to the foreground, which runs the same pull and says so again.
+    @MainActor
+    private func markHouseholdsPulled(by engine: SyncEngine) {
+        guard syncEngine === engine else { return }
+        appState.householdsPulled = true
+    }
+
     @MainActor
     private func markFirstPullFinished(by engine: SyncEngine) {
         guard syncEngine === engine else { return }

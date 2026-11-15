@@ -61,7 +61,7 @@ struct TellSheet: View {
         .onChange(of: listener.transcript) { _, words in if !words.isEmpty { text = words } }
         .task {
             // A light household's speech stays on the phone; a full one's is as it always was.
-            listener.onDeviceOnly = DailyGate.speechOnPhoneOnly(edition: appState.edition)
+            listener.onDeviceOnly = DailyGate.speechOnPhoneOnly(edition: appState.edition, known: appState.editionKnown)
             await listener.start()
         }
         .onDisappear { listener.stop() }
@@ -120,16 +120,18 @@ final class Dictation {
         !onDeviceOnly || supportsOnDevice
     }
 
-    /// This instance can never listen on this phone: only on-device recognition will do
-    /// (`onDeviceOnly`) and the phone has none for its language. Known before anything is asked,
-    /// so `start()` asks for no permission then, and the walk and the bar begin by typing. Always
-    /// false when `onDeviceOnly` is false (Tell in a full household): its start is as it was.
-    var cannotListenHere: Bool {
-        #if os(iOS)
-        !Self.mayListen(onDeviceOnly: onDeviceOnly, supportsOnDevice: recognizer?.supportsOnDeviceRecognition ?? false)
-        #else
-        false
-        #endif
+    /// How a start begins when only on-device recognition will do (ruling D23), decided at the first
+    /// real use, never latched: with on-device support reported, as always (prompts as needed); with
+    /// none reported and Speech Recognition already decided (granted or refused earlier), unavailable
+    /// with no prompt; with none reported and Speech Recognition never asked, ask for it first and read
+    /// the support again before the microphone is ever asked for (the support may only read true once
+    /// recognition is allowed). So a phone that cannot is asked once at most, and one that can is never
+    /// wrongly switched off. Not consulted at all when `onDeviceOnly` is false (Tell in a full household).
+    enum OnDeviceStart: Equatable { case proceed, askSpeechThenReread, unavailable }
+
+    nonisolated static func onDeviceStart(supportsOnDevice: Bool, speechAsked: Bool) -> OnDeviceStart {
+        if supportsOnDevice { return .proceed }
+        return speechAsked ? .unavailable : .askSpeechThenReread
     }
 
     #if os(iOS)
@@ -153,13 +155,24 @@ final class Dictation {
         let mine = attempt
         asking = mine
         problem = nil
-        // On the phone only, and this phone cannot: said before either permission prompt, never after
-        // both were granted. (With `onDeviceOnly` false this is never true, and nothing here changes.)
-        if cannotListenHere { problem = "Speech isn't available right now — type it instead."; return }
+        // On the phone only (`onDeviceStart`, D23). With `onDeviceOnly` false none of this runs.
+        var rereadSupport = false
+        if onDeviceOnly {
+            switch Self.onDeviceStart(supportsOnDevice: recognizer?.supportsOnDeviceRecognition ?? false,
+                                      speechAsked: SFSpeechRecognizer.authorizationStatus() != .notDetermined) {
+            case .unavailable: problem = "Speech isn't available right now — type it instead."; return
+            case .askSpeechThenReread: rereadSupport = true
+            case .proceed: break
+            }
+        }
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }
         guard speech == .authorized else { problem = "Allow Speech Recognition in Settings to speak — or type it."; return }
+        // Recognition now allowed: on-device support read again; still none, the microphone is never asked for.
+        if rereadSupport, !(recognizer?.supportsOnDeviceRecognition ?? false) {
+            problem = "Speech isn't available right now — type it instead."; return
+        }
         guard await AVAudioApplication.requestRecordPermission() else { problem = "Allow the microphone in Settings to speak — or type it."; return }
         guard let recognizer, recognizer.isAvailable,
               Self.mayListen(onDeviceOnly: onDeviceOnly, supportsOnDevice: recognizer.supportsOnDeviceRecognition)

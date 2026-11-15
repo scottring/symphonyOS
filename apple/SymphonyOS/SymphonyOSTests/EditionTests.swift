@@ -47,49 +47,67 @@ struct EditionLastKnownTests {
     /// A full household signing in on a fresh install: nothing on the phone, nothing remembered.
     /// The pages are not light while the first pull runs.
     @Test func aFreshInstallIsNotLightBeforeTheFirstPull() {
-        #expect(Edition.current([], lastKnown: nil, firstPullFinished: false) == .full)
-        #expect(!Edition.remembers([], firstPullFinished: false))
+        #expect(Edition.current([], lastKnown: nil, householdsPulled: false) == .full)
+        #expect(!Edition.remembers([], householdsPulled: false))
     }
 
     /// Another account's light household row is still in the store (sign-out keeps it): until this
     /// person's first pull it is not read, and it is never remembered for them.
     @Test func anotherAccountsRowIsNotReadBeforeTheFirstPull() {
-        #expect(Edition.current(["light"], lastKnown: nil, firstPullFinished: false) == .full)
-        #expect(Edition.current(["light"], lastKnown: .full, firstPullFinished: false) == .full)
-        #expect(!Edition.remembers(["light"], firstPullFinished: false))
+        #expect(Edition.current(["light"], lastKnown: nil, householdsPulled: false) == .full)
+        #expect(Edition.current(["light"], lastKnown: .full, householdsPulled: false) == .full)
+        #expect(!Edition.remembers(["light"], householdsPulled: false))
     }
 
     /// The pull lands light: light, and remembered.
     @Test func thePullLandingLightIsLight() {
-        #expect(Edition.current(["light"], lastKnown: nil, firstPullFinished: true) == .light)
-        #expect(Edition.remembers(["light"], firstPullFinished: true))
+        #expect(Edition.current(["light"], lastKnown: nil, householdsPulled: true) == .light)
+        #expect(Edition.remembers(["light"], householdsPulled: true))
     }
 
     /// The pull lands full (even over a light row remembered from before): full, and remembered.
     @Test func thePullLandingFullIsFull() {
-        #expect(Edition.current(["full"], lastKnown: .light, firstPullFinished: true) == .full)
-        #expect(Edition.current([nil], lastKnown: nil, firstPullFinished: true) == .full)
-        #expect(Edition.remembers(["full"], firstPullFinished: true))
+        #expect(Edition.current(["full"], lastKnown: .light, householdsPulled: true) == .full)
+        #expect(Edition.current([nil], lastKnown: nil, householdsPulled: true) == .full)
+        #expect(Edition.remembers(["full"], householdsPulled: true))
     }
 
     /// The pull fails (offline): it never finishes for the session, so a person with nothing
     /// remembered stays not light, whatever rows are on the phone.
     @Test func aFailedPullStaysNotLight() {
         for rows in [[], ["light"], ["light", "light"]] as [[String?]] {
-            #expect(Edition.current(rows, lastKnown: nil, firstPullFinished: false) == .full)
+            #expect(Edition.current(rows, lastKnown: nil, householdsPulled: false) == .full)
         }
     }
 
     /// A person remembered as light, offline: light, as before (their own memory, not the rows).
     @Test func aRememberedLightPersonOfflineIsLight() {
-        #expect(Edition.current([], lastKnown: .light, firstPullFinished: false) == .light)
-        #expect(Edition.current(["full"], lastKnown: .light, firstPullFinished: false) == .light)
+        #expect(Edition.current([], lastKnown: .light, householdsPulled: false) == .light)
+        #expect(Edition.current(["full"], lastKnown: .light, householdsPulled: false) == .light)
+    }
+
+    /// Ruling D24: the edition is right as soon as this sign-in's households rows are in, while the
+    /// other fifteen tables are still pulling (`initialSyncFinished` still false): a brand-new light
+    /// person sees light pages from then, and a full household never reads light.
+    @MainActor @Test func theEditionIsRightOnceTheHouseholdsArePulled() {
+        let state = AppState()
+        state.householdsPulled = true
+        #expect(state.initialSyncFinished == false)
+        #expect(Edition.current(["light"], lastKnown: nil, householdsPulled: state.householdsPulled) == .light)
+        #expect(Edition.current(["full"], lastKnown: nil, householdsPulled: state.householdsPulled) == .full)
+        #expect(Edition.current(["full"], lastKnown: .light, householdsPulled: state.householdsPulled) == .full)
+        #expect(Edition.remembers(["light"], householdsPulled: state.householdsPulled))
+        #expect(Edition.known(lastKnown: nil, householdsPulled: state.householdsPulled))
+        // Sign-out forgets both.
+        state.editionKnown = true
+        state.signedOut()
+        #expect(!state.householdsPulled && !state.editionKnown)
     }
 
     /// The gate is handed what `current` reads: before the pull, with nothing remembered, no light
     /// page on any window and no light half-open display.
     @Test func theGateShowsNoLightPageBeforeTheFirstPull() {
-        let edition = Edition.current(["light"], lastKnown: nil, firstPullFinished: false)
+        let edition = Edition.current(["light"], lastKnown: nil, householdsPulled: false)
         for horizon in Horizon.allCases {
             for layout in [TodayLayout.oneColumn, .glance, .dayPage, .journal] {
                 #expect(!DailyGate.shows(horizon, edition: edition, layout: layout, phone: true))

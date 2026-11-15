@@ -77,7 +77,7 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 
 **Behaviour a change must keep:**
 - Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes. Anything the person does in that second (a tap on a flag or a peak, Undo, a compass point through VoiceOver) plants the flag first, under the parent shown when they let go, then takes effect (`WalkEvent.leavesAWaitingFlag`).
-- The walk listens on the phone only. Where on-device recognition is missing, this is known before anything is asked (`Dictation.cannotListenHere`): the walk begins with speech off (its lesson teaches typing), and no permission prompt is ever shown.
+- The walk listens on the phone only. Whether it can is decided at the first real hold, never when the walk is made (ruling D23, `Dictation.onDeviceStart`): on-device support reported, the prompts as needed; none reported with Speech Recognition already decided, typing with no prompt; none reported and never asked, Speech Recognition is asked for, the support read again, and the microphone never asked for while it is still none. Unavailable opens typing, as before.
 - The stage's words stop growing at extra large (`.dynamicTypeSize(...xLarge)` on the stage): its layout is fixed stage points.
 - A peak's label offers its text the pill's width and no more: a long custom area name scales down, then truncates, inside its pill.
 - The top shade is drawn between the painting and the world: it darkens the painting behind the words and never dims a flag or a label.
@@ -117,7 +117,7 @@ Not designed yet:
 - There the system status column overlaps the raised ending sheet's top-right corner.
 - The walk stays reachable by VoiceOver under the half-open display.
 
-**Speech is shared with Tell.** `Dictation` (`Views/Capture/TellSheet.swift`) serves both. What Tell must keep: its record-only session (others ducked, the session let go on stop), `stop()` as a cancel, and recognition that may use the server when on-device is unsupported. The walk's instance sets `playsAlongside` (its sounds play while it listens) and `onDeviceOnly` (never a server: no on-device recogniser opens typing), and uses `finish()` and `onEnd`. With `onDeviceOnly` and no on-device recogniser for the phone's language, `start()` reports speech unavailable before either permission is asked (`cannotListenHere`); with `onDeviceOnly` false (Tell in a full household) that check is never true and its start is exactly as before.
+**Speech is shared with Tell.** `Dictation` (`Views/Capture/TellSheet.swift`) serves both. What Tell must keep: its record-only session (others ducked, the session let go on stop), `stop()` as a cancel, and recognition that may use the server when on-device is unsupported. The walk's instance sets `playsAlongside` (its sounds play while it listens) and `onDeviceOnly` (never a server: no on-device recogniser opens typing), and uses `finish()` and `onEnd`. With `onDeviceOnly`, `start()` decides by `onDeviceStart` (D23) at that start: never before the first use, and at most one prompt on a phone that cannot recognise on the device; with `onDeviceOnly` false (Tell in a household known to be full) none of it runs and its start is exactly as before.
 
 **Launch arguments** (Debug, with `-SymphonyDemo`; add `-SymphonyLight` for the light edition):
 - `-SymphonyWalk`: open the walk over an empty store.
@@ -139,10 +139,17 @@ exceptions the ledger keeps as deferred (for one, the bar's keyboard-rise condit
 `docs/superpowers/plans/2026-11-14-iphone-light-daily.md` (its "As built" records every ruling).
 
 **The edition, before the first pull.** `AppState.edition` comes from `Edition.current`: until this
-sign-in's first pull has finished, only what was remembered for this person (`EditionMemory`), and with
-nothing remembered it is full; nothing is remembered before the pull; `applyEdition` runs again when the
-pull finishes. So a fresh install, or another account's household row left on the phone (sign-out keeps the
-store), never shows a light page. Sign-out (`AppState.signedOut`) resets the page, the date, the edition,
+sign-in's `households` rows have been pulled (`SyncEngine` reports that step on its own, before the other
+fifteen tables: `AppState.householdsPulled`, ruling D24), only what was remembered for this person
+(`EditionMemory`), and with nothing remembered it is full; nothing is remembered before the rows are in;
+`applyEdition` runs again then, fetching the rows (not the `@Query`, which may lag). So a fresh install, or
+another account's household row left on the phone (sign-out keeps the store), never shows a light page, and
+a brand-new light person sees the full app only for the one households request: from sign-in, the old Today
+and the full dock; as the households rows land, light Today (scenery, "nothing today", the bar, no dock);
+when the whole first pull is in, the walk fades in over it. A failed households pull leaves the edition not
+light; the next try is the resync when the app comes back to the foreground. Until the edition is known
+(pulled, or remembered: `AppState.editionKnown`) speech stays on the phone everywhere, Tell included
+(`DailyGate.speechOnPhoneOnly(edition:known:)`, ruling D25). Sign-out (`AppState.signedOut`) resets the page, the date, the edition,
 Inbox or More and the dock flag; a waiting Tell is dropped in a light household and kept in a full one
 (as before the light edition: a Tell asked while signed out opens after sign-in).
 
@@ -281,7 +288,10 @@ two (`DailyMetrics.quietLines`).
 - The bar's light carries `.startsMediaSession` while a tap would start listening (`DailyBar.tapStartsListening`); the bands' painting is `Image(decorative:)`.
 - A Tell asked during a walk-down is answered only if it returns to Today (`DailyWalkDown.keepsTell`); otherwise it is dropped.
 - "‹Month› ends" shows only when that month holds a goal of mine; "It’s on …" names the month when it is not this one.
-- Every write (`add`, `move`, `setFirst`, `toggle`) reads the day first; the model is made again when the household's seasons change.
+- Every write (`add`, `move`, `setFirst`, `toggle`) reads the day first. The model keeps the seasons it was made with (it is not made again behind the person's back: the household list empties for a moment in every resync, and a remake would drop a draft, an Undo and a listen).
+- A change of horizon lets the bar go only when the page changes (`DailyGate.pageChanges`): on the spread Today and Week are one page.
+- A Tell's deferred tap is dropped if a walk opened meanwhile.
+- Before the edition is known speech stays on the phone (D25); on-device speech is decided at the first use (D23).
 - Month, Season and Year open where the person is when they have goals there, else on the walk's period, and the heading switches between the two (`DailyPeriods`); Week's band and the signposts read the current month first. The walk's own periods are unchanged.
 
 **Debug launch arguments** (with `-SymphonyDemo -SymphonyLight`):

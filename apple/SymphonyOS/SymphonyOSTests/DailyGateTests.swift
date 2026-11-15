@@ -42,6 +42,13 @@ struct DailyGateTests {
 
     @Test func lightSpeechIsPhoneOnlyAndFullIsAsBefore() {
         #expect(DailyGate.speechOnPhoneOnly(edition: .light)); #expect(!DailyGate.speechOnPhoneOnly(edition: .full))
+        // Ruling D25: not yet known (it reads full then), speech stays on the phone; only a known full household may use the server.
+        #expect(DailyGate.speechOnPhoneOnly(edition: .full, known: false))
+        #expect(DailyGate.speechOnPhoneOnly(edition: .light, known: false))
+        #expect(!DailyGate.speechOnPhoneOnly(edition: .full, known: true))
+        #expect(Edition.known(lastKnown: nil, householdsPulled: false) == false)
+        #expect(Edition.known(lastKnown: .full, householdsPulled: false))
+        #expect(Edition.known(lastKnown: nil, householdsPulled: true))
     }
 
     @Test func aWalkLeftPartWayIsWaiting() {
@@ -344,5 +351,16 @@ struct DailyGateTests {
         #expect(DailyGate.plannerSize(measured: upright, kept: flat, keyboardUp: true) == upright)
         #expect(DailyGate.plannerSize(measured: CGSize(width: 890, height: 700), kept: flat, keyboardUp: true).height == 700)
         #expect(DailyGate.plannerSize(measured: flat, kept: .zero, keyboardUp: true) == flat)
+    }
+
+    /// Residual patch: a change of horizon lets the bar go only when the page changes. On the spread
+    /// Today and Week are one page (a pending Remove keeps its Undo); on a phone they are two.
+    @Test func onlyAChangeOfPageLetsTheBarGo() {
+        #expect(!DailyGate.pageChanges(from: .today, to: .week, layout: .journal))
+        #expect(!DailyGate.pageChanges(from: .week, to: .today, layout: .journal))
+        #expect(DailyGate.pageChanges(from: .week, to: .month, layout: .journal))
+        #expect(DailyGate.pageChanges(from: .today, to: .week, layout: .oneColumn))
+        #expect(DailyGate.pageChanges(from: .month, to: .season, layout: .oneColumn))
+        #expect(!DailyGate.pageChanges(from: .month, to: .month, layout: .oneColumn))
     }
 }

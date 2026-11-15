@@ -69,7 +69,8 @@ enum DailyAdd {
     /// Whether the phrase the parser matched said a time, so the time is kept as a time. The parser
     /// marks only a colon, "am", "pm" or "o'clock" (`hasTime`); a date it found with no time reads
     /// noon, so any other clock time was said too ("at 3 tomorrow": 3:00 pm), and so was noon itself
-    /// when "noon" or "midday" left the words with the phrase ("lunch at noon").
+    /// when "noon" or "midday" left the words with the phrase ("lunch at noon") or the words say
+    /// "at 12" ("lunch at 12 tomorrow").
     static func saidATime(_ parsed: CaptureParser.Result, words: String) -> Bool {
         guard let date = parsed.date else { return false }
         if parsed.hasTime { return true }
@@ -78,7 +79,8 @@ enum DailyAdd {
         func names(_ text: String) -> Bool {
             text.range(of: #"\b(noon|midday)\b"#, options: [.regularExpression, .caseInsensitive]) != nil
         }
-        return names(words) && !names(parsed.title)
+        if names(words) && !names(parsed.title) { return true }
+        return words.range(of: #"\bat\s+12\b"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     /// The title with a last lone "at" taken off: what a time leaves behind when the parser takes

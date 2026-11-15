@@ -81,16 +81,21 @@ struct iOSMainView: View {
         let edition: Edition
         if let demoEdition {
             edition = demoEdition
+            appState.editionKnown = true
         } else {
-            // Before this sign-in's first pull the rows may be none yet or another account's:
-            // only this person's memory counts, else full (`Edition.current`); nothing is
-            // remembered until the pull is in.
+            // Before this sign-in's households rows are pulled they may be none yet or another
+            // account's: only this person's memory counts, else full (`Edition.current`); nothing is
+            // remembered until they are in. The rows are fetched now, not read from the `@Query`,
+            // which may lag the pull, so a full household never reads light for a moment (D24).
             let memory = EditionMemory()
             let userId = auth.currentUser?.id
-            let editions = households.map(\.edition)
-            let pulled = appState.initialSyncFinished
-            edition = Edition.current(editions, lastKnown: memory.lastKnown(for: userId), firstPullFinished: pulled)
-            if Edition.remembers(editions, firstPullFinished: pulled) { memory.remember(edition, for: userId) }
+            let rows = (try? modelContext.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+            let editions = rows.map(\.edition)
+            let pulled = appState.householdsPulled
+            let lastKnown = memory.lastKnown(for: userId)
+            edition = Edition.current(editions, lastKnown: lastKnown, householdsPulled: pulled)
+            appState.editionKnown = Edition.known(lastKnown: lastKnown, householdsPulled: pulled)
+            if Edition.remembers(editions, householdsPulled: pulled) { memory.remember(edition, for: userId) }
         }
         let changedToLight = edition == .light && appState.edition != .light
         // No longer light (an invite accepted, the household row synced): the dock is back at
@@ -182,7 +187,9 @@ struct iOSMainView: View {
             appState.walkResumeRequested = false
         }
         .onChange(of: households.map(\.edition)) { _, _ in applyEdition() }
-        // The first pull is in (or a new sign-in starts over): the edition is read again first.
+        // This sign-in's households rows are in (before the rest of the pull), or a new sign-in starts
+        // over: the edition is read again (`SyncEngine` `onHouseholds`, ruling D24).
+        .onChange(of: appState.householdsPulled) { _, _ in applyEdition() }
         .onChange(of: appState.initialSyncFinished) { _, _ in applyEdition(); considerWalk() }
         .onChange(of: appState.edition) { _, _ in considerWalk() }
         .onChange(of: appState.walkReplayRequested) { _, _ in considerWalk() }
@@ -335,7 +342,7 @@ extension iOSMainView {
         // The edition from the same rows the decision read (the demo's is its launch argument).
         let edition = demo ? appState.edition
             : Edition.current(householdRows.map(\.edition), lastKnown: EditionMemory().lastKnown(for: userId),
-                              firstPullFinished: appState.initialSyncFinished)
+                              householdsPulled: appState.householdsPulled)
         let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
                               edition: edition, seasons: householdRows.first?.seasons,
                               store: store, listener: opening.listener)

@@ -110,8 +110,6 @@ import Observation
         self.handoverMemory = handoverMemory
         self.parse = parse
         self.writer = DailyWriter(context: context, userId: userId, periods: periods)
-        // A phone that can never listen here: the bar types from the start, and nothing is asked.
-        if self.listener.cannotListenHere { bar.speechOff = true }
     }
 
     /// Torn down with a pull-up pending: it is written, straight through the writer
@@ -175,9 +173,9 @@ import Observation
         switch answer {
         case .listen, .focusField:
             // With speech off the reducer asks for the field. Still idle when it runs: a tap that started
-            // listening meanwhile is not turned into a second tap.
-            scheduler.run { [weak self] in
-                guard let self, !self.bar.isListening else { return }
+            // listening meanwhile is not turned into a second tap; and no walk opened over the page meanwhile.
+            scheduler.run { [weak self, weak app] in
+                guard let self, !self.bar.isListening, app?.walkShowing != true else { return }
                 self.send(.micTapped)
             }
         case .none, .wait, .leaveAlone, .oldSheet, .covered: break

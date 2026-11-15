@@ -379,26 +379,24 @@ struct WalkModelTests {
         #expect(!Dictation.mayListen(onDeviceOnly: true, supportsOnDevice: false))
         #expect(Dictation.mayListen(onDeviceOnly: false, supportsOnDevice: false))   // Tell, as before
         #expect(!Dictation().onDeviceOnly)
-        // Tell (server allowed) never refuses before asking: its start is as it was.
-        #expect(!Dictation().cannotListenHere)
     }
 
-    /// Final review 2 I3: on a phone that cannot recognise speech on the device, the walk knows before
-    /// anything is asked: it begins by typing (its lesson teaches typing), and a hold never starts the
-    /// listener, so no permission prompt is ever shown.
-    @Test func aPhoneThatCannotListenBeginsTheWalkTyping() throws {
-        let ctx = try walkTestContext()
-        listener.cannotListenHere = true
-        let m = model(ctx)
-        #expect(m.state.speechIsOff)
-        m.choose(.quick)
-        #expect(m.state.lightSymbol == nil || m.state.lightSymbol == "keyboard")
-        m.send(.orbDown)
-        m.send(.orbUp(heldMs: 900))
-        m.send(.orbDown)
-        m.send(.orbUp(heldMs: 80))
-        #expect(listener.starts == 0)
+    /// Ruling D23: on the phone only, speech is decided at the first real start, in an order that cannot
+    /// switch it off wrongly. Support reported: as always. None, and Speech Recognition already decided:
+    /// unavailable, no prompt. None, and never asked: ask for Speech Recognition, read the support again,
+    /// and only then decide (the microphone is never asked for while it is still none).
+    @Test func onDeviceSpeechIsDecidedAtTheFirstStart() {
+        let table: [(supports: Bool, asked: Bool, start: Dictation.OnDeviceStart)] = [
+            (true, false, .proceed), (true, true, .proceed),
+            (false, true, .unavailable), (false, false, .askSpeechThenReread),
+        ]
+        for row in table {
+            #expect(Dictation.onDeviceStart(supportsOnDevice: row.supports, speechAsked: row.asked) == row.start)
+        }
+        // Nothing is decided when a model is made: a new walk and a new bar both still listen on the first use.
+        #expect(!Dictation().onDeviceOnly)
     }
+
 
     /// Final review 2 (minor): Leave for now says "Your place is kept." only in a walk that keeps it;
     /// a walk-down (no store) is never stored and says nothing of the kind.

@@ -107,8 +107,10 @@ struct LightPlannerView<Full: View>: View {
         }
         .onChange(of: hidesDock) { _, hides in appState.dailyHidesDock = hides }
         // Another page: a listen on the one left never carries over to it (Today and Week share a frame,
-        // so nothing else tells the bar Today went away).
-        .onChange(of: appState.horizon) { _, _ in model?.send(.left) }
+        // so nothing else tells the bar Today went away). On the spread they are one page: nothing goes.
+        .onChange(of: appState.horizon) { old, new in
+            if DailyGate.pageChanges(from: old, to: new, layout: layout) { model?.send(.left) }
+        }
         // Set down half open: the page stays, inert, and lets go of the keyboard; its bar stops and
         // the display's own bar takes over. Opened flat: the page is as it was, on today's day.
         .onChange(of: covered) { _, covered in
@@ -139,8 +141,6 @@ struct LightPlannerView<Full: View>: View {
             appState.dailyLastDay = turn.lastDay
         }
         .onChange(of: auth.currentUser?.id) { _, _ in makeModel() }
-        // The household's seasons arrived (the first pull) or changed (Settings): the model's periods are read again.
-        .onChange(of: seasons) { _, _ in makeModel() }
         .onChange(of: scenePhase) { _, phase in model?.sceneChanged(DailyModel.Scene(phase)) }
         .task {
             while !Task.isCancelled {
@@ -192,7 +192,6 @@ struct LightPlannerView<Full: View>: View {
             model = nil
             return
         }
-        let old = model
         model?.close()
         #if DEBUG
         let listener = DemoMode.isOn ? DemoMode.dailyListener : nil    // `-SymphonyDailyState speak`
@@ -204,16 +203,8 @@ struct LightPlannerView<Full: View>: View {
         let memory = SignpostMemory()
         let handoverMemory = HandoverMemory()
         #endif
-        let made = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory,
-                              handoverMemory: handoverMemory)
-        // Made again under a page that stays up (the seasons changed in Settings): the page on screen,
-        // its week and where its goals hang are kept, since the page does not appear again to set them.
-        if let old {
-            made.page = old.page
-            made.week = old.week
-            made.hanging = old.hanging
-        }
-        model = made
+        model = DailyModel(context: modelContext, userId: userId, seasons: seasons, listener: listener, memory: memory,
+                           handoverMemory: handoverMemory)
         if covered { model?.cover() }
     }
 

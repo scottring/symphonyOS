@@ -1034,8 +1034,8 @@ on every band and behind the walk (Tasks A1 and A2, see `apple/SymphonyOS/PLANNI
 three final reviews of the whole branch (seams; the walk and the painting; what the pages read and
 write), and one fix wave answering them (`.superpowers/sdd/2026-11-14-iphone-light-daily/final-fix-wave.md`,
 its addendum, and `final-fix-report.md`). Nothing is pushed, merged into main or deployed, and nothing in
-this plan needs a database, server or web change. On the iPhone 17 simulator the unit target passes 1111
-tests in 75 suites after the fix wave, and so do the UI classes (`WalkUITests`, `LightEditionUITests`,
+this plan needs a database, server or web change. On the iPhone 17 simulator the unit target passes 1115
+tests in 75 suites after the fix wave and its residual patch, and so do the UI classes (`WalkUITests`, `LightEditionUITests`,
 `LightDailyUITests`, `LightSpreadUITests`, `FullHouseholdUnchangedUITests`, `PlannerScreensUITests`), each
 alone and all together in one run. Nobody has spoken to the bar, typed into it, heard it with VoiceOver
 or held a real Duo: the hand walk below is still the gate.
@@ -1108,9 +1108,10 @@ or held a real Duo: the hand walk below is still the gate.
 
 ### What the final fix wave changed (2026-11-14)
 
-- **The edition is never guessed.** Until this sign-in's first pull has finished, the edition is only
-  what was remembered for this person, and with nothing remembered it is full (`Edition.current`); nothing
-  is remembered before the pull. So a full household on a fresh install, or signing in after a light
+- **The edition is never guessed.** Until this sign-in's households rows are pulled (reported by the sync
+  engine before the rest of the first pull, D24), the edition is only what was remembered for this person,
+  and with nothing remembered it is full (`Edition.current`); nothing is remembered before then. A brand-new
+  light person sees the full app only for that one request, then light Today, then the walk. So a full household on a fresh install, or signing in after a light
   account on the same phone, never sees a light page. Signing out resets the page, the date, the edition,
   Inbox or More and the dock flag; a full household's waiting Tell is kept across sign-in (as before the
   light edition), a light one's is dropped.
@@ -1125,10 +1126,10 @@ or held a real Duo: the hand walk below is still the gate.
   tapped (D22). A Tell from Week or a mountain page ends on Today with the bar listening (the tap goes through
   the scheduler); Details, an inactive scene and a change of page let the bar go; on the Duo's inside
   screens the keyboard alone never changes the layout; the "‹Month› ends" sign needs something of mine in
-  that month; the model is remade when the seasons change; every write reads the day first.
+  that month; every write reads the day first.
 - **The walk.** Its text stops growing at extra large; an interrupted walk in a household that is not light
-  only waits in Settings ("Pick the walk back up"); with speech on the phone only and none on the phone, the
-  walk and the bar begin by typing and nothing is asked; a custom area's name stays in its pill; the top shade
+  only waits in Settings ("Pick the walk back up"); on-device speech is decided at the first hold, asking at
+  most once on a phone that cannot (D23); a custom area's name stays in its pill; the top shade
   is drawn under the flags; a missed layout state is logged, not a crash; Leave for now in a walk-down does
   not say the place is kept; the light reads "task" on Week and Today and is a media-session control to VoiceOver.
 - **Month, Season and Year open where you are** (the owner's decision below).
@@ -1159,6 +1160,10 @@ or held a real Duo: the hand walk below is still the gate.
 20. **D20** (lane A) A band's cut of the painting holds only the part of its square frame that can ever show (decoded 2.7 to 11.2 MB each, down from 9 to 33.5). If wrong: a sliver of unpainted frame if a band ever shows more than the core says (tested on every listed window).
 21. **D21** The listening line is not announced to VoiceOver; the light's label and value carry the state (an announcement while the recogniser is live can be transcribed into the field). If wrong: a VoiceOver user hears no spoken "Listening", only the light's changed name.
 22. **D22** Typed words are never thrown away: a tap on the light with words in the field starts listening, and what is heard is added after them. If wrong: an unexpected joined sentence the person can edit.
+23. **D23** On-device speech is decided at the first real start, never latched when a model is made: support reported, as always; none with Speech Recognition already decided, unavailable with no prompt; none and never asked, Speech Recognition is asked for and the support read again before the microphone. Why: nobody can confirm the support reads true before authorization on a real iPhone, and a wrong "no" would switch speech off on every phone. If wrong: a phone that truly cannot gets one prompt before it types.
+24. **D24** The edition is read as soon as this sign-in's households rows are pulled, not when the whole first pull is in. If wrong: a brand-new light person sees the full app for the whole first pull.
+25. **D25** Speech stays on the phone unless the household is known to be full (rows pulled, or remembered). If wrong: a brand-new full household's Tell is on-device only for the seconds before its households rows land.
+26. **D26** After a sign-out the next sign-in opens Today on today's date, for every household (one person's page and date never greet the next). A small change for a full household too; the owner is told. If wrong: two lines in `signedOut()`.
 
 The 17 consistency amendments of the pre-flight scan were adopted as written. The controller also ruled
 that a handover line shown even for a second counts as seen (Task 16; recorded earlier under the owner's
@@ -1194,6 +1199,11 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - A walk opening commits a pending Remove (its Undo is lost); so does lowering the handle.
 - A tick or a first-thing mark ends the Undo of a move before it.
 - The mountain pages cross the fold on the spread, as the walk does.
+- The light pages' model keeps the household seasons it was made with: a custom-season change in Settings reaches walk-downs only after a relaunch (re-review B-I3: remaking it dropped drafts and Undo in every resync).
+- A no-day add on Week in the minute after midnight at the week's turn may file into the week the page still shows (B-M5).
+- A light household on an iPad: Inbox → Today makes no "chosen for today" row (B-M6).
+- A sign's walk-down where the month and the season the signs read come from different sides of the rule (B-M8).
+- A possible flash of the old Today as a light household signs out (B-M9; also on the hand-walk list below).
 - When email confirmation is required, sign-up ends silently (release checklist).
 - The demo's walk mints new ids each launch, so footing differs between demo shots; make them fixed before App Store screenshots.
 - The launch helper's relaunch path has never run against a real bad launch.
@@ -1216,6 +1226,8 @@ Each is in the ledger (`.superpowers/sdd/2026-11-14-iphone-light-daily/progress.
 - **The handover** on a real phone: the light's travel and speed.
 - A demo on a real phone must be started from the Mac with its launch arguments; a tap on the icon opens the real sign-in.
   Do not pin the date on the device (`-SymphonyDailyNow`): the walk reads the real clock, so its flags would land in periods the pinned pages do not open.
+- **First hold of the light on a real phone** (walk and bar): the prompts appear, then it listens (D23).
+- A possible flash of the old Today when signing out of a light household (B-M9).
 - **Owed by hand after the final fix wave:** the first hold's permission sequence (two prompts, then listening;
   and on a phone with no on-device speech, no prompt at all); the Duo's keyboard on its inside screens (the
   page must not flip to the old planner); a Tell from the Lock Screen while Week shows (Today, listening); text
