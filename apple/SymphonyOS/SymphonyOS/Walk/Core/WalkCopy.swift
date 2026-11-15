@@ -358,15 +358,16 @@ enum WalkCopy {
         /// `focused`: the goal above the step is about; `focusedOfSeveral`: the same, with another
         /// one above in the area stood in, which a tap switches to.
         case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example, stub(Int)
-        /// Today's first thing, not planted by this walk, the goal above on the Today step: a tap
-        /// goes on to the next week task in the area stood in.
-        case firstThingFocused
+        /// Today's first thing on the Today step: `firstThingFocused` while it is the goal above (a
+        /// tap goes on to the next week task here); `firstThingFocusable`, not planted by this walk,
+        /// while another is (a tap makes it the goal above).
+        case firstThingFocusable, firstThingFocused
         /// A tap does something: the label says what. A plain flag, someone else's first thing,
         /// or the only goal above, is only read.
         var taps: Bool {
             switch self {
             case .plain, .firstThing, .focused: return false
-            case .mine, .focusedOfSeveral, .firstThingMine, .firstThingFocused, .example, .stub:
+            case .mine, .focusedOfSeveral, .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub:
                 return true
             }
         }
@@ -382,6 +383,7 @@ enum WalkCopy {
         case .focusedOfSeveral: return "\(withTag), the goal this step is about, tap for the next one here"
         case .firstThing: return "Today: \(text), first thing"
         case .firstThingMine: return "Today: \(text), first thing, tap to remove"   // planted by the walk
+        case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"
         case .firstThingFocused: return "Today: \(text), first thing, tap for the next one here"
         case .example: return "Example: \(text), tap to make it yours"
         case .stub(let n): return "\(n) more, tap to show"

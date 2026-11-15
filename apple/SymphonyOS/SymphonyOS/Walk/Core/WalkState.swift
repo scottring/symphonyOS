@@ -80,7 +80,9 @@ struct WalkState: Equatable {
         switch event {
         case .areaTapped(let id): return tapArea(id)
         case .bannerTapped(let id):
-            // A flag on the step's own level (on Today, the first thing) is selected; one level up, focused.
+            // The goal above is the switch, whoever planted it (on Today the first thing too); any
+            // other flag on the step's own level (on Today, the first thing) is selected.
+            if let level, id == focus[level] { return focusParent(id) }
             if selects(id) { return select(id) }
             return focusParent(id)
         case .noteExpired:
@@ -341,12 +343,18 @@ struct WalkState: Equatable {
         return parentsAnywhere().filter { column(of: $0) == here }
     }
 
-    /// Steps 2 to 5: every flag one level above the step's, in planting order. Today's first
-    /// thing is a week task too, but it is Today's own flag, never a goal above it. On a walk
-    /// down, only the flags of its own line (`walkingDown`).
+    /// Steps 2 to 5: every flag one level above the step's, in planting order (on Today every
+    /// week task, the first thing included: it is a week task like the others). On a walk down,
+    /// only the flags of its own line (`walkingDown`).
     private func parentsAnywhere() -> [WalkItem] {
         guard let level, level != .year, let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
-        return items(on: above).filter { (level != .today || $0.id != firstThing) && onWalkedLine($0) }
+        return items(on: above).filter(onWalkedLine)
+    }
+
+    /// The goals above the walk may settle on by itself: never Today's first thing, which is the
+    /// goal above only by "Start with this one" or a tap.
+    private func choosable(_ parents: [WalkItem]) -> [WalkItem] {
+        level == .today ? parents.filter { $0.id != firstThing } : parents
     }
 
     /// On a walk down, whether the flag's line (it, then its parents up) starts at the goal
@@ -354,7 +362,7 @@ struct WalkState: Equatable {
     private func onWalkedLine(_ item: WalkItem) -> Bool {
         guard !walkingDown.isEmpty else { return true }
         var at: WalkItem? = item
-        for _ in WalkLevel.allCases {
+        for _ in 0...WalkLevel.allCases.count {                // a chain is never deeper than year to Today
             guard let flag = at else { return false }
             if walkingDown.contains(flag.id) { return true }
             at = self.item(flag.parentId)
@@ -363,16 +371,22 @@ struct WalkState: Equatable {
     }
 
     /// Steps 2 to 5: where a tap on the goal the step is about goes: the next goal above here,
-    /// round again (none with only one). On Today the first thing, when it stands here, is one
-    /// of them, first in the round. Nil: a tap does nothing.
+    /// round again (on Today the first thing is one of them); none with only one.
     func nextGoalAbove() -> UUID? {
         guard let level, level != .year, let current = focus[level] else { return nil }
-        var round = parentsHere()
-        if level == .today, let first = item(firstThing), column(of: first) == standing, onWalkedLine(first) {
-            round.insert(first, at: 0)
-        }
+        let round = parentsHere()
         guard round.count > 1, let index = round.firstIndex(where: { $0.id == current }) else { return nil }
         return round[(index + 1) % round.count].id
+    }
+
+    /// The goal above after a tap on this flag, or nil when the tap does not change it: the
+    /// goal above itself walks the round; on Today a first thing the walk did not plant, while
+    /// it is not the goal above, becomes it (one the walk planted is selected instead).
+    func goalAboveAfterTap(on id: UUID) -> UUID? {
+        guard let level, level != .year else { return nil }
+        if id == focus[level] { return nextGoalAbove() }
+        guard level == .today, id == firstThing, let first = item(id), !first.mine, onWalkedLine(first) else { return nil }
+        return id
     }
 
     /// The post a flag stands on: its area when that area is kept, else the nameless
@@ -406,7 +420,7 @@ struct WalkState: Equatable {
                 focusArea = column(of: parent)
                 return
             }
-            if let parent = rememberedOrNewest(parentsHere()) {
+            if let parent = rememberedOrNewest(choosable(parentsHere())) {
                 focus[level] = parent.id
                 focusArea = column(of: parent)
                 return
@@ -414,7 +428,7 @@ struct WalkState: Equatable {
             focus[level] = nil
             let here = standing
             if items(on: level).contains(where: { column(of: $0) == here }) { return }
-            if let newest = parentsAnywhere().last {
+            if let newest = choosable(parentsAnywhere()).last {
                 focus[level] = newest.id
                 focusArea = column(of: newest)
                 return
@@ -449,7 +463,7 @@ struct WalkState: Equatable {
         guard (1...6).contains(step), kept.contains(id), id != standing else { return [] }
         focusArea = id
         if let level, level != .year {
-            focus[level] = rememberedOrNewest(parentsHere())?.id
+            focus[level] = rememberedOrNewest(choosable(parentsHere()))?.id
             follow(focus[level])
         } else {
             follow(focusArea)
@@ -457,10 +471,10 @@ struct WalkState: Equatable {
         return [.save]
     }
 
-    /// Steps 2 to 5: a tap on the goal the step is about switches (`nextGoalAbove`); with
+    /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with
     /// nowhere to go, nothing. No other goal above is drawn. A tap never changes the first thing.
     private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
-        guard let level, id == focus[level], let next = nextGoalAbove() else { return [] }
+        guard let level, let next = goalAboveAfterTap(on: id) else { return [] }
         focus[level] = next
         follow(next)
         return [.save]
@@ -497,6 +511,7 @@ enum WalkEffect: Equatable {
 
 enum WalkUndoEntry: Equatable {
     case plant(UUID), nameArea(WalkArea), keep(UUID), unkeep(UUID, index: Int)
-    case move(UUID, from: UUID?, keptAdded: UUID?), pullUp(WalkItem, index: Int, wasFirstThing: Bool)
+    /// `walkedAt`: where the pulled-up flag stood in `walkingDown`, if it started a walk down's line.
+    case move(UUID, from: UUID?, keptAdded: UUID?), pullUp(WalkItem, index: Int, wasFirstThing: Bool, walkedAt: Int?)
     case firstThing(previous: UUID?, created: UUID?)
 }

@@ -38,7 +38,10 @@ extension WalkState {
     /// under the focused parent and in its area, or, with none, in the area stood in.
     private mutating func plantFlag(_ said: WalkWords.Said, on level: WalkLevel,
                                     plantSoundMs: Int, _ env: WalkEnv) -> [WalkEffect] {
-        let parent = level == .year ? nil : item(focus[level])
+        var parent = level == .year ? nil : item(focus[level])
+        // On Today never under a flag whose own goal above is a week task (a first thing said
+        // earlier): beside it, under that week task, so no line grows deeper than year to Today.
+        while level == .today, let p = parent, let up = item(p.parentId), up.level == .week { parent = up }
         let areaId = parent?.areaId ?? standing
         // The first thing is a week task dated today, titled with everything that was said.
         let item = WalkItem(id: env.newId(), level: level == .today ? .week : level, title: said.title,
@@ -185,10 +188,11 @@ extension WalkState {
         guard let id = selected, let index = items.firstIndex(where: { $0.id == id }), items[index].mine
         else { return [] }
         let wasFirstThing = firstThing == id
+        let walkedAt = walkingDown.firstIndex(of: id)       // a walk down's own line, given back by Undo
         let item = items.remove(at: index)
         pulledChildren[id] = unlinkChildren(of: id)
         forget(id)
-        undo.append(.pullUp(item, index: index, wasFirstThing: wasFirstThing))
+        undo.append(.pullUp(item, index: index, wasFirstThing: wasFirstThing, walkedAt: walkedAt))
         undoShowing = true
         return [.write(.remove(id, item.level)), .sound(.poles, afterMs: 0),
                 .timer(.undo, ms: WalkState.undoMs), .save]
@@ -226,9 +230,12 @@ extension WalkState {
                     forget(keptAdded)
                 }
             }
-        case .pullUp(let item, let index, let wasFirstThing):
+        case .pullUp(let item, let index, let wasFirstThing, let walkedAt):
             if item.mine, self.item(item.id) == nil {
                 items.insert(item, at: min(index, items.count))
+                if let walkedAt, !walkingDown.contains(item.id) {
+                    walkingDown.insert(item.id, at: min(walkedAt, walkingDown.count))
+                }
                 for child in pulledChildren[item.id] ?? [] {
                     if let i = items.firstIndex(where: { $0.id == child }), items[i].parentId == nil {
                         items[i].parentId = item.id

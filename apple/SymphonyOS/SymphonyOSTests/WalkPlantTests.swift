@@ -434,7 +434,7 @@ struct WalkPlantTests {
             .write(.remove(m.deposit.id, .week)), .sound(.poles, afterMs: 0),
             .timer(.undo, ms: WalkState.undoMs), .save,
         ])
-        #expect(s.undo == [.pullUp(m.deposit, index: 1, wasFirstThing: true)])
+        #expect(s.undo == [.pullUp(m.deposit, index: 1, wasFirstThing: true, walkedAt: nil)])
 
         // A pulled-up year goal leaves its season flag standing, with no parent.
         var year = m.on(1, items: [m.strong, m.lift])
@@ -770,6 +770,93 @@ struct WalkPlantTests {
         everyTapThatSaysSoActs(alone)
     }
 
+    /// Fix round 2, path 1: two week tasks said on Week; on Today "Start with this one". A tap on
+    /// the goal above (the first thing, which the walk planted) reaches the other task; again,
+    /// it wraps to the same first thing and the Next line is Finish.
+    @Test func onTodayTheGoalAboveIsTheSwitchEvenWhenTheWalkPlantedIt() throws {
+        let tile = WalkItem(id: UUID(), level: .week, title: "Call the tile shop", areaId: m.home.id, day: m.today)
+        let gym = WalkItem(id: UUID(), level: .week, title: "Gym induction", areaId: m.home.id, day: m.today)
+        var s = m.on(5, items: [tile, gym])
+        s.kept = [m.home.id]
+        s.focusArea = m.home.id
+        s.lastPlanted[.week] = gym.id
+        _ = s.apply(.noteExpired, m.env)
+        #expect(s.focus[.today] == gym.id)
+        _ = s.act(.startThere, m.env)
+        #expect(s.firstThing == gym.id && s.focus[.today] == gym.id)
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.finish)
+        everyTapThatSaysSoActs(s)
+
+        #expect(s.apply(.bannerTapped(gym.id), m.env) == [.save])
+        #expect(s.focus[.today] == tile.id && s.selected == nil)
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.startWithThis)
+        everyTapThatSaysSoActs(s)
+
+        #expect(s.apply(.bannerTapped(tile.id), m.env) == [.save])
+        #expect(s.focus[.today] == gym.id && s.firstThing == gym.id)
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.finish)
+        everyTapThatSaysSoActs(s)
+    }
+
+    /// Fix round 2, path 2: Gym and Shoes; "pack the bag" said under Gym becomes the first thing.
+    /// The round visits all three and wraps without stopping; with Gym the goal above, a tap on
+    /// "pack the bag" selects it.
+    @Test func onTodayTheRoundVisitsASpokenFirstThingAndWraps() throws {
+        let gym = WalkItem(id: UUID(), level: .week, title: "Gym", areaId: m.home.id, day: m.today)
+        let shoes = WalkItem(id: UUID(), level: .week, title: "Shoes", areaId: m.home.id, day: m.today)
+        var s = m.on(5, items: [gym, shoes])
+        s.kept = [m.home.id]
+        s.focusArea = m.home.id
+        s.lastPlanted[.week] = shoes.id
+        _ = s.apply(.noteExpired, m.env)
+        _ = s.apply(.bannerTapped(shoes.id), m.env)            // round again to Gym
+        #expect(s.focus[.today] == gym.id)
+        _ = s.plant("pack the bag", m.env)
+        let pack = try #require(s.items.last)
+        #expect(s.firstThing == pack.id && pack.parentId == gym.id && s.focus[.today] == gym.id)
+        everyTapThatSaysSoActs(s)
+
+        var visited: [UUID] = []
+        for _ in 0..<3 {
+            let focused = try #require(s.focus[.today])
+            #expect(s.apply(.bannerTapped(focused), m.env) == [.save])
+            visited.append(try #require(s.focus[.today]))
+            #expect(s.firstThing == pack.id && s.selected == nil)
+            #expect(WalkCopy.nextLine(s, m.env.periods)?.text
+                    == (s.focus[.today] == pack.id ? WalkCopy.finish : WalkCopy.startWithThis))
+            everyTapThatSaysSoActs(s)
+        }
+        #expect(visited == [shoes.id, pack.id, gym.id])         // all three, and round again
+
+        _ = s.apply(.bannerTapped(pack.id), m.env)              // not the goal above: chosen for Remove
+        #expect(s.selected == pack.id && s.focus[.today] == gym.id)
+    }
+
+    /// Fix round 2 (d): something said on Today never hangs under a flag whose own goal above is a
+    /// week task. Said while a spoken first thing is the goal above, it lands beside it, under the
+    /// week task; on a walk down that keeps it on the walk's line.
+    @Test func aFirstThingSaidUnderAnotherHangsBesideIt() throws {
+        let book = WalkItem(id: UUID(), level: .month, title: "Book the gym", areaId: m.health.id, parentId: m.lift.id)
+        let induction = WalkItem(id: UUID(), level: .week, title: "Gym induction", areaId: m.health.id,
+                                 parentId: book.id, day: m.today)
+        var s = m.on(5, items: [m.strong, m.lift, book, induction])
+        s.kept = [m.health.id]
+        s.focusArea = m.health.id
+        s.walkingDown = [m.strong.id]
+        s.focus[.today] = induction.id
+        _ = s.plant("pack the bag", m.env)
+        let pack = try #require(s.items.last)
+        #expect(pack.parentId == induction.id)
+        _ = s.apply(.bannerTapped(induction.id), m.env)         // round on to the spoken first thing
+        #expect(s.focus[.today] == pack.id)
+        _ = s.plant("fill the bottle", m.env)
+        let bottle = try #require(s.items.last)
+        #expect(bottle.parentId == induction.id)                // beside it, never under it
+        #expect(s.firstThing == bottle.id)
+        #expect(s.parentsHere().map(\.id) == [induction.id, pack.id, bottle.id])   // still the walk's line
+        everyTapThatSaysSoActs(s)
+    }
+
     /// Each drawn flag's tap, sent to the reducer: it acts exactly when the flag says it takes a tap.
     private func everyTapThatSaysSoActs(_ s: WalkState, sourceLocation: SourceLocation = #_sourceLocation) {
         let layout = WalkLayout.make(s, today: m.today, footing: .level)
@@ -811,6 +898,37 @@ struct WalkPlantTests {
     }
 
     // MARK: Walk another one down
+
+    /// Fix round 2: Undo of Pull it up gives back what the pull-up took from a walk down's own
+    /// lines: the walked goal, and a flag the walk down planted with no goal above. Skipping
+    /// Season after that still borrows nothing of another goal's line.
+    @Test func undoingAPullUpOnAWalkDownKeepsItsLines() throws {
+        var s = m.on(6, items: [m.strong, m.bathroom, m.lift])
+        #expect(s.apply(.walkAnother, m.env) == [.save])
+        #expect(s.walkingDown == [m.bathroom.id])
+        _ = s.act(.back, m.env)                                // up to Year
+        #expect(s.step == 1)
+        _ = s.apply(.bannerTapped(m.bathroom.id), m.env)       // the walked goal, chosen
+        _ = s.apply(.pullUp, m.env)
+        _ = s.apply(.undo, m.env)
+        #expect(s.walkingDown == [m.bathroom.id])
+
+        _ = s.act(.next, m.env)                                // Season, about the walked goal
+        #expect(s.focus[.season] == m.bathroom.id)
+        _ = s.act(.next, m.env)                                // Season skipped
+        #expect(s.step == 3)
+        #expect(s.focus[.month] == nil)                        // never "Lift twice a week"
+        _ = s.plant("call the tiler", m.env)
+        let tiler = try #require(s.items.last)
+        #expect(tiler.parentId == nil)
+
+        _ = s.apply(.bannerTapped(tiler.id), m.env)
+        _ = s.apply(.pullUp, m.env)
+        _ = s.apply(.undo, m.env)
+        #expect(s.walkingDown == [m.bathroom.id, tiler.id])
+        _ = s.act(.next, m.env)                                // Week: about the tiler, this walk down's own
+        #expect(s.focus[.week] == tiler.id)
+    }
 
     /// At the ending, with a year goal not yet walked: Season in a quick walk on that
     /// goal, and nothing of the chain just walked left to steer the next one.

@@ -779,9 +779,10 @@ private struct Builder {
     func role(_ item: WalkItem, todayBand: Bool) -> WalkCopy.BannerRole {
         if todayBand || (s.step == 5 && item.id == s.firstThing) {
             guard s.step == 5 else { return .firstThing }
+            // The goal above walks the round, whoever planted it; else the walk's own is chosen for Remove.
+            if s.focus[.today] == item.id { return s.nextGoalAbove() != nil ? .firstThingFocused : .firstThing }
             if item.mine { return .firstThingMine }
-            // Not planted by this walk: while it is the goal above, a tap walks on round the week tasks here.
-            return s.focus[.today] == item.id && s.nextGoalAbove() != nil ? .firstThingFocused : .firstThing
+            return s.goalAboveAfterTap(on: item.id) != nil ? .firstThingFocusable : .firstThing
         }
         guard s.step < 6, !s.ground, let level else { return .plain }
         if item.level == level { return item.mine ? .mine : .plain }

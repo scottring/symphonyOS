@@ -102,7 +102,7 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Settings"], "Settings")
         tap(app.buttons["Pick the walk back up"], "Pick the walk back up")
         XCTAssertTrue(orb.waitForExistence(timeout: 30), "the walk was not picked back up")
-        XCTAssertTrue(app.staticTexts["What would make the year ahead a good one?"].waitForExistence(timeout: 15),
+        XCTAssertTrue(app.staticTexts["What would make this a good year for your health?"].waitForExistence(timeout: 15),
                       "not back on Year")
         XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15),
                       "the flag planted before leaving is gone")

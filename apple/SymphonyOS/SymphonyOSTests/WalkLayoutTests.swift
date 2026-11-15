@@ -712,7 +712,7 @@ struct WalkLayoutTests {
         t.firstThing = week.id
         #expect(WalkLayout.make(t, today: today, footing: .level).banners(on: .today).first?.taps == true)
         t.items[0].mine = false
-        #expect(WalkLayout.make(t, today: today, footing: .level).banners(on: .today).first?.taps == false)      // a tap never makes it the goal above
+        #expect(WalkLayout.make(t, today: today, footing: .level).banners(on: .today).first?.taps == true)       // tap to focus
         t.step = 6
         #expect(WalkLayout.make(t, today: today, footing: .level).banners(on: .today).first?.taps == false)
     }
@@ -751,10 +751,10 @@ struct WalkLayoutTests {
         s.firstThing = week.id
         let label = WalkLayout.make(s, today: today, footing: .level).banners(on: .today).first?.label
         #expect(label == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingMine))
-        // Not planted by this walk: only read, and started with, still only read with no other week task here.
+        // Not planted by this walk: a tap makes it the goal above; then, with no other week task here, only read.
         s.items[0].mine = false
         let theirs = WalkLayout.make(s, today: today, footing: .level).banners(on: .today).first?.label
-        #expect(theirs == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThing))
+        #expect(theirs == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingFocusable))
         s.focus[.today] = week.id
         let focused = WalkLayout.make(s, today: today, footing: .level).banners(on: .today).first?.label
         #expect(focused == WalkCopy.bannerLabel(week.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThing))
