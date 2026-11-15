@@ -690,27 +690,41 @@ struct WalkPlantTests {
         #expect(s.items[0].day == m.today)
     }
 
+    /// The walk's own first thing is chosen for Pull it up by a tap while another task is the goal
+    /// above. Alone it is the goal above itself (fix round 3), and a tap on it does nothing.
     @Test func onTodayThePlantedFirstThingCanBePulledUp() {
-        var s = m.on(5)
+        var alone = m.on(5)
+        _ = alone.plant("call the plumber", m.env)
+        _ = alone.apply(.undoExpired, m.env)                   // settled, as after any event
+        let lone = alone.items[0]
+        #expect(alone.focus[.today] == lone.id)
+        let before = alone
+        #expect(alone.apply(.bannerTapped(lone.id), m.env).isEmpty)
+        #expect(alone == before)
+
+        let gym = WalkItem(id: UUID(), level: .week, title: "Gym induction", areaId: m.health.id, day: m.today)
+        var s = m.on(5, items: [gym])
+        _ = s.apply(.noteExpired, m.env)
+        #expect(s.focus[.today] == gym.id)
         _ = s.plant("call the plumber", m.env)
-        let first = s.items[0]
+        let first = s.items[1]
         _ = s.apply(.undoExpired, m.env)
 
         let tap = s.apply(.bannerTapped(first.id), m.env)
         #expect(s.selected == first.id)
         #expect(tap == [.sound(.tick, afterMs: 0)])
-        #expect(s.focus[.today] == nil)
+        #expect(s.focus[.today] == gym.id)
         #expect(s.moveTargets.isEmpty)                         // its area is inherited: Pull it up only
         #expect(s.apply(.moveTo(m.home.id), m.env).isEmpty)
 
         let pulled = s.apply(.pullUp, m.env)
-        #expect(s.items.isEmpty)
+        #expect(s.items == [gym])
         #expect(s.firstThing == nil)
         #expect(pulled == [
             .write(.remove(first.id, .week)), .sound(.poles, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save,
         ])
         _ = s.apply(.undo, m.env)
-        #expect(s.items == [first])
+        #expect(s.items == [gym, first])
         #expect(s.firstThing == first.id)
     }
 
@@ -868,6 +882,168 @@ struct WalkPlantTests {
                 #expect((after != s || !effects.isEmpty) == banner.taps, "\(banner.label)", sourceLocation: sourceLocation)
             }
         }
+    }
+
+    // MARK: Today, every state a tap can reach (fix round 3)
+
+    /// A Today seed: these areas kept, these flags, standing here, then settled as the reducer
+    /// leaves every state. `finishOutOfReach` marks a seed the last check skips (see there).
+    private struct TodaySeed {
+        let name: String; let state: WalkState; var finishOutOfReach = false
+    }
+
+    private func today(_ name: String, kept: [WalkArea], items: [WalkItem], standing: WalkArea?,
+                       firstThing: UUID? = nil, lastPlanted: UUID? = nil, walkingDown: [UUID] = [],
+                       say: String? = nil) -> TodaySeed {
+        var s = m.on(5, items: items)
+        s.kept = kept.map(\.id)
+        s.focusArea = standing?.id
+        s.firstThing = firstThing
+        s.walkingDown = walkingDown
+        if let lastPlanted { s.lastPlanted[.week] = lastPlanted }
+        _ = s.apply(.noteExpired, m.env)
+        if let say { _ = s.plant(say, m.env); _ = s.apply(.undoExpired, m.env) }
+        s.undo = []
+        return TodaySeed(name: name, state: s)
+    }
+
+    private func week(_ title: String, _ area: WalkArea?, mine: Bool = true, under parent: UUID? = nil) -> WalkItem {
+        WalkItem(id: UUID(), level: .week, title: title, areaId: area?.id, parentId: parent, day: m.today, mine: mine)
+    }
+
+    /// The seeds: one, two and three kept areas; none, one and several week tasks an area; an area
+    /// whose only week task is the first thing; a first thing marked (Start with this one, reached
+    /// in the search) and one spoken; the walk's own and another's; a first walk and a walk down;
+    /// a loose week task on the nameless post.
+    private func todaySeeds() -> [TodaySeed] {
+        let (health, home, people) = (m.health, m.home, m.people)
+        var seeds: [TodaySeed] = []
+        let tile = week("Call the tile shop", home)
+        seeds.append(today("one area, one task", kept: [home], items: [tile], standing: home))
+        let a = week("Gym", home), b = week("Shoes", home), c = week("Their errand", home, mine: false)
+        seeds.append(today("one area, several, theirs marked", kept: [home], items: [a, b, c], standing: home,
+                           firstThing: c.id))
+        let gym = week("Gym induction", health), tiler = week("Call the tiler", home)
+        seeds.append(today("two areas, one task each (the re-review's path)", kept: [health, home],
+                           items: [gym, tiler], standing: home, lastPlanted: tiler.id))
+        let g2 = week("Gym", health), s2 = week("Shoes", health), spoken = week("Book the skip", home)
+        seeds.append(today("two areas, the first thing alone in its area", kept: [health, home],
+                           items: [g2, s2, spoken], standing: health, firstThing: spoken.id))
+        let g3 = week("Gym", health), mum = week("Call mum", people), dinner = week("Book dinner", people, mine: false)
+        seeds.append(today("three areas, none in one, theirs marked", kept: [health, home, people],
+                           items: [g3, mum, dinner], standing: people, firstThing: dinner.id))
+        let g4 = week("Gym", health), s4 = week("Shoes", health)
+        seeds.append(today("spoken first thing under a task", kept: [health, home], items: [g4, s4], standing: health,
+                           lastPlanted: g4.id, say: "pack the bag"))
+        let book = WalkItem(id: UUID(), level: .month, title: "Book the gym", areaId: health.id, parentId: m.lift.id)
+        let induction = week("Gym induction", health, under: book.id)
+        let fence = week("Mend the fence", home)
+        seeds.append(today("walk down, on its line", kept: [health, home],
+                           items: [m.strong, m.lift, book, induction, fence], standing: health,
+                           walkingDown: [m.strong.id]))
+        var off = today("walk down, the first thing off its line", kept: [health, home],
+                        items: [m.strong, m.bathroom, m.lift, book, induction, fence], standing: home,
+                        firstThing: induction.id, walkingDown: [m.bathroom.id])
+        // The Next line reads Finish only while the first thing is the goal above (or none is),
+        // and a walk down never makes a flag off its line the goal above: Finish is out of reach
+        // by taps here for a reason outside the Today rules. Left for the controller to rule on.
+        off.finishOutOfReach = true
+        seeds.append(off)
+        let loose = week("Find the passport", nil), shop = week("Call the shop", home)
+        seeds.append(today("a loose task on the nameless post, marked", kept: [home], items: [loose, shop],
+                           standing: home, firstThing: loose.id))
+        let loose2 = week("Find the passport", nil), shop2 = week("Call the shop", home), shoes2 = week("Shoes", health)
+        seeds.append(today("a loose first thing, two areas", kept: [health, home], items: [loose2, shop2, shoes2],
+                           standing: health, firstThing: loose2.id))
+        return seeds
+    }
+
+    /// What an area's label says a tap does, off the ground.
+    private func areaHint(_ s: WalkState, _ id: UUID) -> String? { WalkCopy.areaHint(s, id) }
+
+    /// Every Today state a tap (on a drawn flag or a kept area) or the Next line's "Start with this
+    /// one" can reach from the seeds, searched breadth first to the end (a seed may not pass
+    /// `cap` states). In each: a flag's role and an area's hint say exactly what the reducer does,
+    /// a tap never changes the first thing, and taps alone lead back to the first thing as the goal
+    /// above with the Next line reading Finish. The nameless post has no label to tap, so it is
+    /// reached only through its flags.
+    @Test func onTodayEveryStateATapReachesKeepsItsWord() throws {
+        let cap = 3000
+        let walkThere = WalkCopy.areaHint(ground: false, kept: true, focused: false)
+        var visitedInAll = 0
+        for seed in todaySeeds() {
+            var states = [seed.state]
+            var tapEdges: [[Int]] = [[]]
+            var next = 0
+            while next < states.count {
+                let s = states[next]
+                // The Undo stack (and its pill) grows with every "Start with this one" but changes no tap:
+                // states that differ only there are one state.
+                func index(of reached: WalkState) -> Int {
+                    var t = reached
+                    t.undo = []
+                    t.undoShowing = false
+                    if let i = states.firstIndex(of: t) { return i }
+                    states.append(t); tapEdges.append([])
+                    return states.count - 1
+                }
+                let layout = WalkLayout.make(s, today: m.today, footing: .level)
+                for post in layout.posts {
+                    for banner in post.banners {
+                        guard let event = WalkLayout.tapEvent(banner, on: post), case .bannerTapped = event else { continue }
+                        var after = s
+                        _ = after.apply(event, m.env)
+                        #expect((after != s) == banner.taps, "\(seed.name): \(banner.label)")
+                        #expect(after.firstThing == s.firstThing, "\(seed.name): \(banner.label) changed the first thing")
+                        if after != s { let i = index(of: after); tapEdges[next].append(i) }
+                    }
+                }
+                for id in s.kept {
+                    var after = s
+                    _ = after.apply(.areaTapped(id), m.env)
+                    let name = s.area(id)?.name ?? "?"
+                    if areaHint(s, id) == walkThere {
+                        #expect(after.standing == id, "\(seed.name): \(name) says it can be walked to")
+                    } else {
+                        #expect(after == s, "\(seed.name): \(name) takes no walk, yet a tap changed the walk")
+                    }
+                    #expect(after.firstThing == s.firstThing, "\(seed.name): a tap on \(name) changed the first thing")
+                    if after != s { let i = index(of: after); tapEdges[next].append(i) }
+                }
+                if WalkCopy.nextLine(s, m.env.periods)?.action == .startThere {
+                    var after = s
+                    _ = after.apply(.nextTapped, m.env)
+                    _ = index(of: after)
+                }
+                next += 1
+                try #require(states.count <= cap, "\(seed.name): more than \(cap) states")
+            }
+            visitedInAll += states.count
+
+            // Taps alone lead back to the first thing as the goal above, with Finish.
+            guard !seed.finishOutOfReach else { continue }
+            var good = Set(states.indices.filter { i in
+                let s = states[i]
+                return s.firstThing != nil && s.focus[.today] == s.firstThing
+                    && WalkCopy.nextLine(s, m.env.periods)?.text == WalkCopy.finish
+            })
+            var grew = true
+            while grew {
+                grew = false
+                for i in states.indices where !good.contains(i) && tapEdges[i].contains(where: good.contains) {
+                    good.insert(i); grew = true
+                }
+            }
+            for i in states.indices where states[i].firstThing != nil && !good.contains(i) {
+                let s = states[i]
+                let place = s.area(s.standing)?.name ?? "nameless", above = s.item(s.focus[.today])?.title ?? "none"
+                let first = s.item(s.firstThing)?.title ?? "?"
+                let message = "\(seed.name): no taps lead back to Finish from \(place), goal above \(above), first thing \(first)"
+                Issue.record(Comment(rawValue: message))
+            }
+        }
+        #expect(visitedInAll > 0)
+        print("Today search visited \(visitedInAll) states")
     }
 
     @Test func moveTargetsAreEveryOtherArea() {

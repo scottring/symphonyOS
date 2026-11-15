@@ -351,10 +351,16 @@ struct WalkState: Equatable {
         return items(on: above).filter(onWalkedLine)
     }
 
-    /// The goals above the walk may settle on by itself: never Today's first thing, which is the
-    /// goal above only by "Start with this one" or a tap.
+    /// The goals above the walk may settle on by itself: on Today any week task but the first
+    /// thing, which it takes only when nothing else is there (a lone first thing is the goal above).
     private func choosable(_ parents: [WalkItem]) -> [WalkItem] {
         level == .today ? parents.filter { $0.id != firstThing } : parents
+    }
+
+    /// Of these parents, the one the walk settles on: the remembered or newest choosable one,
+    /// else the first thing among them.
+    private func pick(_ parents: [WalkItem]) -> WalkItem? {
+        rememberedOrNewest(choosable(parents)) ?? parents.first { $0.id == firstThing }
     }
 
     /// On a walk down, whether the flag's line (it, then its parents up) starts at the goal
@@ -372,9 +378,14 @@ struct WalkState: Equatable {
 
     /// Steps 2 to 5: where a tap on the goal the step is about goes: the next goal above here,
     /// round again (on Today the first thing is one of them); none with only one.
+    /// A first thing on the nameless post is in every area's round on Today: the nameless post
+    /// has no label to walk to, so this is the way back to it.
     func nextGoalAbove() -> UUID? {
         guard let level, level != .year, let current = focus[level] else { return nil }
-        let round = parentsHere()
+        let here = standing
+        let round = parentsAnywhere().filter {
+            column(of: $0) == here || (level == .today && $0.id == firstThing && column(of: $0) == nil)
+        }
         guard round.count > 1, let index = round.firstIndex(where: { $0.id == current }) else { return nil }
         return round[(index + 1) % round.count].id
     }
@@ -420,7 +431,7 @@ struct WalkState: Equatable {
                 focusArea = column(of: parent)
                 return
             }
-            if let parent = rememberedOrNewest(choosable(parentsHere())) {
+            if let parent = pick(parentsHere()) {
                 focus[level] = parent.id
                 focusArea = column(of: parent)
                 return
@@ -428,7 +439,8 @@ struct WalkState: Equatable {
             focus[level] = nil
             let here = standing
             if items(on: level).contains(where: { column(of: $0) == here }) { return }
-            if let newest = choosable(parentsAnywhere()).last {
+            let anywhere = parentsAnywhere()
+            if let newest = choosable(anywhere).last ?? anywhere.first(where: { $0.id == firstThing }) {
                 focus[level] = newest.id
                 focusArea = column(of: newest)
                 return
@@ -460,15 +472,31 @@ struct WalkState: Equatable {
             undoShowing = true
             return [.sound(.tick, afterMs: 0), .timer(.undo, ms: WalkState.undoMs), .save]
         }
-        guard (1...6).contains(step), kept.contains(id), id != standing else { return [] }
+        guard walksThere(id) else { return [] }
+        stand(in: id)
+        return [.save]
+    }
+
+    /// Off the ground, on steps 1 to 6, whether a tap on this kept area stands the walk there
+    /// (after settling); never for the area already stood in. An area where the walk cannot stand
+    /// (nothing above or on this step for it) takes no tap, and its label says so (`WalkCopy.areaHint`).
+    func walksThere(_ id: UUID) -> Bool {
+        guard !ground, (1...6).contains(step), kept.contains(id), area(id) != nil, id != standing else { return false }
+        var after = self
+        after.stand(in: id)
+        after.settleStanding()
+        return after.standing == id
+    }
+
+    /// Stands in the area; on steps 2 to 5 the goal above is the area's own (`pick`), or none.
+    private mutating func stand(in id: UUID) {
         focusArea = id
         if let level, level != .year {
-            focus[level] = rememberedOrNewest(choosable(parentsHere()))?.id
+            focus[level] = pick(parentsHere())?.id
             follow(focus[level])
         } else {
             follow(focusArea)
         }
-        return [.save]
     }
 
     /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with

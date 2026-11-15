@@ -390,7 +390,7 @@ private struct Builder {
             let footing = feet[i].value * sigma(WalkPostKey(level: .year, column: area.id))
             return L.Label(id: area.id, name: area.name, frame: footing == 0 ? slot.frame : slot.frame.offsetBy(dx: 0, dy: footing),
                            kept: kept, focused: focused, opacity: Double(opacity), tappable: tappable,
-                           hint: tappable ? WalkCopy.areaHint(ground: s.ground, kept: kept, focused: focused) : nil,
+                           hint: tappable ? WalkCopy.areaHint(s, area.id) : nil,
                            selected: tappable && (s.ground ? kept : focused), footing: footing, ground: s.ground)
         }
     }

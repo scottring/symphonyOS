@@ -390,6 +390,14 @@ enum WalkCopy {
         }
     }
 
+    /// An area label's hint from what a tap on it does: off the ground nil for an area the walk
+    /// cannot stand in (`WalkState.walksThere`).
+    static func areaHint(_ s: WalkState, _ id: UUID) -> String? {
+        if s.ground { return areaHint(ground: true, kept: s.kept.contains(id), focused: false) }
+        if id == s.standing { return areaHint(ground: false, kept: true, focused: true) }
+        return s.walksThere(id) ? areaHint(ground: false, kept: true, focused: false) : nil
+    }
+
     static func areaHint(ground: Bool, kept: Bool, focused: Bool) -> String {
         if ground { return kept ? "Tap to let go" : "Tap to keep" }
         return focused ? "You are here" : "Tap to walk there"
