@@ -7,25 +7,35 @@ import CoreGraphics
 /// or planted here, only asked for as effects.
 extension WalkState {
 
-    /// The compass points are out: the light is held (before speaking) or open. On Welcome
+    /// The compass points are out: the light is open, or held after a press that began with them open
+    /// or slid out of the light (S15: a plain hold on its way to speaking shows none). On Welcome
     /// they always are: its three choices are the whole screen.
     var showsPoints: Bool {
         if step == 0 { return true }
         switch orb {
-        case .holding, .open: return true
+        case .open: return true
+        case .holding: return orbWasOpen || pressWentOut
         case .idle, .speaking, .finishing: return false
         }
     }
 
-    /// The veil behind the open compass (and Welcome's choices): the scene steps back. Not during a
-    /// press, so a hold on its way to speaking does not darken the mountain.
-    var showsVeil: Bool { step == 0 || orb == .open || teaching }
+    /// F22: every word on the mountain is veiled (cloths, poles and pills stay; their words are not
+    /// drawn) while the choices are open, the light is taught, or something is being typed.
+    var veilsWords: Bool { (1...5).contains(step) && (orb == .open || teaching || typing != nil) }
 
-    /// The Next line under the light shows on steps 1 to 5 while the light is at rest and nothing is being typed.
-    /// On Welcome it is the quick start, under the light while it is not pressed.
+    /// The field holds something that is not blank: Add plants it.
+    var typedHasWords: Bool { !(typing ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// The veil behind the open compass (and Welcome's choices), the lesson and the typing field: the
+    /// scene steps back. Not during a press, so a hold on its way to speaking does not darken the mountain.
+    var showsVeil: Bool { step == 0 || orb == .open || teaching || ((1...5).contains(step) && typing != nil) }
+
+    /// Next at the foot shows on steps 1 to 5 while the light is at rest and nothing is being typed,
+    /// the lesson included (S19: it shows the way on). On Welcome it is the quick start, under the
+    /// light while it is not pressed.
     var showsNextLine: Bool {
         if step == 0 { return orb == .idle || orb == .open }
-        return (1...5).contains(step) && orb == .idle && typing == nil && !teaching
+        return (1...5).contains(step) && orb == .idle && typing == nil
     }
 
     /// The top row (Back, More, Leave for now) on every step after Welcome but Look back up; hidden
@@ -39,8 +49,8 @@ extension WalkState {
     /// The choices on the light are open (More is drawn gold then).
     var choicesOpen: Bool { orb == .open }
 
-    /// The quiet Undo pill beside the hint; it gives way while the points show,
-    /// where Undo is the up-left point instead.
+    /// The quiet Undo pill above the light, where the hint was; it gives way while the points show,
+    /// where Undo is the top point instead.
     var showsUndoPill: Bool { undoShowing && !showsPoints }
 
     mutating func applyOrb(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
@@ -148,6 +158,7 @@ extension WalkState {
         case .speaking:
             guard WalkOrb.isOut(location) else { return [] }
             // Sliding out cancels what was being said; the points show again.
+            pressWentOut = true
             orb = .holding(hover: hover)
             return [.listen(false)] + (hover == nil ? [] : [.sound(.tick, afterMs: 0)])
         case .holding(let current):
@@ -187,9 +198,9 @@ extension WalkState {
                 return wentOut ? release : act(.quick, env) + release
             }
             if heldMs < WalkOrb.holdMs {
-                // A tap that puts the lesson away does only that, as a tap anywhere does.
+                // A tap during the lesson puts it away and opens the choices (S19).
                 if wasTeaching {
-                    orb = .idle
+                    orb = .open
                     return release
                 }
                 // With speech off a tap types straight away (the light shows a keyboard).

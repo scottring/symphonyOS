@@ -514,24 +514,24 @@ struct WalkStepsTests {
         #expect(early.calendarOffer == false)
     }
 
-    @Test func theCalendarOfferIsAQuietLineAndOnePoint() {
+    /// S35: the calendar is offered by one point on the light, with no note.
+    @Test func theCalendarOfferIsOnePoint() {
         var env = m.env
         env.canAskCalendar = true
         var s = m.at(4)
         let effects = s.act(.next, env)
-        #expect(s.note == WalkCopy.calendarLine)
-        #expect(effects == [.timer(.note, ms: WalkState.calendarNoteMs), .save])
+        #expect(s.note == nil)
+        #expect(effects == [.save])
 
         var plain = m.at(4)
         #expect(plain.act(.next, m.env) == [.save])
         #expect(plain.note == nil)
 
-        // Leaving Today takes the line with it.
         _ = s.act(.back, m.env)
         #expect(s.note == nil && s.step == 4)
         _ = s.act(.next, env)
 
-        // The point asks once; the answer takes the offer and its line away.
+        // The point asks once; the answer takes the offer away.
         #expect(s.act(.calendar, env) == [.askCalendar])
         #expect(!s.calendarOffer)
         #expect(s.act(.calendar, env) == [])

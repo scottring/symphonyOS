@@ -11,8 +11,8 @@ extension WalkState {
 
     /// Plants what was said on this step. On the ground it names an area; on
     /// Year a goal goes in the area the walk stands in; lower levels hang under
-    /// the focused parent; on Today it becomes the first thing. Nothing said,
-    /// nothing planted.
+    /// the focused parent; on Today it becomes the first thing and the goal above.
+    /// Nothing said, nothing planted.
     mutating func plant(_ raw: String, _ env: WalkEnv) -> [WalkEffect] {
         guard let level else { return [] }
         if ground { return nameArea(raw, env) }
@@ -59,6 +59,9 @@ extension WalkState {
             effects.append(.write(.firstThing(item.id, previous: firstThing)))
             undo.append(.firstThing(previous: firstThing, created: item.id))
             moveMark(to: item.id, env.periods.today)
+            // P15: what was just said is what Finish is about, so it is the goal above at once (the next
+            // thing said still hangs beside it, above).
+            focus[.today] = item.id
         } else {
             undo.append(.plant(item.id))
         }
@@ -138,11 +141,11 @@ extension WalkState {
         return item.level == level
     }
 
-    /// The areas the selected flag can move to: every label but its own. None
-    /// for Today's first thing, whose area comes from its parent: it can only be pulled up.
+    /// The areas the selected flag can move to (F24): the areas the person kept, in ridge order, never
+    /// its own. None for Today's first thing, whose area comes from its parent: it can only be pulled up.
     var moveTargets: [WalkArea] {
         guard let item = item(selected), level != .today else { return [] }
-        return areas.filter { $0.id != item.areaId }
+        return keptAreas.filter { $0.id != item.areaId }
     }
 
     /// A flag on the step's own level, planted by this walk: selected (or let go).
@@ -200,8 +203,10 @@ extension WalkState {
 
     // MARK: Undo
 
-    /// Reverses the newest action, whatever step it was taken on. The stack
-    /// lives as long as the walk runs; the pill hiding does not empty it.
+    /// Reverses the newest action taken on the step in view (F23): the stack is emptied whenever the
+    /// step changes or the walk leaves the ground (`settle`), so Undo never reaches back past the
+    /// step the person is looking at. The pill hiding does not empty it; a whole-year tour going on
+    /// to the next area or goal stays on its step and keeps it.
     mutating func undoLast(_ env: WalkEnv) -> [WalkEffect] {
         guard let entry = undo.popLast() else { return [] }
         var effects: [WalkEffect] = []

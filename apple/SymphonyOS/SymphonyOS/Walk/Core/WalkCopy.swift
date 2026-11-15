@@ -3,7 +3,8 @@ import Foundation
 /// Every word the walk shows or speaks, and which compass points the orb offers
 /// on each step. Nothing else in the walk writes a string.
 enum WalkCopy {
-    static let shortLength = 40
+    /// The longest title the question quotes whole (S33).
+    static let shortLength = 56
     static let wordmark = "Symphony"
     static let welcomeTitle = "Let’s start up high and walk down to today."
     static let welcomeSub = "Name what matters this year, then follow it down to what you’ll do today."
@@ -52,9 +53,13 @@ enum WalkCopy {
             return p.monthIsCurrent ? "What’s one thing for the rest of \(p.monthName)?" : "What’s one thing for \(p.monthName)?"
         case .week:
             if let t = parent { return "For “\(short(t.title))”, what happens this week?" }
-            return "What would move that forward this week?"
+            return "What’s one thing for this week?"
         case .today:
-            if let t = parent { return "Start the day with “\(short(t.title))”?" }
+            if let t = parent {
+                // Once the goal above is the first thing, the question says the day starts with it (S35).
+                if t.id == s.firstThing { return "You’ll start the day with “\(short(t.title))”." }
+                return "Start the day with “\(short(t.title))”?"
+            }
             return "What’s the first thing you’ll do today?"
         }
     }
@@ -68,10 +73,12 @@ enum WalkCopy {
         case .year: return "Something that would feel true twelve months from now. Big or small."
         case .season: line = "A season is a few months. What is this stretch really for?"
         case .month: line = "Small enough to finish by the \(WalkPeriods.ordinal(p.monthLastDay))."
-        case .week: line = "Say the day for each: “the deposit, today.”"
+        case .week: line = "Say the day too, as in “on Friday”."
         case .today: line = "Just one. The rest of today can wait its turn."
         }
-        if s.parentsHere().count > 1 { line += focusAbove }
+        // Exactly when the goal above takes a tap: the round it walks (on Today the nameless post's first
+        // thing is in it too), not only the goals here.
+        if s.nextGoalAbove() != nil { line += focusAbove }
         return line
     }
 
@@ -91,7 +98,8 @@ enum WalkCopy {
         if level == .today {
             if let focused = s.focus[.today], focused != s.firstThing { return hintStartHere }
             if s.firstThing != nil { return hintFirstThing }
-        } else if !s.items(on: level).isEmpty {
+        } else if s.items(on: level).contains(where: { s.column(of: $0) == s.standing }) {
+            // Another only where the post stood at already holds one on this level (S36).
             return s.speechIsOff ? hintSpeechOff : hintAnother
         }
         return s.speechIsOff ? hintSpeechOff : hintFirst
@@ -107,7 +115,7 @@ enum WalkCopy {
     static let hintGroundNone = "Tap the ones that matter."
     /// Names the Next line's own words (`startWithThis`), which is what it reads here.
     static let hintStartHere = "Tap “\(startWithThis)”, or hold to speak."
-    static let hintFirstThing = "Tap Finish to keep it, or hold to say another."
+    static let hintFirstThing = "Tap “\(finish)”, or hold to change it."
     static let hintSpeaking = "Let go when you’ve said it"
     /// Speech is off for this walk: a tap types, a hold opens the other choices.
     static let hintSpeechOff = "Tap the light and type."
@@ -123,7 +131,7 @@ enum WalkCopy {
     /// The lines that teach the light: the 20-point line, then the 15-point line if there is one.
     static func teaching(_ s: WalkState) -> [String] { s.speechIsOff ? [teachSpeechOff] : [teachHold, teachLetGo] }
 
-    /// The line under the light that moves the walk on: the south point's words and action,
+    /// Next at the foot, the line that moves the walk on: its words and action,
     /// shown whenever the light is at rest and nothing is being typed. `skip` when nothing has
     /// been added on this step yet (drawn quieter).
     struct NextLine: Equatable {
@@ -141,7 +149,7 @@ enum WalkCopy {
         return NextLine(text: ahead.label, action: ahead.action, skip: ahead.label == skipStep)
     }
 
-    static let skipStep = "Skip this step"; static let finish = "Finish"; static let startWithThis = "Start with this one"
+    static let skipStep = "Skip this step"; static let finish = "Finish the walk"; static let startWithThis = "Start with this one"
     static func next(_ place: String) -> String { "Next: \(place)" }
     static let nextGoal = "Next goal"
     /// A name cut to `length` characters, the last an ellipsis, when it is longer.
@@ -149,7 +157,7 @@ enum WalkCopy {
         name.count <= length ? name : String(name.prefix(length - 1)).trimmingCharacters(in: .whitespaces) + "…"
     }
 
-    /// Where moving on goes, in words, and the action that does it (the south point).
+    /// Where moving on goes, in words, and the action that does it (Next).
     private static func forward(_ s: WalkState, _ p: WalkPeriods) -> (label: String, action: WalkAction)? {
         guard let level = s.level else { return nil }
         if s.ground { return (s.kept.isEmpty ? skipStep : next("your goals"), .next) }
@@ -264,8 +272,14 @@ enum WalkCopy {
         }
     }
 
+    /// A title as the question quotes it (S33): whole up to `shortLength` characters; longer, cut at the
+    /// last space at or before the 55th character (trailing spaces trimmed), then "…"; a word of 56
+    /// letters or more with no space is cut at 55.
     static func short(_ title: String) -> String {
-        title.count <= shortLength ? title : String(title.prefix(shortLength - 1)) + "…"
+        guard title.count > shortLength else { return title }
+        let head = title.prefix(shortLength - 1)
+        let atWord = head.lastIndex(of: " ").map { String(head[..<$0]).trimmingCharacters(in: .whitespaces) } ?? ""
+        return (atWord.isEmpty ? String(head) : atWord) + "…"
     }
 
     // MARK: Notes
@@ -277,12 +291,33 @@ enum WalkCopy {
     /// The permission prompts took the touch and speech was allowed.
     static let speakNow = "Now hold the light and speak."
     static let ridgeFull = "That’s as many as fit. Tap one to let it go."
-    static let calendarLine = "See your calendar on Today too"
 
     // MARK: Hint row and banners
 
+    /// What the newest step back undoes, for VoiceOver (the pill's label and the light's top point's,
+    /// F23); nil with nothing to undo.
+    static func undoLabel(_ s: WalkState) -> String? {
+        guard let entry = s.undo.last else { return nil }
+        func title(_ id: UUID) -> String? { s.item(id).map { "“\(short($0.title))”" } }
+        switch entry {
+        case .plant(let id): return title(id).map { "Undo adding \($0)" } ?? undo
+        case .keep(let id): return s.area(id).map { "Undo keeping \($0.name)" } ?? undo
+        case .unkeep(let id, _): return s.area(id).map { "Undo letting go of \($0.name)" } ?? undo
+        case .nameArea(let area): return "Undo adding \(area.name)"
+        case .move(let id, _, _): return title(id).map { "Undo moving \($0)" } ?? undo
+        case .pullUp(let item, _, _, _): return "Undo removing “\(short(item.title))”"
+        case .firstThing: return "Undo the first thing"
+        }
+    }
+
+    /// The Move row's chip and Remove, for VoiceOver (F24): what they do to which flag.
+    static func moveLabel(_ title: String, to area: String) -> String { "Move “\(short(title))” to \(area)" }
+    static func removeLabel(_ title: String) -> String { "Remove “\(short(title))”" }
+
     static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Remove"
-    static let typePlaceholder = "Type it, then return"; static let firstThingTag = "FIRST THING"
+    /// The typing field (F22): its placeholder, its gold Add, and its X (to VoiceOver).
+    static let typeAdd = "Add", typeClose = "Close without adding"
+    static let typePlaceholder = "Type it, then tap Add"; static let firstThingTag = "FIRST THING"
     /// How many more flags a banner on Look back up stands for: "+2 more".
     static func more(_ count: Int) -> String { "+\(count) more" }
     /// What a folded stub says: the 26-point pennant has room for the count only ("+2").
@@ -291,7 +326,7 @@ enum WalkCopy {
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
     static let groundWhy = "Tap the ones that matter to you."
-    /// Added to a step's why line while the area stood in has more than one goal above (F3).
+    /// Added to a step's why line while a tap on the goal above switches to another (F3, `nextGoalAbove`).
     static let focusAbove = " Tap the goal above to switch."
 
     // MARK: The ending
@@ -363,6 +398,9 @@ enum WalkCopy {
         /// `focused`: the goal above the step is about; `focusedOfSeveral`: the same, with another
         /// one above in the area stood in, which a tap switches to.
         case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example, stub(Int)
+        /// On Today, the goal above when the next one in the round is not here but the nameless post's
+        /// first thing: a tap goes to the first thing.
+        case focusedThenFirstThing
         /// Today's first thing on the Today step: `firstThingFocused` while it is the goal above (a
         /// tap goes on to the next week task here); `firstThingFocusable`, not planted by this walk,
         /// while another is (a tap makes it the goal above).
@@ -372,7 +410,8 @@ enum WalkCopy {
         var taps: Bool {
             switch self {
             case .plain, .firstThing, .focused: return false
-            case .mine, .focusedOfSeveral, .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub:
+            case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingFocusable, .firstThingFocused,
+                 .example, .stub:
                 return true
             }
         }
@@ -386,6 +425,7 @@ enum WalkCopy {
         case .plain: return withTag
         case .focused: return "\(withTag), the goal this step is about"
         case .focusedOfSeveral: return "\(withTag), the goal this step is about, tap for the next one here"
+        case .focusedThenFirstThing: return "\(withTag), the goal this step is about, tap for the first thing"
         case .firstThing: return "Today: \(text), first thing"
         case .firstThingMine: return "Today: \(text), first thing, tap to remove"   // planted by the walk
         case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"

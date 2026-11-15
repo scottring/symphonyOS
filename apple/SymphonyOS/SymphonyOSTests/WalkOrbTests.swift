@@ -29,14 +29,37 @@ private func polar(_ degrees: CGFloat, _ distance: CGFloat) -> CGPoint {
 }
 
 struct WalkOrbTests {
-    @Test func thePointsShowWhileHeldOrOpen() {
+    /// Open, the points show; held, only once the press began with them open or slid out of the light.
+    @Test func thePointsShowWhileOpenOrSlidOut() {
         var s = state(step: 1)
-        for (orb, shows) in [(WalkState.Orb.idle, false), (.open, true), (.holding(hover: nil), true),
-                             (.holding(hover: .s), true), (.speaking(live: "x"), false),
-                             (.finishing(live: "x"), false)] {
+        for (orb, shows) in [(WalkState.Orb.idle, false), (.open, true), (.holding(hover: nil), false),
+                             (.speaking(live: "x"), false), (.finishing(live: "x"), false)] {
             s.orb = orb
-            #expect(s.showsPoints == shows)
+            #expect(s.showsPoints == shows, "\(orb)")
         }
+        s.orb = .holding(hover: .w); s.pressWentOut = true; #expect(s.showsPoints)
+        s.pressWentOut = false; s.orbWasOpen = true; #expect(s.showsPoints)
+    }
+
+    /// S15: a plain hold on its way to speaking shows no points; sliding out of the light shows them, as
+    /// does a press begun with them open. Welcome's always show.
+    @Test func aHoldShowsNoPointsUntilItSlidesOut() {
+        var s = state(step: 2, planted: true)
+        _ = s.apply(.orbDown, env)
+        #expect(!s.showsPoints)
+        _ = s.apply(.orbMoved(WalkOrb.position(of: .w)), env)
+        #expect(s.showsPoints)
+        var open = state(step: 2, planted: true); open.orb = .open
+        _ = open.apply(.orbDown, env)
+        #expect(open.showsPoints)
+        var speaking = state(step: 2, planted: true)
+        speak(&speaking, "lift")
+        #expect(!speaking.showsPoints)
+        _ = speaking.apply(.orbMoved(WalkOrb.position(of: .w)), env)     // sliding out cancels; the points show
+        #expect(speaking.showsPoints)
+        var welcome = WalkState()
+        _ = welcome.apply(.orbDown, env)
+        #expect(welcome.showsPoints)
     }
 
     @Test func theUndoPillGivesWayToThePoints() {
@@ -44,7 +67,8 @@ struct WalkOrbTests {
         s.undoShowing = true
         #expect(s.showsUndoPill)
         s.orb = .open; #expect(!s.showsUndoPill)
-        s.orb = .holding(hover: .nw); #expect(!s.showsUndoPill)
+        s.orb = .holding(hover: .w); s.pressWentOut = true; #expect(!s.showsUndoPill)
+        s.pressWentOut = false
         s.orb = .idle; #expect(s.showsUndoPill)
         s.undoShowing = false; #expect(!s.showsUndoPill)
     }
@@ -470,7 +494,7 @@ struct WalkOrbTests {
         return s
     }
 
-    /// Walking on from the ground teaches the light, once: the veil, no Next line, no hint; going
+    /// Walking on from the ground teaches the light, once: the veil, Next still at the foot, no hint; going
     /// down and back up does not teach it again, nor does the next step.
     @Test func theLightIsTaughtOnceOnTheFirstStepThatListens() {
         var s = onTheGround()
@@ -478,7 +502,7 @@ struct WalkOrbTests {
         _ = s.act(.next, env)
         #expect(s.step == 1 && !s.ground)
         #expect(s.teaching && s.taught)
-        #expect(s.showsVeil && !s.showsNextLine && !s.showsPoints)
+        #expect(s.showsVeil && s.showsNextLine && !s.showsPoints)     // S19: Next (here Skip) shows the way on
         #expect(WalkCopy.hint(s) == "")
         _ = s.apply(.veilTapped, env)
         #expect(!s.teaching)
@@ -515,16 +539,16 @@ struct WalkOrbTests {
         #expect(s.orb == .speaking(live: ""))
     }
 
-    /// During the lesson a tap on the light only puts it away, as a tap anywhere does: no typing,
-    /// no choices. After it, a tap opens the other choices (the light means one thing: hold to speak).
-    @Test func aTapOnTheLightOnlyPutsTheLessonAway() {
+    /// S19: during the lesson a tap on the light puts it away and opens the choices (no typing); the
+    /// next tap closes them, as it always does.
+    @Test func aTapOnTheLightPutsTheLessonAwayAndOpensTheChoices() {
         var s = onTheGround()
         _ = s.act(.next, env)
         _ = s.apply(.orbDown, env)
         _ = s.apply(.orbUp(heldMs: 80), env)
-        #expect(!s.teaching && s.typing == nil && s.orb == .idle)
+        #expect(!s.teaching && s.typing == nil && s.orb == .open)
         _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
-        #expect(s.orb == .open && s.typing == nil)
+        #expect(s.orb == .idle && s.typing == nil)
     }
 
     /// A compass point chosen through VoiceOver puts it away too.
@@ -579,9 +603,12 @@ struct WalkOrbTests {
         _ = s.act(.next, env)
         #expect(s.teaching)
         #expect(WalkCopy.teaching(s) == [WalkCopy.teachSpeechOff])
-        // The tap that puts the lesson away does only that; the next tap types, as it always does with speech off.
+        // The tap that puts the lesson away opens the choices (Type it among them); a tap closes them, and
+        // the next tap types, as it always does with speech off.
         _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
-        #expect(!s.teaching && s.typing == nil)
+        #expect(!s.teaching && s.typing == nil && s.orb == .open)
+        _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
+        #expect(s.orb == .idle && s.typing == nil)
         _ = s.apply(.orbDown, env); _ = s.apply(.orbUp(heldMs: 80), env)
         #expect(s.typing == "")
         #expect(s.lightSymbol == "keyboard")
@@ -851,11 +878,11 @@ struct WalkOrbTests {
         #expect(tap == [.timer(.hold, ms: nil)])
         #expect(s.typing == "" && s.orb == .idle && !s.showsPoints)
         _ = s.apply(.typeDismissed, env)
-        // A hold: never listens, no flag; the points show and stay open after letting go.
+        // A hold: never listens, no flag; the points open as it lets go, and stay open (S15: not while held).
         _ = s.apply(.orbDown, env)
         let held = s.apply(.orbHeld, env)
         #expect(held.isEmpty)
-        #expect(s.orb == .holding(hover: nil) && s.typing == nil && s.showsPoints)
+        #expect(s.orb == .holding(hover: nil) && s.typing == nil && !s.showsPoints)
         _ = s.apply(.orbUp(heldMs: 900), env)
         #expect(s.orb == .open && s.typing == nil)
         // A tap with the points open closes them, as with speech on.

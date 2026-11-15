@@ -75,14 +75,16 @@ extension WalkLayout {
     static let welcomeHintTop: CGFloat = 790.5
 
     /// One line. At rest above the light; while the light is open, held, speaking or finishing at the
-    /// foot, where Next is not drawn; on Welcome under its line. Not drawn while the Undo pill or the
-    /// Move row stands in its place.
+    /// foot, where Next is not drawn; while typing (a note) just above the field; on Welcome under its
+    /// line. Not drawn while the Undo pill or the Move row stands in its place.
     static func hintFrame(_ s: WalkState) -> CGRect? {
         let text = WalkCopy.hint(s)
         guard !text.isEmpty else { return nil }
         let top: CGFloat
         if s.step == 0 {
             top = welcomeHintTop
+        } else if s.typing != nil {
+            top = typingHintTop
         } else if s.orb != .idle {
             top = footHintTop
         } else {
@@ -106,6 +108,40 @@ extension WalkLayout {
         guard s.selected != nil, s.orb == .idle, s.typing == nil else { return nil }
         return moveRowRect
     }
+
+    /// Inside the Move row (F24): "Move to" and the kept areas' chips at its left (scrolling sideways
+    /// when they overflow), Remove alone at its right, never scrolled. On Today there is nowhere to
+    /// move: no chips, and Remove stands alone in the middle.
+    static let moveChipsRect = CGRect(x: 10, y: 558, width: 272, height: 38)
+    static let removeRect = CGRect(x: 290, y: 558, width: 90, height: 38)
+    static let removeAloneRect = CGRect(x: 150, y: 558, width: 90, height: 38)
+
+    static func moveChipsFrame(_ s: WalkState) -> CGRect? {
+        guard moveRowFrame(s) != nil, s.level != .today else { return nil }
+        return moveChipsRect
+    }
+
+    static func removeFrame(_ s: WalkState) -> CGRect? {
+        guard moveRowFrame(s) != nil else { return nil }
+        return s.level == .today ? removeAloneRect : removeRect
+    }
+
+    // MARK: The typing field (F22)
+
+    /// With the keyboard down (all rise by the keyboard's lift): the field across the foot, the X at its
+    /// left (closes it, plants nothing), the words between, and Add at its right (plants). A note while
+    /// typing is the hint, one line just above the field.
+    static let typeFieldRect = CGRect(x: 10, y: 750, width: 370, height: 44)
+    static let typeCloseRect = CGRect(x: 10, y: 750, width: 44, height: 44)
+    static let typeWordsRect = CGRect(x: 58, y: 750, width: 254, height: 44)
+    static let typeAddRect = CGRect(x: 316, y: 750, width: 64, height: 44)
+
+    static func typeFieldFrame(_ s: WalkState) -> CGRect? { typing(s) ? typeFieldRect : nil }
+    static func typeCloseFrame(_ s: WalkState) -> CGRect? { typing(s) ? typeCloseRect : nil }
+    static func typeWordsFrame(_ s: WalkState) -> CGRect? { typing(s) ? typeWordsRect : nil }
+    static func typeAddFrame(_ s: WalkState) -> CGRect? { typing(s) ? typeAddRect : nil }
+
+    private static func typing(_ s: WalkState) -> Bool { (1...5).contains(s.step) && s.typing != nil }
 
     // MARK: The lines that teach the light
 

@@ -13,7 +13,7 @@ struct WalkEnv {
 /// The whole walk as one value. `apply` and `act` move it from step to step and
 /// say, as effects, what a later layer should do (sound, listen, write, wait, save).
 struct WalkState: Equatable {
-    static let undoMs = 7000; static let noteMs = 3200; static let calendarNoteMs = 6000    // the Undo pill, a note, the calendar line
+    static let undoMs = 7000; static let noteMs = 3200      // the Undo pill, a note
 
     var step = 0; var ground = false       // 0 Welcome, 1 Year, 2 Season, 3 Month, 4 Week, 5 Today, 6 Look back up
     var depth: WalkDepth = .quick
@@ -107,11 +107,10 @@ struct WalkState: Equatable {
         // The calendar and the ending.
         case .calendarAnswered:
             calendarOffer = false
-            if note == WalkCopy.calendarLine { note = nil }
             return []
         case .sheetHandle: return moveSheet()
         case .goToToday: return step == 6 ? end(.finished) : []
-        // The line under the light: exactly what its south point does.
+        // Next at the foot: exactly what its own action does.
         case .nextTapped:
             guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
             return respond(to: line.action, env)
@@ -126,9 +125,12 @@ struct WalkState: Equatable {
             teaching = false
             orb = orb == .open ? .idle : .open
             return []
-        // A tap on the veil around the open compass closes it; on Welcome the choices stay.
+        // A tap on the veil around the open compass closes it; on Welcome the choices stay. While typing
+        // it closes an empty field and leaves one holding words as it is.
         case .veilTapped:
-            if teaching {
+            if typing != nil {
+                if !typedHasWords { typing = nil }
+            } else if teaching {
                 teaching = false
             } else if orb == .open, step != 0 {
                 orb = .idle
@@ -207,6 +209,10 @@ struct WalkState: Equatable {
         if step == 1, ground {
             ground = false
             orb = .idle
+            // What was done on the ground stays there (F23): Undo is for the step in view.
+            undo = []
+            pulledChildren = [:]
+            undoShowing = false
             startTour()
             teachOnce()
             return [.save]
@@ -246,21 +252,17 @@ struct WalkState: Equatable {
     /// Arrives on a step, from above or below, still standing in the same area. Focus per
     /// step is remembered; a step with none takes the area's remembered or newest goal above
     /// (`settleStanding`). Year entered from below has its tour over.
-    /// Today, while the calendar may be asked for, offers it: one quiet line, held
-    /// longer than a note, and the Calendar point. The line stays on Today.
+    /// Today, while the calendar may be asked for, offers it on the light's right point only (S35: no note).
     private mutating func enter(_ newStep: Int, _ env: WalkEnv) -> [WalkEffect] {
         step = newStep
         tour = []
         settle()
         teachOnce()
-        if note == WalkCopy.calendarLine { note = nil }
         guard let level, level != .year else { return [] }
         if level == .season, depth == .full { resumeSeasonTour() }
         guard level == .today else { return [] }
         calendarOffer = env.canAskCalendar
-        guard calendarOffer else { return [] }
-        note = WalkCopy.calendarLine
-        return [.timer(.note, ms: WalkState.calendarNoteMs)]
+        return []
     }
 
     /// Leaving the ground: the walk stands in the first kept area; in a whole-year
@@ -320,11 +322,13 @@ struct WalkState: Equatable {
         taught = true
     }
 
-    /// What belongs to one step only is put away when the step changes.
+    /// What belongs to one step only is put away when the step changes, Undo included (F23).
     private mutating func settle() {
         selected = nil
         expanded = nil
         undoShowing = false
+        undo = []
+        pulledChildren = [:]
         typing = nil
         orb = .idle
         sheetOpen = false

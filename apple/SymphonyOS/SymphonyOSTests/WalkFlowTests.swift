@@ -582,6 +582,115 @@ final class WalkFlowTests {
         #expect(m.state.focus[.week] == tiler.id)
     }
 
+    // MARK: Undo stays on its step (F23)
+
+    @Test func undoStaysOnItsStep() async throws {
+        let m = model(try walkTestContext())
+        quickStart(m, keeping: ["Health"])
+        await say(m, "feel strong again")
+        #expect(!m.state.undo.isEmpty)
+        m.send(.nextTapped)
+        #expect(m.state.step == 2)
+        #expect(m.state.undo.isEmpty)
+        #expect(!WalkCopy.points(m.state, m.periods).contains { $0.at == .n || $0.action == .undo })
+        #expect(WalkLayout.undoFrame(m.state) == nil)
+        m.send(.backTapped)
+        #expect(m.state.step == 1)
+        #expect(m.state.undo.isEmpty && WalkLayout.undoFrame(m.state) == nil)
+        #expect(m.state.items.count == 1)
+    }
+
+    @Test func leavingTheGroundTakesItsUndo() throws {
+        let m = model(try walkTestContext())
+        m.choose(.quick)
+        for name in ["Health", "Home"] { m.send(.areaTapped(area(m, name))) }
+        #expect(m.state.undo.count == 2 && m.state.undoShowing)
+        m.send(.nextTapped)
+        #expect(m.state.step == 1 && !m.state.ground)
+        #expect(m.state.undo.isEmpty && !m.state.undoShowing)
+        #expect(m.state.kept.count == 2)
+    }
+
+    /// A whole-year tour going on to the next area stays on Year: what was done there can still be undone.
+    @Test func aTourKeepsUndoOnYear() async throws {
+        let m = model(try walkTestContext())
+        m.choose(.full)
+        for name in ["Health", "Home"] { m.send(.areaTapped(area(m, name))) }
+        m.choose(.next)
+        await say(m, "feel strong again")
+        m.send(.nextTapped)
+        #expect(m.state.step == 1 && m.state.focusArea == area(m, "Home"))
+        #expect(m.state.undo.count == 1)
+        m.send(.undo)
+        #expect(m.state.items.isEmpty)
+    }
+
+    // MARK: The lesson shows the way on (S19)
+
+    @Test func theLessonShowsTheWayOn() throws {
+        let m = model(try walkTestContext())
+        m.choose(.quick)
+        m.choose(.next)                                        // off the ground, nothing kept: Year, first arrival
+        #expect(m.state.step == 1 && m.state.teaching)
+        #expect(WalkLayout.nextFrame(m.state) != nil)
+        #expect(WalkCopy.nextLine(m.state, m.periods)?.text == WalkCopy.skipStep)
+        m.send(.nextTapped)                                    // it puts the lesson away and walks on
+        #expect(m.state.step == 2 && !m.state.teaching)
+    }
+
+    @Test func aTapDuringTheLessonOpensTheChoices() throws {
+        let m = model(try walkTestContext())
+        m.choose(.quick)
+        m.choose(.next)
+        #expect(m.state.teaching)
+        m.send(.orbDown)
+        m.send(.orbUp(heldMs: 80))
+        #expect(!m.state.teaching && m.state.orb == .open && m.state.choicesOpen)
+        #expect(m.state.typing == nil)
+    }
+
+    // MARK: Typing (F22)
+
+    /// On Year off the ground, with Type it chosen: the field open, empty.
+    private func typingOnYear(_ ctx: ModelContext) -> WalkModel {
+        let m = model(ctx)
+        quickStart(m, keeping: ["Health"])
+        m.send(.veilTapped)                                    // the lesson put away
+        m.choose(.type)
+        return m
+    }
+
+    @Test func aVeilTapClosesAnEmptyField() throws {
+        let m = typingOnYear(try walkTestContext())
+        #expect(m.state.typing == "" && !m.state.typedHasWords)
+        #expect(m.state.veilsWords && m.state.showsVeil)       // the mountain's words are veiled while typing
+        m.send(.veilTapped)
+        #expect(m.state.typing == nil && !m.state.veilsWords)
+    }
+
+    @Test func aVeilTapKeepsTypedWords() throws {
+        let m = typingOnYear(try walkTestContext())
+        m.send(.typeChanged("run a"))
+        #expect(m.state.typedHasWords)
+        m.send(.veilTapped)
+        #expect(m.state.typing == "run a")
+        m.send(.typeChanged("   "))
+        #expect(!m.state.typedHasWords)
+    }
+
+    /// The field's X sends `.typeDismissed`: whatever it holds, nothing is planted or written.
+    @Test func closingTheFieldPlantsNothing() throws {
+        let ctx = try walkTestContext()
+        let m = typingOnYear(ctx)
+        m.send(.typeChanged("run a 5K"))
+        var s = m.state
+        let effects = s.apply(.typeDismissed, WalkEnv(periods: m.periods, now: now))
+        #expect(!effects.contains { if case .write = $0 { return true }; return false })
+        m.send(.typeDismissed)
+        #expect(m.state.typing == nil && m.state.items.isEmpty)
+        #expect(fetch(ctx, Goal.self).isEmpty && fetch(ctx, PendingChange.self).isEmpty)
+    }
+
     // MARK: The calendar ask and the ending
 
     /// A quick start with nothing kept, every step skipped down to Today.
@@ -599,27 +708,24 @@ final class WalkFlowTests {
         downToToday(m)
         #expect(m.state.step == 5)
         #expect(m.state.calendarOffer)
-        #expect(m.state.note == WalkCopy.calendarLine)
+        #expect(m.state.note == nil)                           // S35: no note, only the point
         #expect(offersCalendar(m))
 
-        // The line was ignored: back up and down again, and it is offered again.
+        // The offer was ignored: back up and down again, and it is offered again.
         m.choose(.back)
-        #expect(m.state.note != WalkCopy.calendarLine)          // the line belongs to Today
         m.choose(.next)
-        #expect(m.state.calendarOffer && m.state.note == WalkCopy.calendarLine)
+        #expect(m.state.calendarOffer && offersCalendar(m))
         #expect(calendar.asks == 0)
 
         m.choose(.calendar)
         await scheduler.settle()
         #expect(calendar.asks == 1)
         #expect(!m.state.calendarOffer)
-        #expect(m.state.note != WalkCopy.calendarLine)
 
         m.choose(.back)
         m.choose(.next)
         #expect(m.state.step == 5)
         #expect(!m.state.calendarOffer && !offersCalendar(m))
-        #expect(m.state.note != WalkCopy.calendarLine)
         m.choose(.calendar)
         await scheduler.settle()
         #expect(calendar.asks == 1)
@@ -645,16 +751,6 @@ final class WalkFlowTests {
         downToToday(light)
         #expect(!light.state.calendarOffer && !offersCalendar(light) && light.state.note == nil)
         #expect(denied.asks == 0)
-    }
-
-    @Test func theCalendarLineStaysItsOwnTime() throws {
-        let m = model(try walkTestContext())
-        downToToday(m)
-        #expect(m.state.note == WalkCopy.calendarLine)
-        scheduler.advance(WalkState.noteMs)
-        #expect(m.state.note == WalkCopy.calendarLine)
-        scheduler.advance(WalkState.calendarNoteMs - WalkState.noteMs)
-        #expect(m.state.note == nil)
     }
 
     @Test func theSheetStartsDown() async throws {

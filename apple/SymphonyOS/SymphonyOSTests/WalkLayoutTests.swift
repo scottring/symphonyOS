@@ -1092,6 +1092,58 @@ struct WalkLayoutTests {
         #expect(WalkLayout.moveRowFrame(s) == nil)
     }
 
+    /// F24: with every area kept and a flag chosen, Remove stands alone at the Move row's right, never
+    /// scrolled, meeting no other control; the chips take the rest of the row. On Today there is
+    /// nowhere to move: Remove stands alone in the middle.
+    @Test func removeIsAlwaysInSight() throws {
+        var s = WalkState()
+        s.areas = ridge; s.kept = ridge.map(\.id); s.step = 1
+        let goal = WalkItem(id: uid(1), level: .year, title: "Run a 5K", areaId: ridge[0].id)
+        s.items = [goal]; s.focusArea = ridge[0].id
+        _ = s.select(goal.id)
+        let row = try #require(WalkLayout.moveRowFrame(s))
+        #expect(WalkLayout.removeFrame(s) == CGRect(x: 290, y: 558, width: 90, height: 38))
+        #expect(WalkLayout.moveChipsFrame(s) == CGRect(x: 10, y: 558, width: 272, height: 38))
+        let remove = try #require(WalkLayout.removeFrame(s)), chips = try #require(WalkLayout.moveChipsFrame(s))
+        #expect(row.contains(remove) && row.contains(chips))
+        #expect(!Invariants.overlap(remove, chips))
+        for (name, f) in Self.controlFrames(s) where name != "move row" {
+            #expect(!Invariants.overlap(f, remove), "Remove meets \(name)")
+        }
+        s.selected = nil
+        #expect(WalkLayout.removeFrame(s) == nil && WalkLayout.moveChipsFrame(s) == nil)
+
+        var onToday = state(5)
+        let first = WalkItem(id: uid(2), level: .week, title: "Call the plumber", day: today)
+        onToday.items = [first]; onToday.firstThing = first.id; onToday.selected = first.id
+        #expect(WalkLayout.moveRowFrame(onToday) != nil)
+        #expect(WalkLayout.removeFrame(onToday) == CGRect(x: 150, y: 558, width: 90, height: 38))
+        #expect(WalkLayout.moveChipsFrame(onToday) == nil)
+    }
+
+    /// F22: while typing, the field at the foot holds the X, the words and Add; each is a full touch and
+    /// meets nothing else; a note stands just above the field; no top row, no Next.
+    @Test func theFieldsControlsKeepClear() {
+        var s = state(2); s.typing = "run a"; s.note = WalkCopy.nothingHeard
+        #expect(WalkLayout.typeFieldFrame(s) == CGRect(x: 10, y: 750, width: 370, height: 44))
+        #expect(WalkLayout.typeCloseFrame(s) == CGRect(x: 10, y: 750, width: 44, height: 44))
+        #expect(WalkLayout.typeAddFrame(s) == CGRect(x: 316, y: 750, width: 64, height: 44))
+        #expect(WalkLayout.hintFrame(s) == CGRect(x: 10, y: 724, width: 370, height: 19.5))
+        let parts = [("close", WalkLayout.typeCloseFrame(s)), ("words", WalkLayout.typeWordsFrame(s)),
+                     ("add", WalkLayout.typeAddFrame(s))].compactMap { n, f in f.map { (n, $0) } }
+        #expect(parts.count == 3)
+        let field = WalkLayout.typeFieldFrame(s) ?? .null
+        for (i, a) in parts.enumerated() {
+            #expect(a.1.width >= 44 && a.1.height >= 44, "\(a.0)")
+            #expect(field.contains(a.1), "\(a.0)")
+            for b in parts[(i + 1)...] { #expect(!Invariants.overlap(a.1, b.1), "\(a.0) meets \(b.0)") }
+            for (name, f) in Self.controlFrames(s) { #expect(!Invariants.overlap(a.1, f), "\(a.0) meets \(name)") }
+        }
+        #expect(WalkLayout.nextFrame(s) == nil && WalkLayout.backFrame(s) == nil)
+        s.typing = nil
+        #expect(WalkLayout.typeFieldFrame(s) == nil && WalkLayout.typeAddFrame(s) == nil)
+    }
+
     /// A post's band point (its base less its footing) is on its band; the footing stays within its bound.
     @Test func postsStandOnTheirBand() {
         for (s, layout) in zip(Generated.all, Generated.naturalLayouts) {
