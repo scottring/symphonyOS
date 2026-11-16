@@ -884,7 +884,7 @@ Each line: what was built, then the cost if the ruling is wrong.
 - **F32** The side posts' high row is 86 above the low row (board: 84), and touching pills narrow by a point. Cost: none visible.
 - **F33** (superseded by F39) Lines counted from the real fonts.
 - **F34** The small "you are here" caret is drawn only where it has room. Cost: on a full post the caret is missing.
-- **F35** On a walk-down only the walked goal's line is on the mountain. Cost: other areas' counts are not in view then.
+- **F35** On a walk-down the standing post keeps to the walked goal's line. The other areas still stand at the side wherever they hold something on the step, and can be walked to; what is said there starts its own line (the final review's T1: this line used to say only the walked line is on the mountain, which is not what the screen shows). Cost: a person can wander off the goal being walked down.
 - **F36** With examples on, examples give way before the person's own goals. Cost: sometimes only one example shows.
 - **F37** Every line of a cloth has a fixed height. Cost: an emoji may sit a little low.
 - **F38** (superseded by F39) Where a line may break.
@@ -894,7 +894,7 @@ Each line: what was built, then the cost if the ruling is wrong.
 Process rulings (the controller's, while building):
 
 - **P1** Task 5 made only the view edits needed to compile; Task 6 drew. Cost: none left.
-- **P2** Old state (`expanded`, stubs) kept compiling until Task 9 deleted it. Cost: none left.
+- **P2** Old state (`expanded`, the stubs) was kept compiling while the views moved over. It was never deleted: it is still in the code, read by nothing (`WalkState.swift:30, 107`; `WalkState+Plant.swift:181-191`). Cost: dead code, to delete in a later pass.
 - **P3** The pages passed a no-op for side posts until Task 9 wired them. Cost: none left.
 - **P4** Task 9's goal count reads the demo plan, not a literal. Cost: none.
 - **P5** "The Mac must still build" means no new Mac errors; the Mac target was already broken in two full-edition files (`DinnerCard.swift`, `ListsView.swift`). Cost: a Mac build stays broken for reasons outside this pass.
@@ -919,7 +919,7 @@ Process rulings (the controller's, while building):
 - **P25** American wording in the examples (and, from Task 10, in the demo plans). Cost: wording.
 - **P26** Implementers and reviewers ran on one model after a usage limit stopped a task overnight. Cost: a subtler fault might reach the final review.
 - **P27** Two picture stops moved on the phone (Year closer, Month further left) so side posts stand on land. Cost: his approved phone picture differs on two steps (one line each to restore).
-- **P28** The standing pill's and side pills' names are counted from the font's real capital widths and never shrunk (Task 10); the ground's chips are still by estimate (a known gap). Cost: a long name is cut with "…" on a side pill.
+- **P28** The standing pill's and side pills' names are counted from the font's real capital widths and never shrunk by a view (Task 10); a side pill has two sizes, chosen by the layout (P53, the fix wave). The ground's chips are still by estimate and shrink (a known gap). Cost: a name that does not fit a side pill even at 7.6 pt is cut with "…" after as many letters as fit.
 - **P29** The painting's land is data and every side slot is tested on it. Cost: none.
 - **P30** The pages' side posts walk (Task 9); names counted from real widths (Task 10). Cost: none.
 - **P31** (superseded by F39) No break at a space before punctuation.
@@ -943,6 +943,8 @@ Process rulings (the controller's, while building):
 - **P49** With Move to open on the two smallest windows, the panel can cover the chosen goal on the Year page when an area has a 24-letter name; the panel names the goal, so it is accepted and pinned. Cost: the chosen cloth is under its own panel there.
 - **P50** Today's step stays outside F40: the cloth above is the candidate for "Start the day with …?", and the first thing under it is not its child. Cost: one stacked picture that is not a hierarchy.
 - **P51** Task 9's last open items were done in Task 10 (section D). Cost: none once Task 10 is reviewed.
+- **P52** Three older full-app UI test classes (`CarriedOverUITests`, `PlannerScreensUITests`, `SkinScreenshotsUITests`) are not run in this pass: they sign the repo's shared test account into the live server. One was run once by accident (see "What Scott should look at", item 23). Cost: a full-app fault only those three would catch goes unseen; the nine files the full app depends on are unchanged and `FullHouseholdUnchangedUITests` passes.
+- **P53** A side pill's name has two sizes, chosen by the layout and drawn as chosen (never scaled by a view): 9.5 pt, and 7.6 pt where the whole name does not fit at 9.5. A name that fits at neither is set at 7.6 and cut so it fills the pill by letters after its last whole word ("SIDE PRO…"), never a bare first word with room to spare. Built in the fix wave, with the small size tracked 0.5 so LEARNING stays whole in the phone's narrowest side pill. Cost: 7.6 pt capitals are small on a phone.
 
 ### Where the build differs from the board's numbers, and why
 
@@ -970,6 +972,15 @@ Process rulings (the controller's, while building):
 - During a walk-down, goals the walk did not plant under a goal off the walked line are seen only on the paper; the "Not under a goal yet" stop offers goals off the line, and planting there starts a new line; the loose stop is not kept when a walk is picked back up (it lands on the newest goal above).
 - Left as small cleanups not done in Task 10: `MountainPage` falls back to today's date where its periods are not set yet (requiring them breaks many page tests that build a page without periods); `mountainFoot`'s `paperTop` is computed and pinned but not drawn from; the "one flag cut to fit" branch of the stack was not proven unreachable.
 - The walk at 79% on short windows and the single column on the fold opened flat each want their own board.
+- Added by the final review and the fix wave:
+  - the accessibility audit test accepts four whole kinds of finding (text size, contrast, an unnamed element, unnamed text) rather than named elements, so a new finding of one of those kinds would pass;
+  - the generated sweep draws flags only on the newest goal above; older stops and the "Not under a goal yet" stop are pinned only by hand-written cases;
+  - `Invariants.check`'s F40 block compares the layout with the same functions it draws from, so it cannot catch a wrong rule; the real pins are `WalkGoalAboveTests` and `PlanPaperTests`;
+  - three test tightenings were never shown failing first (the paper's foot bound, the carve-out's `maxY`, the last cloth's 36);
+  - the river's trace is conservative: a band under the wooded spit's bank is not traced as water;
+  - the walk's eyebrow stays above the raised paper and repeats its heading ("DECEMBER" over "December");
+  - "eight letters or fewer is whole on a side pill" is pinned for the names in the tests (the six built-in areas, Garden, Learning, Reading, Friends, Finances, Family, Travel, Studio); a short name of wide letters (WORKSHOP, MORTGAGE) is cut at 7.6 pt;
+  - on Today's step the cloth above (a week task) still says to VoiceOver "the goal this step is about"; only the why line was reworded (A4).
 
 ### What Scott should look at on his phone
 
@@ -981,14 +992,23 @@ In plain words, the things only his eye (or his real Duo) can judge:
 4. **The river's lower bend** (P42): Look back up's post on the phone now stands on the bank (537.5, not 556). `shots/task-10/owner-phone-lookback-foot-after.png`.
 5. **A tall bare pole on Look back up** when an area holds only a year and a season goal: two cloths at the top of a long pole.
 6. **Look back up's cloths hang square** (no tilt), so every cloth keeps a full touch.
-7. **Week's cloth on Look back up skips the task Today's cloth shows** (P38), so one task is not read twice.
+7. **Week's cloth on Look back up skips the task Today's cloth shows** (P38), but only where the area has another task this week. When an area's only task this week is today's, Look back up reads it twice, on the Week cloth and on the Today cloth ("Call the trainer about the Tuesday slot" in the long demo plan; the final review's T3). His call whether that should change.
 8. **The nameless post is read-only on Look back up**; its goals are on every level's paper.
 9. **A partner's goals are listed on the paper** (P35), as the posts count them; the light version has no partner yet.
 10. **Move to on the pages offers every area** (P45), kept or not, and moving a goal to a new area keeps that area.
 11. **The goal above shows only its own goals** (F40, his decision of 2026-11-16): "1 of 3" on the cloth, a tap moves to the next, "Not under a goal yet" for the rest. An empty goal above says "No fall goal under this yet" on a page (`owner-phone-season-empty-stop.png`), and "Hold the light to add one." in the walk. The round includes empty goals above (P48).
 12. **Today is left out of F40** (P50): on Today's step the cloth above is the task "Start the day with …?" asks about, and the first thing under it is not its child. His call whether that should look different.
-13. **While a goal is chosen on a page, its panel covers the area's pill** on phone windows; with Move to open on the two smallest windows it can cover the chosen goal itself when an area has a 24-letter name (P49).
+13. **While a goal is chosen on a page, its panel covers the area's pill** on phone windows; with Move to open on the two smallest windows it can cover the chosen goal itself when an area has a 24-letter name (P49). While a goal is chosen the page shows no hint (the fix wave: it used to say "Tap the goal above to switch" with the goal above under the panel). `shots/fix-wave/owner-phone-month-chosen.png`.
 14. **Example wording** (P21, P25): the lists are drafts; "Grow a kitchen garden" (not "Plant", which the walk never says) and "Text friends about Friday dinner today". Weekday examples can land next week ("on Monday" said on a Friday plants the following Monday).
 15. **Walk it down from a page** (`owner-phone-walkdown-open.png`): it opens standing in the goal's own area, with that goal above.
-16. **Things only the real Duo can confirm** (Task 12): the inside screen still turns; folding with the app open; the outside screen stays upright; a sign-out then a full household signing in on the same phone; the account-deletion sign-out; half open in the middle of the walk.
-17. **Left out of this pass on purpose**: large text on Today and Week and on the controls; Inbox and the rest of Settings; moving between weeks; editing a goal's words; a colour key on Look back up; the walk at 79% on short windows and opened flat (each needs a new board).
+16. **Things only the real Duo can confirm** (Task 12): the inside screen still turns; folding with the app open; the outside screen stays upright; a sign-out then a full household signing in on the same phone; the account-deletion sign-out; half open in the middle of the walk. Why the turning matters: the hold that keeps a phone upright reads the first active scene the app has, not the window's own; that is only a problem if the Duo gives each screen a scene of its own, which only the real Duo shows.
+17. **Four small posts on Look back up stand over the river** (P37's `lookBackRiver` exceptions): on the phone the right inner and outer low posts (Home and People in the demo, `shots/final-review/walk-full-step6.png`); also one slot each on the half window and the inside screen upright. They were left where they are: clearing them means moving that picture or the slots, which only a new board can.
+18. **On a walk-down the other areas still stand at the side** and can be walked to; what is said there starts its own line (the final review's T1; F35's line is corrected above).
+19. **Behind Today and Week nothing says the posts and cloths can be tapped**, though they can (the walk's own Look back up says "Tap a post to see that area"; the final review's T2). His call whether a line should say so.
+20. **The area's name behind Today and Week is gold again** (the fix wave): "See my whole plan" drew the page's dark band over the area's pill and caret, so they read grey, as if switched off; the band now stands under the posts, as on the walk. `shots/fix-wave/owner-phone-today-wholeplan.png`.
+21. **Side pills have two sizes** (P53): a name is set at 9.5 pt, or at 7.6 pt where it does not fit whole; only a long name is cut, after as many letters as fit ("SIDE PRO…"). The small size is small. The ground's chips still shrink a long name. `shots/fix-wave/owner-phone-sidepill.png`.
+22. **The accessibility check found 76 things, accepted, not fixed**: 47 about text size (the mountain's words are a fixed size), 24 about contrast (white words over the painting, among them the hint and "1 of 3", and the muted More, Inbox and the bar's placeholder), and a few unnamed elements. VoiceOver and Reduce Motion were read in the code but never tried by hand on a phone.
+23. **An older full-app test once signed the shared test account into the live server** (Task 10, by accident; it only read, and both its tests failed before reaching Today). Those three older test classes are not part of this pass (P52); whether they fail on main too is unchecked.
+24. **A question left from Task 2 (ledger line 117), still open:** the ledger recorded that on a walk-down where Today already has a first thing off the walked line, the gold Next reads "Start with this one" whenever a week task on the line is the goal above, so taps alone cannot reach Finish without replacing the first thing. Task 3 settled the other half (a first thing just spoken becomes the goal above, so Next reads Finish: P15) and showed that a walk-down with no week task on its line ends without touching the first thing (P14); no test reaches the case with a week task on the line, so whether it still holds is not known. His call what Next should say there.
+25. **Today's step says "Tap the task above to switch."** only while a task stands above the first thing; with the first thing alone on the post it says nothing about switching (the fix wave; it used to say "the goal above" with nothing above). `shots/fix-wave/owner-phone-walk-step5.png`.
+26. **Left out of this pass on purpose**: large text on Today and Week and on the controls; Inbox and the rest of Settings; moving between weeks; editing a goal's words; a colour key on Look back up; the walk at 79% on short windows and opened flat (each needs a new board).

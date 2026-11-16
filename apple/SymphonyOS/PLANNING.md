@@ -77,7 +77,7 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 
 **The goal above shows only its own** (ruling F40, the owner's decision of 2026-11-16). On Season, Month and Week the post shows only the goals whose parent is the goal above shown. A tap on it goes round the area's goals above in planting order, then a "Not under a goal yet" stop for the area's goals hanging under none of them. While there is more than one stop the cloth carries "1 of 3". An empty goal above stays in the round (it is how a first goal is added under it) and says so: "Hold the light to add one." in the walk, "No fall goal under this yet" on a page (P48). Year, Today and Look back up are outside this rule (P50: on Today the cloth above is the task the question asks about).
 
-**The layout's guarantees** (`WalkLayoutTests`, `Invariants.check`, swept over every generated state on a phone and three wider windows, both footings): nothing rises above the question's floor (y 282); no cloth, pill, caret, side post or control meets another; every control takes a touch 44 real points across (`WalkStage.touch`); every cloth's lines fit its width; what a tap does agrees with what VoiceOver says (`Banner.taps`, roles); the counts agree with the paper; the shape of F40. Lines are broken by the app itself (F39: `WalkLayout.breakLines`, the fonts' own widths in `WalkLayout+Lines.swift`), a cut line ends in "…" without a stray comma, and views draw the lines unscaled. The question block ends by y 278 (F30). Area names on the standing pill and the side pills are counted from DM Sans SemiBold's real capital widths and never shrunk (P28, P30); the ground's chips are still counted by estimate and shrink to 0.85 where a name is wider (a known gap).
+**The layout's guarantees** (`WalkLayoutTests`, `Invariants.check`, swept over every generated state on a phone and three wider windows, both footings): nothing rises above the question's floor (y 282); no cloth, pill, caret, side post or control meets another; every control takes a touch 44 real points across (`WalkStage.touch`); every cloth's lines fit its width; what a tap does agrees with what VoiceOver says (`Banner.taps`, roles); the counts agree with the paper; the shape of F40. Lines are broken by the app itself (F39: `WalkLayout.breakLines`, the fonts' own widths in `WalkLayout+Lines.swift`), a cut line ends in "…" without a stray comma, and views draw the lines unscaled. The question block ends by y 278 (F30). Area names on the standing pill and the side pills are counted from DM Sans SemiBold's real capital widths and never shrunk by a view (P28, P30). A side pill has two sizes, chosen by the layout (P53, `WalkLayout.sidePillSet`): 9.5 pt, or 7.6 pt where the whole name does not fit at 9.5; a name that fits at neither is set at 7.6 and cut so it fills the pill by letters ("SIDE PRO…"). The ground's chips are still counted by estimate and shrink to 0.85 where a name is wider (a known gap).
 
 **The paper** (`PlanPaper`, `PlanPaperView`, F7). A plain list of one level by area, raised over the mountain: "+n more", the nameless post, or a Look back up cloth opens it; "Show the mountain" closes it. A row walks to its goal and chooses it, or brings it into sight under its goal above; each row's VoiceOver hint says which. While it is up nothing under it takes a touch.
 
@@ -87,7 +87,7 @@ A walk down the mountain from the year to the first thing today. The core (`Walk
 - Letting go while speaking waits for the last words: the orb is `finishing` until the recogniser ends or `WalkOrb.finishMs` (1 s) passes. Anything the person does in that second (a tap on a flag or a peak, Undo, a compass point through VoiceOver) plants the flag first, under the parent shown when they let go, then takes effect (`WalkEvent.leavesAWaitingFlag`).
 - The walk listens on the phone only. Whether it can is decided at the first real hold, never when the walk is made (ruling D23, `Dictation.onDeviceStart`): on-device support reported, the prompts as needed; none reported with Speech Recognition already decided, typing with no prompt; none reported and never asked, Speech Recognition is asked for, the support read again, and the microphone never asked for while it is still none. Unavailable opens typing, as before.
 - The stage's words stop growing at extra large (`.dynamicTypeSize(...xLarge)` on the stage): its layout is fixed stage points.
-- An area's name is broken by the app at its pill's width and drawn unscaled; a name its lines cannot hold is cut with "…" (a side pill has one line). A ground chip still shrinks a name to 0.85 where it is wider.
+- An area's name is broken by the app at its pill's width and drawn unscaled; a name its lines cannot hold is cut with "…" (a side pill has one line, at 9.5 or 7.6 pt as the layout says: P53). A ground chip still shrinks a name to 0.85 where it is wider.
 - The top shade is drawn between the painting and the world: it darkens the painting behind the words and never dims a flag or a label.
 - A state the layout's hand cannot settle (one the generated sweep missed) is logged as a fault (`WalkLayout.log`), never a crash.
 - A first empty hold shows a quiet note; a second in a row opens typing. Refused or unavailable speech opens typing; for the rest of that walk a tap on the light types and a hold opens the other choices (and leaves them open).
@@ -194,8 +194,10 @@ brings the dock back and leaves nothing light open or waiting.
   area, its side posts walking there, the goal above showing only its own goals (F40). Until the person walks a
   page starts on the parent of the area's newest goal on the level. The hint over the foot reads, first that
   applies: how to begin on an empty page; on a goal above with nothing under it "No fall goal under this yet" /
-  "No November goal under this yet"; "Tap the goal above to switch" while it is one of several; "Tap a post to
-  walk to that area"; "Tap a flag to move it or walk it down". A chosen goal's panel names it and offers Walk it
+  "No November goal under this yet"; "Tap the goal above to switch" while it is one of several (on the stop for
+  the goals under none, "Tap “Not under a goal yet” to switch", the walk's own words); "Tap a post to
+  walk to that area"; "Tap a flag to move it or walk it down". While a goal is chosen there is no hint: its
+  panel stands over the goal above and carries the words. A chosen goal's panel names it and offers Walk it
   down (which opens the walk standing in the goal's own area, on its own line), Move to (every area, P45) and Remove.
 - *The pages' paper foot*: a paper foot at the bottom of the window holding a strip ("Read the whole year",
   "17 goals, as a plain list by area"; one line on windows under 700 high) that raises the level's paper, and
@@ -203,7 +205,8 @@ brings the dock back and leaves nothing light open or waiting.
   walk's (`PlanPaper`); a row walks there or brings its goal into sight. The page's heading hides under it.
 - *See my whole plan* (the handle on Today's and Week's sheet): the sheet lowers over the walk's Look back up
   picture for the plan (`DailyLookBack`): the area top to bottom, the other areas as side posts, a cloth opens
-  its level's paper; a tap on the lowered strip raises the sheet.
+  its level's paper; a tap on the lowered strip raises the sheet. The page's top shade stands under the whole
+  plan's posts (`DailyWholePlan`, `DailyMetrics.wholePlanShade`), so the area's pill and caret are gold, as on the walk.
 - *Which period a page opens on* (the owner's "Where I am, if it has goals", 2026-11-14): for Month, Season
   and Year, `here` is the period holding today and `ahead` the walk's (`WalkPeriods.pick`). The same period:
   that one. Two periods: the page opens on `here` when the person has a goal of their own on that level in
@@ -325,7 +328,10 @@ two (`DailyMetrics.quietLines`).
 - Also: `-TodaySize WxH` and `-HalfOpen laptop|book` (Duo sizes on a phone), `-HalfOpenSplit N`, `-SpreadFold N`, `-SymphonyHandoverRemembers`.
 
 `SymphonyOSUITests/LightDailyUITests`, `LightEditionUITests`, `LightSpreadUITests` and
-`FullHouseholdUnchangedUITests` walk these pages by taps; nothing is typed or spoken.
+`FullHouseholdUnchangedUITests` walk these pages by taps; nothing is typed or spoken. In a demo launch Sign
+Out is local (Debug only, `AuthService.signOut`): it calls nothing on the server. `CarriedOverUITests`,
+`PlannerScreensUITests` and `SkinScreenshotsUITests` sign the repo's shared test account into the live server:
+they are not run for the light work (P52).
 
 **Not designed:** a way to step to another week, month, season or year (only the "‹Month› ends" sign opens a
 past one); a task's time (stored, not shown); opening or ticking a calendar event from Week; the pages and the
