@@ -1189,6 +1189,49 @@ final class WalkFlowTests {
         _ = today.apply(.paperOpened, paperEnv)
         _ = today.apply(.paperRow(off.id), paperEnv)
         #expect(!today.paperOpen && today.focus[.today] == on.id, "a row off the line became the task Today is about")
+
+        // Fix round 2 (1): across areas. Health holds an off-line season goal and a month goal under it; the
+        // walk stands in Home on Month. That row walks to Health, but the off-line goal never becomes the
+        // goal above: what is said next starts a line of the walk down's own.
+        var (cross, _, _) = walkDownMonth()
+        let health = cross.kept[1]
+        let fitter = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health)
+        let offSeason = WalkItem(id: UUID(), level: .season, title: "Lift twice a week", areaId: health, parentId: fitter.id)
+        let gym = WalkItem(id: UUID(), level: .month, title: "Find a gym that fits", areaId: health, parentId: offSeason.id)
+        cross.items += [fitter, offSeason, gym]
+        cross = cross.settled
+        #expect(cross.standing == cross.kept[0])
+        _ = cross.apply(.paperOpened, paperEnv)
+        _ = cross.apply(.paperRow(gym.id), paperEnv)
+        #expect(cross.standing == health && cross.selected == gym.id)
+        #expect(cross.focus[.month] != offSeason.id, "a row put the walk down on another goal's line")
+        _ = cross.plant("Book a trial session", paperEnv)
+        let started = try #require(cross.items.last)
+        #expect(started.title == "Book a trial session" && started.parentId != offSeason.id && started.parentId == nil)
+        #expect(cross.walkingDown.contains(started.id), "the flag said next does not start a line of the walk down's own")
+    }
+
+    /// Fix round 2 (2, 5): a row says it walks there only when it does. On Today, on a walk down, a task
+    /// off the walked line in an area with nothing on the line cannot be stood in: its row is the chosen
+    /// form (it is the walk's own first thing), the walk stays where it stood, nothing is saved, and the
+    /// note under the question names it with Remove only (Today has no Move to).
+    @Test func aRowThatCannotWalkThereSaysSo() throws {
+        var (today, lineSeason, offMonth) = walkDownMonth()
+        let off = WalkItem(id: UUID(), level: .week, title: "Book the skip lorry", areaId: today.kept[1], parentId: offMonth.id, day: now)
+        let on = WalkItem(id: UUID(), level: .week, title: "Call the tiler", areaId: today.kept[0], parentId: lineSeason.id, day: now)
+        today.items += [off, on]
+        today.step = 5
+        today.firstThing = off.id
+        today = today.settled
+        let stood = today.standing
+        #expect(stood == today.kept[0] && !today.walksThere(today.kept[1]))
+        _ = today.apply(.paperOpened, paperEnv)
+        let row = try #require(today.paper(paperEnv.periods)?.sections.flatMap(\.rows).first { $0.id == off.id })
+        #expect(row.hint == WalkCopy.paperRowHint(walks: false, chooses: true, lookingBack: false))
+        let effects = today.apply(.paperRow(off.id), paperEnv)
+        #expect(today.standing == stood && today.selected == off.id && !effects.contains(.save))
+        #expect(today.moveTargets.isEmpty && WalkLayout.unseenChoice(today)?.id == off.id)
+        #expect(WalkCopy.why(today, paperEnv.periods) == WalkCopy.chosenNote(off.title, canMove: false))
     }
 
     /// Fix round 1 (1): a compass action while the paper is up closes the paper first, then acts, so the
@@ -1216,13 +1259,23 @@ final class WalkFlowTests {
         let (s, health, _, goals) = paperMonth()
         var shut = s
         #expect(shut.apply(.paperRow(goals[0].id), paperEnv).isEmpty && shut == s && shut.standing == health)
+        // On the ground (Year): a year goal of the walk's own in Work, while the walk's focus is Health, with
+        // the paper somehow up: nothing at all happens.
         var ground = s
         ground.step = 1
         ground.ground = true
-        let before = ground
+        let goal = WalkItem(id: UUID(), level: .year, title: "Sign one more client", areaId: s.kept[1])
+        ground.items.append(goal)
+        ground.focusArea = s.kept[0]
         ground.paperOpen = true
-        _ = ground.apply(.paperRow(ground.items[0].id), paperEnv)
-        #expect(ground.focusArea == before.focusArea && ground.selected == nil)
+        let before = ground
+        #expect(ground.selects(goal.id) && before.focusArea != goal.areaId)
+        #expect(ground.apply(.paperRow(goal.id), paperEnv).isEmpty && ground == before)
+        // Look back up with the paper shut: a row of another area does nothing.
+        let back = lookBack()
+        var shutBack = back.s
+        #expect(shutBack.standing == back.health)
+        #expect(shutBack.apply(.paperRow(back.workSeason.id), paperEnv).isEmpty && shutBack == back.s)
     }
 
     /// Fix round 1 (3): a row in the area already stood in keeps the goal above the person chose, and only
@@ -1253,7 +1306,7 @@ final class WalkFlowTests {
         #expect(s.selected == loose.id && WalkLayout.unseenChoice(s)?.id == loose.id)
         let layout = WalkLayout.make(s, today: now, footing: .level)
         #expect(!layout.posts.flatMap(\.banners).contains { $0.itemId == loose.id } && layout.moveRow != nil)
-        let note = WalkCopy.chosenNote(loose.title)
+        let note = WalkCopy.chosenNote(loose.title, canMove: true)
         #expect(WalkCopy.why(s, paperEnv.periods) == note)
         #expect(WalkLayout.words(s, paperEnv.periods, wing: 0).showsWhy)
         // Chosen on its own post, the step's own why line stands.

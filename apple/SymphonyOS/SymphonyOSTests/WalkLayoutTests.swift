@@ -2270,6 +2270,102 @@ struct WalkLayoutTests {
     /// (`questionGlyphWidths`, `questionOtherWidths`) alone and in every ordered pair, set by the bundled
     /// face at 32 and at 28 points with its own kerning (no `.kern` attribute: a zero there turns the
     /// kerning off), is never wider than `questionWidth` counts it.
+    /// The why line's face (DM Sans Regular 15): every character and every pair of them the core knows is
+    /// set no wider than it is counted (`whyWidth`), so a why line the core breaks never runs past its room.
+    @Test @MainActor func noWhyPairIsSetWiderThanItIsCounted() throws {
+        var characters: [Character] = (32...126).map { Character(UnicodeScalar($0)!) }
+        characters += WalkLayout.whyOtherWidths.keys.sorted()
+        characters += (0xC0...0x17F).compactMap { UnicodeScalar($0) }.filter { $0.properties.isAlphabetic }.map { Character($0) }
+            .filter { !WalkLayout.whyOtherWidths.keys.contains($0) }
+        let font = try #require(UIFont(name: "DMSans-Regular", size: WalkLayout.whySize), "the bundled face is not there")
+        var wider: [String] = []
+        for a in characters {
+            let alone = String(a)
+            if Self.setWidth(alone, font: font) > WalkLayout.whyWidth(alone) + 0.001 { wider.append("“\(alone)”") }
+            for b in characters {
+                let pair = String([a, b])
+                let set = Self.setWidth(pair, font: font), counted = WalkLayout.whyWidth(pair)
+                if set > counted + 0.001 { wider.append("“\(pair)” set \(set), counted \(counted)") }
+            }
+        }
+        #expect(wider.isEmpty, "\(wider.count) set wider than counted: \(wider.prefix(12))")
+    }
+
+    /// Titles a person may give a flag that the why line's note quotes: long, all capitals, CJK, emoji.
+    static let noteTitles = [
+        "Write the first chapter of the memoir I keep putting off now",
+        String(repeating: "W", count: 60),
+        "WALK THE DOG BEFORE WORK EVERY SINGLE MORNING",
+        "毎朝ジョギングをして健康的な生活を続ける目標を立てる今年こそ必ず",
+        "🏃‍♀️🏃‍♀️🏃‍♀️ Run with the club 👨‍👩‍👧‍👦👨‍👩‍👧‍👦 every Sunday 🎉🎉🎉🎉",
+        String(repeating: "x", count: 60),
+    ]
+
+    /// Fix round 2 (3, F39): the chosen note's lines are broken by the core with DM Sans Regular's own widths
+    /// and drawn as given; set for real (CoreText, kerned) each fits the block's room, on every window.
+    @Test @MainActor func theChosenNotesLinesFitTheirRoom() throws {
+        let font = try #require(UIFont(name: "DMSans-Regular", size: WalkLayout.whySize))
+        var lines = 0
+        for title in Self.noteTitles {
+            for canMove in [true, false] {
+                let note = WalkCopy.chosenNote(title, canMove: canMove)
+                for wing in wings {
+                    let room = WalkLayout.wordsWidth(wing: wing)
+                    for line in WalkLayout.whySetLines(note, wing: wing, limit: .max) {
+                        #expect(Self.setWidth(line, font: font) <= room + 0.001, "“\(line)” at \(room)")
+                        lines += 1
+                    }
+                }
+            }
+        }
+        #expect(lines > 50)
+    }
+
+    /// Fix round 2 (3): with a flag chosen off its post (its title one of `noteTitles`), the words block on
+    /// every generated step and every window still ends above the flags: the note is cut to the lines the
+    /// block holds, never pushed past them. The block's height is the lines it draws: each line the layout
+    /// gives, set for real, fits the block's room (so the view sets exactly these), and they are the count.
+    @Test @MainActor func theChosenNoteNeverPassesTheFlags() throws {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        let font = try #require(UIFont(name: "DMSans-Regular", size: WalkLayout.whySize))
+        var measured: [String: CGFloat] = [:]
+        func set(_ line: String) -> CGFloat {
+            if let known = measured[line] { return known }
+            let width = Self.setWidth(line, font: font)
+            measured[line] = width
+            return width
+        }
+        var checked = 0, noted = 0
+        var problems: [String] = []
+        for base in Generated.all where !base.ground {
+            guard let level = base.level else { continue }
+            let own: WalkLevel = level == .today ? .week : level
+            guard let other = base.items.firstIndex(where: { $0.level == own && base.column(of: $0) != base.standing }) else { continue }
+            for title in Self.noteTitles {
+                var s = base
+                s.items[other].title = title
+                s.selected = s.items[other].id
+                guard WalkLayout.unseenChoice(s) != nil else { continue }
+                for wing in wings {
+                    let words = WalkLayout.words(s, p, wing: wing)
+                    if words.foot > WalkLayout.wordsFootLimit + 0.01 {
+                        problems.append("\(Generated.describe(s)) wing \(wing): foot \(words.foot)")
+                    }
+                    if words.why.count != words.whyLines {
+                        problems.append("\(Generated.describe(s)) wing \(wing): \(words.whyLines) lines counted, \(words.why.count) given")
+                    }
+                    for line in words.why where set(line) > WalkLayout.wordsWidth(wing: wing) + 0.001 {
+                        problems.append("\(Generated.describe(s)) wing \(wing): “\(line)” is set wider than the block")
+                    }
+                    if words.showsWhy { noted += 1 }
+                    checked += 1
+                }
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.count): \(problems.prefix(4))")
+        #expect(checked > 1000 && noted > 500, "checked \(checked), noted \(noted)")
+    }
+
     @Test @MainActor func noQuestionPairIsSetWiderThanItIsCounted() throws {
         var characters: [Character] = (32...126).map { Character(UnicodeScalar($0)!) }
         characters += WalkLayout.questionOtherWidths.keys.sorted()

@@ -71,7 +71,7 @@ enum WalkCopy {
         if s.step == 0 { return welcomeSub }
         guard let level = s.level else { return "" }
         if level == .year, s.ground { return groundWhy }
-        if let chosen = WalkLayout.unseenChoice(s) { return chosenNote(chosen.title) }
+        if let chosen = WalkLayout.unseenChoice(s) { return chosenNote(chosen.title, canMove: !s.moveTargets.isEmpty) }
         var line: String
         switch level {
         case .year: return "Something that would feel true twelve months from now. Big or small."
@@ -424,10 +424,11 @@ enum WalkCopy {
     }
 
     /// P35: in the why line's place, while the chosen flag is one its post does not draw (`WalkLayout.unseenChoice`:
-    /// one chosen from the paper under no area), so the Move row never acts on something unnamed.
+    /// one chosen from the paper under no area), so the Move row never acts on something unnamed. It offers
+    /// Move to only where the Move row has an area to move to (`WalkState.moveTargets`; never on Today).
     static let chosenLength = 40
-    static func chosenNote(_ title: String) -> String {
-        "“\(short(title, length: chosenLength))” is chosen. Move it to an area, or remove it."
+    static func chosenNote(_ title: String, canMove: Bool) -> String {
+        "“\(short(title, length: chosenLength))” is chosen. " + (canMove ? "Move it to an area, or remove it." : "Remove it.")
     }
 
     /// A row on the paper to VoiceOver: what its tap does here (`WalkState.paperRowTap`). On Look back up a

@@ -107,14 +107,25 @@ struct WalkSceneView: View {
                 .accessibilityLabel(set.question)
                 .accessibilityAddTraits(.isStaticText)
                 .accessibilityIdentifier("walk.question")
+                // The why line's lines as the layout broke them (F39), each as given on the line height the
+                // block's height assumes; VoiceOver reads the why line whole.
                 if set.showsWhy {
-                    Text(why)
-                        .font(.custom("DMSans-Regular", fixedSize: 15))
-                        .lineSpacing(WalkLayout.whySpacing)
-                        .foregroundStyle(.white)
-                        .walkGlow()
-                        .modifier(WalkEntrance())
-                        .id(why)
+                    VStack(spacing: WalkLayout.whySpacing) {
+                        ForEach(Array(set.why.enumerated()), id: \.offset) { _, line in
+                            Text(line)
+                                .font(.custom("DMSans-Regular", fixedSize: WalkLayout.whySize))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .frame(height: WalkLayout.whyLine)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .walkGlow()
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(why)
+                    .accessibilityAddTraits(.isStaticText)
+                    .modifier(WalkEntrance())
+                    .id(why)
                 }
             }
             .multilineTextAlignment(.center)

@@ -8,8 +8,8 @@ import CoreGraphics
 /// more than `questionMaxLines` lines at its normal size is set one size smaller, and if the block still
 /// would not end by the limit the why line is not drawn; only if it still would not, the quoted goal is
 /// cut at a word (it is otherwise whole up to `WalkCopy.shortLength`). The question's lines are broken
-/// here, by Crimson Pro's own widths, and drawn as given (F39); the why line's are counted by estimate,
-/// as the compass points' words are.
+/// here, by Crimson Pro's own widths, and the why line's by DM Sans Regular's (`WalkLayout+Why.swift`);
+/// both are drawn as given (F39), so the block's height is the lines it draws.
 extension WalkLayout {
     /// The question block's width: the board less 28 each side, and on a wider window up to 166 wider,
     /// centred on x 195 ("On a wider window").
@@ -18,8 +18,8 @@ extension WalkLayout {
     static let wordsTop: CGFloat = 96
     static func wordsWidth(wing: CGFloat) -> CGFloat { wordsBoardWidth + min(2 * wing, wordsMaxWiden) }
 
-    /// How the block is set: the question's size and lines, the why line's lines (0 when it is not drawn),
-    /// and the block's foot by estimate.
+    /// How the block is set: the question's size and lines, the why line's lines (none when it is not
+    /// drawn: `why`, each drawn as given, and their count), and the block's foot.
     struct Words: Equatable {
         /// The question as the block says it (VoiceOver reads it whole), and the lines it is drawn on.
         let question: String
@@ -27,6 +27,7 @@ extension WalkLayout {
         let questionLines: [String]
         let whyLines: Int
         let foot: CGFloat
+        let why: [String]
         var showsWhy: Bool { whyLines > 0 }
     }
 
@@ -38,10 +39,10 @@ extension WalkLayout {
 
     /// Measured from the bundled faces. Crimson Pro's line is 1.111 of its size (35.6 at 32, 31.1 at 28);
     /// the question's lines are counted from the face's own widths (`questionWidth`). DM Sans 15's line
-    /// is 19.53, with the why line's 1.5 between lines; 7.0 a character gives the why lines' real count.
+    /// is 19.53, with the why line's 1.5 between lines; its lines are broken by its own widths (`whyWidth`).
     /// The eyebrow is one line of 15.62; 8 between the three.
     static let questionLineRatio: CGFloat = 1.111
-    static let whyLine: CGFloat = 19.53, whySpacing: CGFloat = 1.5, whyChar: CGFloat = 7.0
+    static let whyLine: CGFloat = 19.53, whySpacing: CGFloat = 1.5
     static let eyebrowLine: CGFloat = 15.62, blockGap: CGFloat = 8
     /// The lines the question is drawn on at `size` in the block's width: broken by the cloths' own
     /// breaker (`breakLines`, F39) with Crimson Pro's widths, every one, so each is no wider than the block.
@@ -139,8 +140,16 @@ extension WalkLayout {
         return across
     }
 
+    /// How many lines a why line takes in the block, uncut.
     static func whyLines(_ why: String, wing: CGFloat) -> Int {
-        wrap(why, width: wordsWidth(wing: wing), char: whyChar).count
+        whySetLines(why, wing: wing, limit: .max).count
+    }
+
+    /// The most why lines a block with this question still holds above `wordsFootLimit` (0: none).
+    static func whyRoom(questionSize: CGFloat, questionLines: Int) -> Int {
+        var n = 0
+        while wordsFoot(questionSize: questionSize, questionLines: questionLines, whyLines: n + 1) <= wordsFootLimit { n += 1 }
+        return n
     }
 
     /// The block's foot by estimate: the eyebrow, the question, and the why line when it has lines.
@@ -151,18 +160,23 @@ extension WalkLayout {
     }
 
     /// F30, in order: more than three lines at the normal size sets the question one size smaller; a
-    /// block that still would not end by `wordsFootLimit` loses its why line.
-    static func words(question: String, why: String, wing: CGFloat) -> Words {
+    /// block that still would not end by `wordsFootLimit` loses its why line. `cuts` (the note naming a
+    /// chosen flag, P35): instead of going, the why line is cut with "…" to the lines the block holds,
+    /// and goes only where it holds none.
+    static func words(question: String, why: String, wing: CGFloat, cuts: Bool = false) -> Words {
         var size = questionSize
         var lines = questionLines(question, size: size, wing: wing)
         if lines.count > questionMaxLines {
             size = questionSmallSize
             lines = questionLines(question, size: size, wing: wing)
         }
-        var whys = why.isEmpty ? 0 : whyLines(why, wing: wing)
-        if wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys) > wordsFootLimit { whys = 0 }
-        return Words(question: question, questionSize: size, questionLines: lines, whyLines: whys,
-                     foot: wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys))
+        var whys = why.isEmpty ? [] : whySetLines(why, wing: wing, limit: .max)
+        if wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys.count) > wordsFootLimit {
+            let room = cuts ? whyRoom(questionSize: size, questionLines: lines.count) : 0
+            whys = room > 0 ? whySetLines(why, wing: wing, limit: room) : []
+        }
+        return Words(question: question, questionSize: size, questionLines: lines, whyLines: whys.count,
+                     foot: wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys.count), why: whys)
     }
 
     /// The block for a step, from its own words. The last resort (P20): a block that still ends below
@@ -170,11 +184,12 @@ extension WalkLayout {
     /// at a time, until it ends there (`WalkCopy.short`). The goal's flag and the paper carry it whole.
     static func words(_ s: WalkState, _ p: WalkPeriods, wing: CGFloat) -> Words {
         let why = WalkCopy.why(s, p)
-        var set = words(question: WalkCopy.question(s, p), why: why, wing: wing)
+        let cuts = unseenChoice(s) != nil
+        var set = words(question: WalkCopy.question(s, p), why: why, wing: wing, cuts: cuts)
         var quote = WalkCopy.shortLength
         while set.foot > wordsFootLimit, quote > 1 {
             quote -= 1
-            set = words(question: WalkCopy.question(s, p, quoting: quote), why: why, wing: wing)
+            set = words(question: WalkCopy.question(s, p, quoting: quote), why: why, wing: wing, cuts: cuts)
         }
         return set
     }

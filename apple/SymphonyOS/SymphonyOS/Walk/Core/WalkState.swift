@@ -626,12 +626,15 @@ struct WalkState: Equatable {
     }
 
     /// What a row's tap does here (`walkToRow`, and each row's words to VoiceOver): whether the walk goes
-    /// to stand in another area (on Look back up, in that flag's area), and whether the flag is chosen.
+    /// to stand in another area (on Look back up, in that flag's area), and whether the flag is chosen. On
+    /// steps 1 to 5 it walks exactly where a tap on that area's label would (`walksThere`): never to the
+    /// area already stood in, nor to one the walk cannot stand in (on Today, on a walk down, an area with
+    /// nothing on the walked line).
     func paperRowTap(_ id: UUID) -> (walks: Bool, chooses: Bool) {
         guard let row = item(id) else { return (false, false) }
         let column = column(of: row)
         if step == 6 { return (column != nil, false) }
-        return (column != nil && column != standing, selects(id) && row.mine)
+        return (column.map(walksThere) ?? false, selects(id) && row.mine)
     }
 
     /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with
