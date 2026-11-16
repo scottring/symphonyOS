@@ -41,6 +41,17 @@ enum DemoResetService {
         try await supabase.rpc("reset_test_account").execute()
     }
 
+    /// The sync queue (`PendingChange`) and the photo spool, alone: after a clear that failed, so
+    /// nothing queued before the reset is ever sent to the emptied account. Never throws.
+    static func dropQueue(_ container: ModelContainer, spoolBase: URL? = nil) {
+        do {
+            try AccountDeletion.wipe(container, types: [PendingChange.self])
+        } catch {
+            log.error("dropping the sync queue failed: \(error.localizedDescription, privacy: .public)")
+        }
+        PhotoCaptureService.deleteSpool(base: spoolBase)
+    }
+
     /// The saved walk, the handover's line seen, and the signs put away, for this person only.
     /// The remembered edition stays (the household is still light).
     static func forgetWalkMarks(userId: UUID, walk: WalkPositionStore, handover: HandoverMemory, signs: SignpostMemory) {
@@ -71,7 +82,8 @@ enum DemoResetService {
         func resetServer() async throws { try await server() }
 
         /// The main view goes first (so no screen holds a row being cleared), then the store, then
-        /// the photo spool (an unsent photo would upload into the emptied account).
+        /// the photo spool (an unsent photo would upload into the emptied account). If the store
+        /// will not clear, the main view stays down for `dropQueue`, `forgetWalk` and `showUnfinished`.
         func clearPhone() async throws {
             appState.dailyPanel = nil
             appState.demoResetting = true
@@ -86,7 +98,6 @@ enum DemoResetService {
                 try AccountDeletion.wipe(container, types: DemoResetService.clearedTypes)
             } catch {
                 DemoResetService.log.error("clearing the phone failed: \(error.localizedDescription, privacy: .public)")
-                appState.demoResetting = false
                 throw error
             }
             PhotoCaptureService.deleteSpool()
@@ -95,6 +106,16 @@ enum DemoResetService {
         func forgetWalk() {
             DemoResetService.forgetWalkMarks(userId: userId, walk: walk, handover: handover, signs: signs)
         }
+
+        /// Unsaved writes in the main context (the save that failed) are let go first, so no later
+        /// autosave can put a queued change back.
+        func dropQueue() {
+            container.mainContext.rollback()
+            DemoResetService.dropQueue(container)
+        }
+
+        /// The main view comes back; sync stays off (the held engine is not restarted).
+        func showUnfinished() { appState.demoResetting = false }
 
         func startOver() async {
             appState.restartSync?()

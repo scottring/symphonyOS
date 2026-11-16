@@ -326,6 +326,10 @@ extension DailyCopy {
     static let demoResetConfirmBody = "Everything in this demo account is removed. This can’t be undone."
     static let demoResetConfirm = "Start over", demoResetCancel = "Cancel"
     static let demoResetFailed = "Couldn’t start over. Check the connection and try again."
+    /// The server was emptied but the phone could not be cleared (`DemoReset.Outcome.unfinished`).
+    static let demoResetUnfinished = "Couldn’t finish starting over. Try again."
+    /// What VoiceOver says for the row while it runs.
+    static let demoResetRunningSpoken = "Starting over"
 }
 
 // MARK: Half open

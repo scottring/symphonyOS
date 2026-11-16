@@ -39,6 +39,8 @@ struct DemoResetTests {
         }
         func forgetWalk() { calls.append("forgetWalk") }
         func startOver() async { calls.append("startOver") }
+        func dropQueue() { calls.append("dropQueue") }
+        func showUnfinished() { calls.append("showUnfinished") }
     }
 
     @Test func stepsRunInOrder() async {
@@ -64,13 +66,63 @@ struct DemoResetTests {
         #expect(steps.calls == ["pauseSync", "resumeSync"])
     }
 
-    /// The server was emptied but the phone's store would not clear: sync stays off (the old rows
-    /// would go back up), nothing is forgotten, no walk opens.
-    @Test func aStoreThatWillNotClearKeepsSyncOff() async {
+    /// The server was emptied but the phone's store would not clear: the sync queue (and the photo
+    /// spool) still go, so nothing queued can reach the emptied account, even after a relaunch; the
+    /// walk's marks are still forgotten; sync stays off, no walk opens, and the outcome is its own
+    /// (its line does not blame the connection).
+    @Test func aStoreThatWillNotClearStillDropsTheQueueAndForgetsTheWalk() async {
         let steps = FakeSteps()
         steps.clearFails = true
-        #expect(await DemoReset.run(steps) == .failed)
-        #expect(steps.calls == ["pauseSync", "resetServer", "clearPhone"])
+        #expect(await DemoReset.run(steps) == .unfinished)
+        #expect(steps.calls == ["pauseSync", "resetServer", "clearPhone", "dropQueue", "forgetWalk", "showUnfinished"])
+    }
+
+    /// The other failures never touch the queue.
+    @Test func onlyAnUnfinishedClearDropsTheQueueAlone() async {
+        for setUp in [{ (s: FakeSteps) in s.settles = false }, { (s: FakeSteps) in s.serverFails = true }, { (_: FakeSteps) in }] {
+            let steps = FakeSteps()
+            setUp(steps)
+            _ = await DemoReset.run(steps)
+            #expect(!steps.calls.contains("dropQueue"))
+            #expect(!steps.calls.contains("showUnfinished"))
+        }
+    }
+
+    /// The queue and the spool go; the rows they would have sent stay until a clear succeeds.
+    @Test func droppingTheQueueLeavesTheRowsAndRemovesTheSpool() throws {
+        let container = try container()
+        let uid = UUID()
+        let ctx = ModelContext(container)
+        ctx.insert(Goal(id: UUID(), userId: uid, name: "g", year: 2026))
+        ctx.insert(PendingChange(tableName: "goals", recordId: UUID(), changeType: "insert"))
+        ctx.insert(PendingChange(tableName: "tasks", recordId: UUID(), changeType: "update"))
+        try ctx.save()
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let dir = PhotoCaptureService.spoolDirectory(in: base)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data([1]).write(to: dir.appendingPathComponent("\(UUID().uuidString).jpg"))
+
+        DemoResetService.dropQueue(container, spoolBase: base)
+
+        let after = ModelContext(container)
+        #expect(try after.fetchCount(FetchDescriptor<PendingChange>()) == 0)
+        #expect(try after.fetchCount(FetchDescriptor<Goal>()) == 1)
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
+        try? FileManager.default.removeItem(at: base)
+    }
+
+    // MARK: The sync engine's hold
+
+    /// Only `stopAndSettle` holds the engine (no push, no push loop, no realtime subscribe after it);
+    /// a plain stop, the path sign-out and account deletion take, never does. No network: the engine
+    /// is never started and has no channels.
+    @Test func onlyStopAndSettleHoldsTheEngine() async throws {
+        let engine = SyncEngine(modelContainer: try container())
+        #expect(await !engine.isHeld)
+        await engine.stop()
+        #expect(await !engine.isHeld)
+        #expect(await engine.stopAndSettle())
+        #expect(await engine.isHeld)
     }
 
     // MARK: The phone
@@ -154,7 +206,9 @@ struct DemoResetTests {
         #expect(DailyCopy.demoResetConfirm == "Start over")
         #expect(DailyCopy.demoResetCancel == "Cancel")
         #expect(DailyCopy.demoResetFailed == "Couldn’t start over. Check the connection and try again.")
+        #expect(DailyCopy.demoResetUnfinished == "Couldn’t finish starting over. Try again.")
+        #expect(DailyCopy.demoResetRunningSpoken == "Starting over")
         #expect(DailyCopy.demoResetRunning == "Starting over…")
-        for line in [DailyCopy.demoResetConfirmBody, DailyCopy.demoResetFailed] { #expect(!line.contains("'")) }
+        for line in [DailyCopy.demoResetConfirmBody, DailyCopy.demoResetFailed, DailyCopy.demoResetUnfinished] { #expect(!line.contains("'")) }
     }
 }

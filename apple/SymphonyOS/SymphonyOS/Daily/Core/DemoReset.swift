@@ -13,10 +13,20 @@ enum DemoReset {
     }
 
     /// The row's state: waiting for a tap, running (it shows progress and takes no second tap),
-    /// or failed (one plain line under it).
-    enum Phase: Equatable { case idle, running, failed }
+    /// failed (nothing changed: one plain line under it about the connection), or unfinished (the
+    /// server was emptied but the phone was not cleared: a line of its own).
+    enum Phase: Equatable { case idle, running, failed, unfinished }
 
-    enum Outcome: Equatable { case startedOver, failed }
+    enum Outcome: Equatable { case startedOver, failed, unfinished }
+
+    /// The row's state after a run.
+    static func phase(after outcome: Outcome) -> Phase {
+        switch outcome {
+        case .startedOver: .idle
+        case .failed: .failed
+        case .unfinished: .unfinished
+        }
+    }
 
     /// The steps in order, each only after the one before it succeeded:
     /// 1. sync stops, and whatever it was sending or bringing in finishes, so nothing queued on
@@ -28,8 +38,10 @@ enum DemoReset {
     ///
     /// Until the server has said yes nothing on the phone is touched: a sync that will not settle,
     /// or a server that refuses (offline, not a test account), only lets sync run again as it did.
-    /// If the phone's store cannot be cleared after the server was emptied, sync is left off, so
-    /// the rows still on the phone are never sent back up; nothing is forgotten and no walk opens.
+    /// If the phone's store cannot be cleared after the server was emptied, the sync queue (and the
+    /// photo spool) are still dropped, so nothing queued can reach the emptied account, even after
+    /// a relaunch; the walk's marks are still forgotten; sync stays off, no walk opens, and the
+    /// outcome is `unfinished`, whose line says so (a tap again finishes the job).
     @MainActor
     static func run(_ steps: some DemoResetSteps) async -> Outcome {
         guard await steps.pauseSync() else {
@@ -45,7 +57,10 @@ enum DemoReset {
         do {
             try await steps.clearPhone()
         } catch {
-            return .failed
+            steps.dropQueue()
+            steps.forgetWalk()
+            steps.showUnfinished()
+            return .unfinished
         }
         steps.forgetWalk()
         await steps.startOver()
@@ -68,4 +83,8 @@ protocol DemoResetSteps {
     func forgetWalk()
     /// Sync from fresh, and the walk's Welcome.
     func startOver() async
+    /// After a clear that failed: the sync queue and the photo spool alone. Never throws.
+    func dropQueue()
+    /// After a clear that failed: the screens come back as they were; sync stays off.
+    func showUnfinished()
 }

@@ -22,6 +22,7 @@ struct DemoResetRow: View {
             HStack(spacing: 12) {
                 Image(systemName: "arrow.counterclockwise")
                     .foregroundStyle(Color.textSecondary)
+                    .accessibilityHidden(true)   // VoiceOver may read the symbol as "Undo"
                 VStack(alignment: .leading, spacing: 2) {
                     Text(running ? DailyCopy.demoResetRunning : DailyCopy.demoResetRow)
                         .foregroundStyle(Color.textPrimary)
@@ -34,6 +35,8 @@ struct DemoResetRow: View {
             }
         }
         .disabled(running)
+        .accessibilityLabel(running ? DailyCopy.demoResetRunningSpoken : DailyCopy.demoResetRow)
+        .accessibilityHint(running ? "" : DailyCopy.demoResetLine)
         .accessibilityIdentifier("settings.demoReset")
         .alert(DailyCopy.demoResetConfirmTitle, isPresented: $confirming) {
             Button(DailyCopy.demoResetConfirm, role: .destructive) { start() }
@@ -42,8 +45,8 @@ struct DemoResetRow: View {
             Text(DailyCopy.demoResetConfirmBody)
         }
 
-        if appState.demoReset == .failed {
-            Text(DailyCopy.demoResetFailed)
+        if let line = Self.line(for: appState.demoReset) {
+            Text(line)
                 .font(.footnote)
                 .foregroundStyle(Color.feedbackRed)
                 .accessibilityIdentifier("settings.demoReset.failed")
@@ -57,7 +60,20 @@ struct DemoResetRow: View {
         let state = appState
         Task { @MainActor in
             let outcome = await DemoReset.run(steps)
-            state.demoReset = outcome == .startedOver ? .idle : .failed
+            state.demoReset = DemoReset.phase(after: outcome)
+            // Said as it appears, wherever the person is (an unfinished clear has closed Settings).
+            if let line = Self.line(for: state.demoReset) {
+                AccessibilityNotification.Announcement(line).post()
+            }
+        }
+    }
+
+    /// The line under the row: none, or the one for how it failed.
+    private static func line(for phase: DemoReset.Phase) -> String? {
+        switch phase {
+        case .idle, .running: nil
+        case .failed: DailyCopy.demoResetFailed
+        case .unfinished: DailyCopy.demoResetUnfinished
         }
     }
 

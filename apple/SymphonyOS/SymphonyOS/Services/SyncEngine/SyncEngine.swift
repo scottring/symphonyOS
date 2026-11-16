@@ -18,6 +18,12 @@ actor SyncEngine {
     private var isSyncing = false
     private var userId: UUID?
     private var pushTask: Task<Void, Never>?
+    /// Set only by `stopAndSettle` (a demo started over, `DemoReset`) and cleared only by `start`:
+    /// while it is set no push runs and no push loop or realtime subscription starts, so nothing
+    /// that was under way when the engine was stopped (a `start` still joining channels, a
+    /// `resync` paused in its push, a network callback already queued) can send a row after the
+    /// server was emptied. Never set in any other path, so with it clear nothing changes.
+    private(set) var isHeld = false
     /// Told, once per pull, as soon as the signed-in person's `households` rows are in (signed in, the
     /// pull and its save succeeded), before the other fifteen tables: the light edition reads its
     /// edition from them (ruling D24). Nothing else about the pull changes.
@@ -56,6 +62,7 @@ actor SyncEngine {
     @discardableResult
     func start(userId: UUID, onFirstPull: (@MainActor @Sendable (Bool) -> Void)? = nil,
                onHouseholds: (@MainActor @Sendable () -> Void)? = nil) async -> Bool {
+        isHeld = false
         self.userId = userId
         self.onHouseholds = onHouseholds
         // Diagnostic + safeguard: force the auth session to load so PostgREST
@@ -102,6 +109,7 @@ actor SyncEngine {
     /// delivers, so this replaces rather than tops up — and without the teardown
     /// every foreground would stack another set of channels.
     private func resubscribeToRealtime() async {
+        guard !isHeld else { return }
         for task in statusTasks { task.cancel() }
         statusTasks.removeAll()
         // removeChannel, NOT unsubscribe: unsubscribe leaves the topic registered on
@@ -120,6 +128,7 @@ actor SyncEngine {
     /// this loop pushes them within a few seconds (previously push only ran on a
     /// network reconnect, so edits effectively never synced).
     private func startPushLoop() {
+        guard !isHeld else { return }
         pushTask?.cancel()
         pushTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -154,6 +163,7 @@ actor SyncEngine {
     /// caller's next step. Used only by a demo started over (`DemoReset`), before the server is
     /// emptied. False when it is still busy after `timeout`.
     func stopAndSettle(timeout: Duration = .seconds(15)) async -> Bool {
+        isHeld = true
         await stop()
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
@@ -166,7 +176,7 @@ actor SyncEngine {
 
     /// Push all pending local changes to Supabase.
     func pushPendingChanges() async {
-        guard isOnline, !isSyncing else { return }
+        guard !isHeld, isOnline, !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
 
@@ -913,6 +923,7 @@ actor SyncEngine {
     // MARK: - Realtime Subscriptions
 
     private func subscribeToRealtime() async {
+        guard !isHeld else { return }
         let tablesToWatch = ["tasks", "projects", "routines", "contacts", "family_members",
                              "actionable_instances", "event_notes"]
 
