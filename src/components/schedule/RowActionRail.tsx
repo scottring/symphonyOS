@@ -205,10 +205,25 @@ export function RowActionRail({
     { node: null, className: SLOT },
   ]
 
+  // Today's To do column is narrow, so there the rail holds no room for
+  // what is not showing (today-journal.css; review, 2026-11-16: a title
+  // wrapped to four lines beside 180px of nothing). The hooks say which cell
+  // is which: `who` reads at rest, a `ctl` waits under hover (numbered from
+  // the row's end), `spare` is the empty spacer. Elsewhere they change nothing.
+  const whoShown = !!who && assigned && !onlySelf
+  const kinds: Array<'who' | 'ctl' | 'spare'> = [
+    !who ? 'spare' : whoShown ? 'who' : 'ctl',
+    context ? 'ctl' : 'spare',
+    verb ? 'ctl' : 'spare',
+    'spare',
+  ]
+  let n = kinds.filter((k) => k === 'ctl').length
+  const hooks = kinds.map((k) => k === 'who' ? { 'data-rail-who': '' } : k === 'ctl' ? { 'data-rail-ctl': String(--n) } : { 'data-rail-spare': '' })
+
   return (
-    <div className={RAIL}>
+    <div className={RAIL} data-rail>
       {cells.map((cell, i) => (
-        <div key={i} data-rail-slot data-only-self={cell.onlySelf || undefined} className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
+        <div key={i} data-rail-slot data-only-self={cell.onlySelf || undefined} {...hooks[i]} className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
           {cell.node}
         </div>
       ))}

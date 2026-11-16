@@ -55,6 +55,10 @@ export interface AboveSheetProps {
   /** Today's week sheet only: how many rows show before the rest fold into
    *  an "N more" line (Scott, 2026-11-09). A single extra row is not folded. */
   shortList?: number
+  /** Today's week sheet only: the caller owns the fold. Rows past
+   *  `shortList` show when true, and the sheet draws no "N more" of its own:
+   *  one "Show rest of week" opens these and the later days together. */
+  expanded?: boolean
   /** More of the sheet, under the list and above the foot (Today's
    *  "Routines today", drawn with SheetRows). */
   children?: ReactNode  /** A heading over the rows (Today's week sheet: "Sometime this week"). */
@@ -226,10 +230,12 @@ export function SheetRows({ rows, label, onPick, pickLabel = defaultPickLabel, o
   )
 }
 
-export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onComplete, rowTools, onReopen, doneRows, onNextStep, onOpen, onDragRow, onReorder, shortList, children, className, rowsHeading }: AboveSheetProps) {
-  const [showAll, setShowAll] = useState(false)
+export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick, pickLabel, onComplete, rowTools, onReopen, doneRows, onNextStep, onOpen, onDragRow, onReorder, shortList, expanded, children, className, rowsHeading }: AboveSheetProps) {
+  const [ownShowAll, setShowAll] = useState(false)
   const [showDone, setShowDone] = useState(false)
-  const canFold = shortList !== undefined && rows.length > shortList + 1
+  const owned = expanded !== undefined
+  const showAll = owned ? expanded : ownShowAll
+  const canFold = shortList !== undefined && (owned ? rows.length > shortList : rows.length > shortList + 1)
   const shown = canFold && !showAll ? rows.slice(0, shortList) : rows
   return (
     <div className={className ? `above-sheet ${className}` : 'above-sheet'}>
@@ -241,7 +247,7 @@ export function AboveSheet({ kicker, title, rows, doneCount, foot, empty, onPick
       ) : empty ? (
         <p className="above-sheet-empty">{empty}</p>
       ) : null}
-      {canFold && (
+      {canFold && !owned && (
         <button type="button" className="above-sheet-more" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
           {showAll ? 'Show fewer' : `${rows.length - shortList} more`}
         </button>

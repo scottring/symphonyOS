@@ -67,6 +67,24 @@ const SPARE = 3
 const ICON_SLOTS = [CONTEXT, VERB, SPARE]
 
 describe('RowActionRail', () => {
+  // Today's To do column gives the title the row (today-journal.css; review,
+  // 2026-11-16): the hooks say which cells read at rest and which wait.
+  it('marks each cell for the narrow To do column: who, controls numbered from the row’s end, spare', () => {
+    const { container } = renderRail()
+    const cells = [...slots(container)]
+    // Nobody to assign here: the who cell holds nothing.
+    expect(cells[WHO]).toHaveAttribute('data-rail-spare')
+    expect(cells[CONTEXT]).toHaveAttribute('data-rail-ctl', '1')
+    expect(cells[VERB]).toHaveAttribute('data-rail-ctl', '0')
+    expect(cells[SPARE]).toHaveAttribute('data-rail-spare')
+    expect(container.querySelector('[data-rail]')).toContainElement(cells[WHO] as HTMLElement)
+  })
+  it('a done task has no verb: its context is the control nearest the row’s end', () => {
+    const { container } = renderRail({ completed: true })
+    const cells = [...slots(container)]
+    expect(cells[VERB]).toHaveAttribute('data-rail-spare')
+    expect(cells[CONTEXT]).toHaveAttribute('data-rail-ctl', '0')
+  })
   // The whole point of the rail: the same number of cells on every row, so the
   // controls form columns down the page. Before this, a task rendered six
   // trailing controls, an event five, a routine three — and nothing lined up.

@@ -437,6 +437,15 @@ export const ScheduleItem = memo(function ScheduleItem({
           {fromEmail && (
             <div className="text-[12px] text-neutral-500 mt-0.5">{emailBadge}</div>
           )}
+          {/* Flagged to talk about: said on the row, as the desktop row's
+              bubble says it, so Today's "To talk about" line need not repeat
+              the task under the list (review, 2026-11-16). */}
+          {item.needsDiscussion && !item.completed && (
+            <div className="flex items-center gap-1.5 text-[12px] text-primary-600 mt-0.5 min-w-0" data-testid="row-talk">
+              <MessageCircle className="w-3 h-3 shrink-0" aria-hidden />
+              <span className="truncate">To talk about{item.discussionNote?.trim() ? ` · ${item.discussionNote.trim()}` : ''}</span>
+            </div>
+          )}
           {/* What this step is for, on the phone too — a phone has no hover to
               reveal it, so the commitment has to be on the row itself. */}
           {item.goalLabel && !item.completed && (

@@ -179,19 +179,19 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         {/* The same four-cell rail a task row draws (who · context · verb ·
             ⋯), so a routine's people sit in the task rows' people column
             instead of wherever its name happened to end. */}
-        <div className={RAIL}>
-        <div className={`shrink-0 md:w-[5.25rem] md:h-7 md:flex md:items-center md:justify-end transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
+        <div className={RAIL} data-rail>
+        <div {...(owners.length ? { 'data-rail-who': '' } : { 'data-rail-ctl': '1' })} className={`shrink-0 md:w-[5.25rem] md:h-7 md:flex md:items-center md:justify-end transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
           {onAssignAll && familyMembers.length > 0 && (
             <MultiAssigneeDropdown members={familyMembers} selectedIds={owners} onSelect={onAssignAll} size="sm"
               label="Who's responsible?" triggerLabel={`Assign people to ${item.title}`} />
           )}
         </div>
-        <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
-        <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
+        <div data-rail-spare="" className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
+        <div data-rail-spare="" className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
         {/* Management menu: Hide for today / edit / Off, mirroring task rows —
             and like theirs, quiet until you reach for it on desktop. Rest
             until… (the strongest) lives in the routine's panel. */}
-        <div className={`relative ${RAIL_SLOT} transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100`}>
+        <div data-rail-ctl="0" className={`relative ${RAIL_SLOT} transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100`}>
           <button
             aria-label="Routine options"
             onClick={() => setMgmtOpen(o => !o)}

@@ -620,7 +620,7 @@ export function TodayView({
   const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
 
   // Open talk-abouts (flagged tasks): one quiet line under For today.
-  const discussion = discussionItems(tasks)
+  const discussionAll = useMemo(() => discussionItems(tasks), [tasks])
   // Goals with an open choice: a way back to a project once the day's
   // tasks for it are ticked off. Same area filter as everything else here.
   const inProgressAll = useInProgressGoals()
@@ -1291,6 +1291,13 @@ export function TodayView({
     for (const key of Object.keys(out) as DaySection[]) out[key] = (out[key] ?? []).filter(notHidden)
     return out
   }, [focusWork.active, notHidden])
+  // To talk about says each thing once (review, 2026-11-16): a flagged task
+  // already in To do wears its conversation bubble there, so the line under
+  // the list keeps only what the list is not showing.
+  const discussion = useMemo(() => {
+    const inToDo = new Set((['allday', 'unscheduled'] as DaySection[]).flatMap((k) => focusActive[k] ?? []).map((i) => i.id))
+    return discussionAll.filter((d) => !inToDo.has(`task-${d.id}`))
+  }, [discussionAll, focusActive])
   // Routines leave the grid unless pinned or placed on this day; their time
   // still counts (dayRoutines.ts). A row a change card marks stays where the
   // card can mark it.
@@ -1537,23 +1544,24 @@ export function TodayView({
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell
         // there is no foot row at all (it was an empty ruled row, 2026-09-23).
-        // Wide page: the day's details on one line under the title — the
-        // specials and other all-day things, the weather, dinner.
+        // A phone outside the shell keeps its controls strip here.
         footer={journalHead
-          ? <>
-              {(journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
-                <div className="today-mast-meta" data-testid="today-mast-meta">
-                  {allDayBlock}
-                  {data.isToday && <WeatherChip now={nowForDisplay} />}
-                  {dinnerLink}
-                </div>
-              )}
-              {/* A phone outside the shell keeps its controls strip here. */}
-              {!foldedControls && !desktopControls && desktopToolbar}
-            </>
+          ? (!foldedControls && !desktopControls ? desktopToolbar : undefined)
           : !desktopControls ? desktopToolbar : undefined}
 
       />
+      {/* The day's details on one plain strip under the picture: the
+          specials and other all-day things, the weather, dinner. On paper,
+          never over the print, so they read the same whatever the scenery
+          is (review, 2026-11-16: by the dinner the eye was reading across
+          train windows). */}
+      {journalHead && (journal.allDayEvents.length > 0 || data.isToday || dinnerLink) && (
+        <div className="today-mast-meta today-day-strip" data-testid="today-mast-meta">
+          {allDayBlock}
+          {data.isToday && <WeatherChip now={nowForDisplay} />}
+          {dinnerLink}
+        </div>
+      )}
       {/* What the day's planning left: one quiet line under the title. */}
       <div className="px-4 md:px-0 empty:hidden">{dayLine}</div>
       {/* The Day session's door, when the controls are not folded. */}

@@ -373,6 +373,25 @@ describe('TodayView', () => {
       renderView({ tasks: [{ ...flagged, completed: true }] })
       expect(screen.queryByRole('group', { name: 'To talk about' })).toBeNull()
     })
+    // Review, 2026-11-16: "Text Greta…" stood in To do and again under To
+    // talk about. In To do it wears its conversation bubble; the line keeps
+    // only what the list is not showing.
+    it('says a flagged task once: on its To do row, marked to talk about, not again on the line', () => {
+      const chosen = { ...flagged, id: 'disc-2', title: 'Text Greta re sleepover', discussionNote: 'who drives', bucket: 'timed', scheduledFor: TODAY, isAllDay: true }
+      renderView({ tasks: [chosen, flagged] })
+      const toDo = screen.getByRole('region', { name: 'To do' })
+      expect(within(toDo).getAllByText('Text Greta re sleepover')).toHaveLength(1)
+      // The phone row says it in words; the desktop row wears the bubble.
+      expect(within(toDo).getByTestId('row-talk')).toHaveTextContent('To talk about · who drives')
+      const line = screen.getByRole('group', { name: 'To talk about' })
+      expect(within(line).queryByText(/Text Greta/)).toBeNull()
+      expect(within(line).getByRole('button', { name: 'Summer camp · with Iris' })).toBeInTheDocument()
+    })
+    it('drops the line when To do already shows everything flagged', () => {
+      renderView({ tasks: [{ ...flagged, bucket: 'timed', scheduledFor: TODAY, isAllDay: true }] })
+      expect(screen.getByRole('region', { name: 'To do' })).toHaveTextContent('Summer camp')
+      expect(screen.queryByRole('group', { name: 'To talk about' })).toBeNull()
+    })
   })
 
   it('the ⋯ menu holds only Hide daily, Print list and Paper sounds', async () => {
@@ -1078,10 +1097,13 @@ describe('TodayView weather', () => {
   afterEach(() => mockUseWeather.mockImplementation(() => noWeather))
   const reading = { weather: { currentTemp: 63, weatherCode: 0, condition: 'Clear', highTemp: 78, lowTemp: 58, hourlyForecast: [] }, loading: false, error: null, requestLocation: vi.fn() }
 
-  it("rides in the masthead on today's page", () => {
+  // On the plain strip under the picture, never over the print (review, 2026-11-16).
+  it("stands on the day's strip under the masthead on today's page", () => {
     mockUseWeather.mockImplementation(() => reading)
     renderView()
-    const ear = within(screen.getByTestId('masthead-card')).getByTestId('today-mast-meta')
+    const ear = screen.getByTestId('today-mast-meta')
+    expect(within(screen.getByTestId('masthead-card')).queryByTestId('today-mast-meta')).not.toBeInTheDocument()
+    expect(screen.getByTestId('masthead-card').compareDocumentPosition(ear) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(ear).getByText('63°')).toBeInTheDocument()
     expect(within(ear).getByText('78° / 58°')).toBeInTheDocument()
   })

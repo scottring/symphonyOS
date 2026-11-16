@@ -65,7 +65,12 @@ it('"+" places the existing action without replacing its parent link; failed sav
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}><p>Existing calendar and routines</p></AlongsideDay></MemoryRouter>)
  unfold()
  fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
- await screen.findByText(/Could not place this action/)
+ // The banner names the task, says where it still is, and holds its Retry (review, 2026-11-16).
+ const alert=await screen.findByRole('alert')
+ expect(alert).toHaveTextContent('Couldn’t plan “Choose picnic spot” for Fri, Oct 9. It is still on the week’s list.')
+ fireEvent.click(within(alert).getByRole('button',{name:'Retry'}))
+ await waitFor(()=>expect(update).toHaveBeenCalledTimes(2))
+ expect(update.mock.calls[1]).toEqual(update.mock.calls[0])
  expect(update).toHaveBeenCalledWith('same-id',{isAllDay:true,scheduledFor:date,bucket:'timed'})
  expect(update.mock.calls[0][1]).not.toHaveProperty('sourceId')
  update.mockResolvedValue(true);fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
@@ -162,7 +167,7 @@ it('a placement that saved is heard by the day; one that failed is not',async()=
  render(<MemoryRouter><AlongsideDay tasks={[task]} date={date} update={update} loading={false} error={false} retry={()=>{}}><Day/></AlongsideDay></MemoryRouter>)
  unfold()
  fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
- await screen.findByText(/Could not place this action/)
+ await screen.findByText(/Couldn’t plan “Choose picnic spot”/)
  expect(heard).not.toHaveBeenCalled()
  update.mockResolvedValue(true)
  fireEvent.click(screen.getByRole('button',{name:'Plan Choose picnic spot for Friday'}))
@@ -238,7 +243,43 @@ it('the workspace’s week sheet shows the first five tasks and folds the rest',
  render(<MemoryRouter><AlongsideDay tasks={many} date={date} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
  unfold()
  expect(within(document.querySelector('.vt-sheet-week .above-sheet-list') as HTMLElement).getAllByRole('listitem')).toHaveLength(5)
- expect(screen.getByRole('button',{name:'14 more'})).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:'Show rest of week · 14 more'})).toBeInTheDocument()
+})
+
+// Review, 2026-11-16: beside the day, Friday's errand stood as large as this
+// afternoon's work. The sheet shows the next day's; one control opens the rest.
+it('beside the day the sheet shows tomorrow’s tasks, and one control opens the rest of the week',()=>{
+ // Mon Oct 5, in the Sunday-start week Oct 4 – Oct 10.
+ const monday=new Date(2026,9,5)
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,5,9));onTestFinished(()=>{vi.useRealTimers()})
+ const on=(id:string,title:string,day:number)=>({id,title,createdAt:monday,completed:false,scheduledFor:new Date(2026,9,day),isAllDay:true}) as Task
+ const pool=Array.from({length:7},(_,i)=>({id:`p${i}`,title:`Pool ${i+1}`,createdAt:monday,completed:false,sourceId:'month'}) as Task)
+ render(<MemoryRouter><AlongsideDay tasks={[...pool,on('tue','Ukulele forms',6),on('thu','Study for the test',8),on('fri','Order pizzas',9)]} date={monday} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ const titles=(name:string)=>within(screen.getByRole('list',{name})).getAllByRole('listitem').map((li)=>li.querySelector('.above-sheet-row-title')?.textContent)
+ expect(titles('This week')).toHaveLength(5)
+ expect(titles('Tomorrow')).toEqual(['Ukulele forms'])
+ expect(screen.queryByText('Order pizzas')).toBeNull()
+ expect(screen.queryByRole('list',{name:'Later this week'})).toBeNull()
+ // 2 more with no day + 2 on later days.
+ const more=screen.getByRole('button',{name:'Show rest of week · 4 more'})
+ expect(more).toHaveAttribute('aria-expanded','false')
+ expect(screen.queryByRole('button',{name:/^\d+ more$/})).toBeNull()
+ fireEvent.click(more)
+ expect(titles('This week')).toHaveLength(7)
+ expect(titles('Later this week')).toEqual(['Ukulele forms','Study for the test','Order pizzas'])
+ fireEvent.click(screen.getByRole('button',{name:'Show less of the week'}))
+ expect(titles('Tomorrow')).toEqual(['Ukulele forms'])
+})
+
+it('a lone extra row is never folded: the sheet shows the whole week',()=>{
+ const monday=new Date(2026,9,5)
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,5,9));onTestFinished(()=>{vi.useRealTimers()})
+ const fri={id:'fri',title:'Order pizzas',createdAt:monday,completed:false,scheduledFor:new Date(2026,9,9),isAllDay:true} as Task
+ render(<MemoryRouter><AlongsideDay tasks={[task,fri]} date={monday} update={vi.fn()} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
+ unfold()
+ expect(within(screen.getByRole('list',{name:'Later this week'})).getByText('Order pizzas')).toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:/Show rest of week/})).toBeNull()
 })
 
 it('checks a week task off from the sheet, and Undo is the same toggle',async()=>{

@@ -7,6 +7,20 @@
 .ad-shell { position: relative; color: var(--color-neutral-800); }
 .ad-status { font-size: 13px; color: var(--color-primary-700); margin: 0 2.5rem 10px; }
 .ad-status:empty { display: none; }
+/* A placement that did not save: what, where it still is, and Retry. */
+.ad-status-failed {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 12px;
+  border: 1px solid hsl(12 60% 84%); border-radius: 10px; background: hsl(14 80% 97%); color: hsl(12 55% 28%);
+}
+.ad-status-failed > span { flex: 1 1 16rem; min-width: 0; }
+.ad-status-retry {
+  flex: none; padding: 4px 12px; border-radius: 999px; border: 1px solid currentColor; background: none;
+  font: 600 13px/1.4 var(--font-family-sans); color: inherit; cursor: pointer;
+}
+.ad-status-retry:hover:not(:disabled) { background: hsl(14 70% 92%); }
+.ad-status-retry:disabled { opacity: .5; cursor: default; }
+.ad-status-dismiss { flex: none; padding: 4px 2px; border: 0; background: none; font: inherit; color: inherit; opacity: .75; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.dark .ad-status-failed, [data-scenery-lighting='nighttime'] .ad-status-failed { border-color: hsl(12 35% 34%); background: hsl(12 30% 16%); color: hsl(14 70% 82%); }
 .ad-day { min-width: 0; }
 .ad-shell button:focus-visible, .ad-shell a:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 3px; }
 /* The fold's edge sits in the page's left gutter, where the column stood. */

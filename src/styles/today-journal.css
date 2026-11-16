@@ -96,7 +96,11 @@
 .today-page .daybook-masthead-row:has(> .masthead-numeral) [data-testid="masthead-eyebrow"] { margin: 0 0 4px; }
 .today-mast-eyebrow { font: 600 13px/1.2 var(--font-family-sans); color: var(--color-neutral-600); }
 .today-mast-right { display: flex; align-items: center; gap: 6px; }
-.today-page .daybook-masthead .daybook-tools:has(> .today-mast-meta) { justify-content: flex-start; margin-top: 16px; padding: 0; border-top: 0; }
+/* The day's details: one plain strip on paper directly under the picture
+   (review, 2026-11-16), so they read the same over any scenery. */
+.today-page .daybook-masthead:has(+ .today-day-strip) { margin-bottom: 0; }
+.today-day-strip { margin: 0 0 22px; padding: 11px 0 12px; border-bottom: 1px solid var(--color-neutral-200); }
+@media (max-width: 767px) { .today-day-strip { margin: 0 16px 14px; padding: 8px 0 10px; } }
 .today-mast-right .uppercase { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; color: var(--color-neutral-700); }
 .today-mast-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
@@ -220,7 +224,7 @@
 /* Dropped on a thing: it lands right after it. */
 .ag-row.is-landing .ag-body { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
 /* Open time: one plain line, no box. */
-.ag-free { margin: 0; padding: 8px 0 18px; font-size: 13px; color: var(--color-neutral-600); }
+.ag-free { margin: 0; padding: 8px 0 18px; font-size: 14.5px; font-weight: 500; color: var(--color-neutral-800); }
 .ag-open-row.is-landing .ag-free { color: var(--color-primary-700); font-weight: 600; }
 /* Now. */
 .ag-now .ag-time { color: var(--today-now); font-weight: 400; }
@@ -248,10 +252,12 @@
   .today-page .daybook-masthead:is(:hover, :focus-within) .daybook-title > :not(span) { opacity: 1; }
 }
 /* The specials and the day's other all-day things, on the details line. */
-.today-page .daybook-masthead .daybook-journal-allday {
+.today-page .today-day-strip .daybook-journal-allday {
   flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 0; margin: 0;
 }
-.today-page .daybook-masthead .daybook-journal-allday button { font-size: 13.5px; }
+.today-page .today-day-strip .daybook-journal-allday button { font-size: 13.5px; }
+/* On a phone the button is a 44px touch target; its chips keep their own height. */
+.today-page .today-day-strip .today-specials { align-items: center; }
 
 /* ---- For today's column: what is moving, and what is coming ----------- */
 .today-page .today-cols .today-talk { display: block; margin-top: 22px; }
@@ -466,6 +472,29 @@
 .today-page .today-focus-card .row-kind-icon { display: inline-flex; flex: none; margin-top: 3px; color: var(--color-neutral-600); }
 .today-page .today-focus-card [data-only-self] { opacity: 0; transition: opacity .15s; }
 .today-page .today-focus-card :is(li, [role='listitem'], .group):is(:hover, :focus-within) [data-only-self] { opacity: 1; }
+/* The title takes the row (review, 2026-11-16). The rail held 180px on
+   every row for four cells that mostly show nothing, and a long title
+   wrapped to four lines beside the gap. In this column who it involves
+   keeps only its own width, and the controls take no room: they come in
+   over the row's end, on paper, when the row is reached for (the week
+   sheet's rule, sheet.css). Nothing moves when they do. No transform on the
+   cells: a routine's menu hangs a fixed backdrop inside one. */
+@media (min-width: 768px) {
+  .today-page .today-focus-card [data-rail] { position: relative; gap: 0; }
+  .today-page .today-focus-card [data-rail] > [data-rail-who] { width: auto; }
+  .today-page .today-focus-card [data-rail] > [data-rail-spare] { display: none; }
+  .today-page .today-focus-card [data-rail] > [data-rail-ctl] {
+    position: absolute; top: 0; bottom: 0; margin-block: auto; width: 28px; height: 28px; justify-content: center;
+    background: var(--color-bg-elevated); border-radius: 999px; box-shadow: 0 0 0 4px var(--color-bg-elevated);
+    opacity: 0; pointer-events: none; transition: opacity .12s;
+  }
+  /* A 30px step under a 4px paper edge: the three read as one piece of
+     paper, with no slivers of the title between them. */
+  .today-page .today-focus-card [data-rail] > [data-rail-ctl='0'] { right: calc(100% + 6px); }
+  .today-page .today-focus-card [data-rail] > [data-rail-ctl='1'] { right: calc(100% + 36px); }
+  .today-page .today-focus-card [data-rail] > [data-rail-ctl='2'] { right: calc(100% + 66px); }
+  .today-page .today-focus-card .group:is(:hover, :focus-within) [data-rail] > [data-rail-ctl] { opacity: 1; pointer-events: auto; }
+}
 
 /* A done-by date on a row: "by Mon 16" (2026-11-13). */
 .row-due {

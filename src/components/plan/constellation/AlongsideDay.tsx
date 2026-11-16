@@ -69,6 +69,10 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember, members = [] } = useFamilyMembers()
   const activity = useCanvasActivity()
   const [pending, setPending] = useState<string | null>(null), [message, setMessage] = useState('')
+  // A placement that did not save: named, with its Retry (review, 2026-11-16).
+  const [failed, setFailed] = useState<{ id: string; title: string; ymd: string } | null>(null)
+  // The rest of the week, past the sheet's short list. Folded on each visit.
+  const [restOpen, setRestOpen] = useState(false)
   // Where Today draws "Routines {day}" on this sheet (TodayView holds the
   // day's plan and its writers; fix round 2, 2026-11-04).
   const [routinesSlot, setRoutinesSlot] = useState<HTMLElement | null>(null)
@@ -123,11 +127,25 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
     && localYmd(t.scheduledFor) > ymd && t.scheduledFor.getTime() < weekEnd.getTime())
     .sort((a, b) => a.scheduledFor!.getTime() - b.scheduledFor!.getTime())
   const isThisWeek = localYmd(week) === localYmd(weekStartAnchor(new Date(), wso))
+  // Beside the day the sheet is short (review, 2026-11-16: Friday's pizza
+  // order stood as large as this afternoon's work): the first few with no
+  // day yet, and what is placed on the next day. One "Show rest of week"
+  // opens the rest of both. A lone extra row is never folded, and a Day
+  // session, which picks from the whole week, shows all of it.
+  const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+  const nextYmd = localYmd(nextDay)
+  const soon = later.filter((t) => localYmd(t.scheduledFor!) === nextYmd)
+  const foldedCount = Math.max(0, open.length - TODAY_WEEK_SHORT_LIST) + (later.length - soon.length)
+  const canFold = foldedCount > 1 && weekDrive !== true
+  const wholeWeek = !canFold || restOpen
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const soonHeading = nextYmd === localYmd(tomorrow) ? 'Tomorrow' : nextDay.toLocaleDateString('en-US', { weekday: 'long' })
+  const laterRows = wholeWeek ? later : soon
 
   const place = async (id: string) => {
     const task = [...earlier, ...weekTasks, ...later].find((t) => t.id === id && !t.completed)
     if (!task || lock.current) return
-    lock.current = true; setPending(id); setMessage('')
+    lock.current = true; setPending(id); setMessage(''); setFailed(null)
     const patch = lineDropUpdates(task, { kind: 'day', at: date })
     // Undo writes back exactly the fields the placement wrote.
     const prev = Object.fromEntries(Object.keys(patch).map((k) => [k, task[k as keyof Task]])) as Partial<Task>
@@ -135,8 +153,8 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
       const ok = await activity.run(`Plan “${task.title}” for ${dayLabel}`, () => update(id, patch), {
         ids: [id], undo: () => update(id, prev), retry: () => { void place(id) },
       })
-      setMessage(ok ? `Planned “${task.title}” for ${dayLabel}.` : 'Could not place this action. It remains available; try again.')
-      if (ok) placedListeners.current.forEach((l) => l())
+      if (ok) { setMessage(`Planned “${task.title}” for ${dayLabel}.`); placedListeners.current.forEach((l) => l()) }
+      else setFailed({ id, title: task.title, ymd })
     } finally { lock.current = false; setPending(null) }
   }
 
@@ -197,6 +215,15 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
     <AlongsideContext.Provider value={workspace}>
       <section className="ad-shell">
         <p role="status" className="ad-status">{message}</p>
+        {/* It says which task, where it still is, and offers the way to try
+            again right beside it. It is this day's: on another day it is gone. */}
+        {failed && failed.ymd === ymd && (
+          <p role="alert" className="ad-status ad-status-failed">
+            <span>Couldn’t plan “{failed.title}” for {dayLabel}. It is still on {isThisWeek ? 'this week’s' : 'the week’s'} list.</span>
+            <button type="button" className="ad-status-retry" disabled={!!pending} onClick={() => { void place(failed.id) }}>Retry</button>
+            <button type="button" className="ad-status-dismiss" aria-label="Dismiss" onClick={() => setFailed(null)}>Dismiss</button>
+          </p>
+        )}
         {weekView ? day : (
           // A session stows the fold rather than unmounting it, so the day
           // under it keeps its state.
@@ -204,7 +231,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
             drive={foldDrive === undefined ? undefined : { above: foldDrive }}
             frontLabel={`${range}, to pick from`}
             above={<AboveSheet kicker={`Week · ${range}`} title={isThisWeek ? 'This week' : range} className="vt-sheet-week"
-              rowsHeading={open.length > 0 ? 'Sometime this week' : undefined} shortList={TODAY_WEEK_SHORT_LIST}
+              rowsHeading={open.length > 0 ? 'Sometime this week' : undefined} shortList={TODAY_WEEK_SHORT_LIST} expanded={wholeWeek}
               rows={open.map((t, i) => earlierIds.has(t.id)
                 ? { id: t.id, title: t.title, ...sheetRowStatus(t), mark: earlierDayMark(t), anchor: i === 0 ? 'leftovers' : undefined }
                 : { id: t.id, title: t.title, ...sheetRowStatus(t) })} doneCount={doneCount} foot={TODAY_WEEK_FOOT}
@@ -217,12 +244,17 @@ export function AlongsideDay({ children, tasks, date, update, complete, addStep,
                 // get a time only when it is certain; set one on the task).
                 ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move'
               }}>
-              {later.length > 0 && <>
-                <h3 className="above-sheet-sub above-sheet-rows-h">Later this week</h3>
-                <SheetRows rows={later.map((t) => ({ id: t.id, title: t.title, ...sheetRowStatus(t), mark: t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) }))}
-                  label="Later this week" onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
+              {laterRows.length > 0 && <>
+                <h3 className="above-sheet-sub above-sheet-rows-h">{wholeWeek ? 'Later this week' : soonHeading}</h3>
+                <SheetRows rows={laterRows.map((t) => ({ id: t.id, title: t.title, ...sheetRowStatus(t), mark: wholeWeek ? t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'short' }) : undefined }))}
+                  label={wholeWeek ? 'Later this week' : soonHeading} onPick={(id) => { if (!pending) void place(id) }} pickLabel={(title) => `Plan ${title} for ${dayWord}`}
                   onComplete={completeTask} onReopen={reopenTask} rowTools={peopleTools} onNextStep={tickNext} onOpen={onSelect} onDragRow={(id, ev) => { ev.dataTransfer.setData(WEEK_ACTION_MIME, id); ev.dataTransfer.effectAllowed = 'move' }} />
               </>}
+              {canFold && (
+                <button type="button" className="above-sheet-more" aria-expanded={restOpen} onClick={() => setRestOpen(!restOpen)}>
+                  {restOpen ? 'Show less of the week' : `Show rest of week · ${foldedCount} more`}
+                </button>
+              )}
               <div ref={setRoutinesSlot} className="ad-routines" />
             </AboveSheet>}>
             {day}
