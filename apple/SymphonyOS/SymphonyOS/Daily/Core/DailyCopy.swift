@@ -57,7 +57,7 @@ enum DailyCopy {
         case .today: "Add to today"
         case .week: "Add to this week"
         case .month: "Add a goal for \(periods.monthName)"
-        case .season: "Add a goal for \(periods.seasonWord)"
+        case .season: "Add a goal for this \(periods.seasonWord)"
         case .year: "Add a goal for \(periods.year)"
         }
     }
@@ -73,13 +73,21 @@ enum DailyCopy {
     /// The bar's empty field in fewer words, for a field too narrow for `placeholder` (the Duo's
     /// outside screen, a 375-point phone): "Add a goal" on Month, Season and Year; Today's and
     /// Week's are short already.
-    static func shortPlaceholder(_ h: Horizon) -> String {
+    /// The bar's empty field in fewer words, for a field too narrow for `placeholder` (the Duo's
+    /// outside screen, a 375-point phone), still saying where a goal goes (S60): "Add for November",
+    /// "Add for this fall", "Add for 2027". Today's and Week's are short already.
+    static func shortPlaceholder(_ h: Horizon, periods: WalkPeriods) -> String {
         switch h {
         case .today: "Add to today"
         case .week: "Add to this week"
-        case .month, .season, .year: "Add a goal"
+        case .month: "Add for \(periods.monthName)"
+        case .season: "Add for this \(periods.seasonWord)"
+        case .year: "Add for \(periods.year)"
         }
     }
+
+    /// A mountain page's field in the fewest words, where not even `shortPlaceholder` fits.
+    static let addAGoal = "Add a goal"
 
     /// The first of `forms` whose width (as `width` measures it, in points) fits `room`; the last,
     /// the shortest, when none does. So the bar's words are never cut short where a form fits.
@@ -95,12 +103,40 @@ enum DailyCopy {
         }
     }
 
-    /// The line above the bar on a mountain page. Week and Today have none.
-    static func hint(_ level: WalkLevel) -> String {
+    /// The line over a mountain page's foot, the same on Year, Season and Month: with no goal on the
+    /// page's level how to begin (S22); else, while other areas stand at the side, that a post walks
+    /// there; else what a flag does.
+    static func hint(_ level: WalkLevel, sides: Bool, empty: Bool) -> String {
+        if empty { return emptyMountain }
+        return sides ? "Tap a post to walk to that area" : "Tap a flag to move it or walk it down"
+    }
+    static let emptyMountain = "Add your first goal with the bar below"
+
+    // MARK: The pages' paper
+
+    /// The strip at a mountain page's foot: "Read the whole year" over "17 goals, as a plain list by area";
+    /// on a short window one line, "Read the whole year · 17 goals". `count` is `WalkCopy.paperCount`'s.
+    static func readWhole(_ level: WalkLevel) -> String {
         switch level {
-        case .year: "Tap a peak to look closer"
-        case .season, .month: "Tap a flag to move it or walk it down"
-        case .week, .today: ""
+        case .year: "Read the whole year"
+        case .season: "Read the whole season"
+        case .month: "Read the whole month"
+        case .week: "Read the whole week"
+        case .today: "Read the whole day"
+        }
+    }
+    static func paperSub(_ count: String) -> String { "\(count), as a plain list by area" }
+    static func paperLine(_ level: WalkLevel, count: String) -> String { "\(readWhole(level)) · \(count)" }
+
+    /// The page's paper's heading: the period the page shows, as its own heading names it ("2027",
+    /// "Fall", "November").
+    static func paperTitle(_ level: WalkLevel, periods: WalkPeriods) -> String {
+        switch level {
+        case .year: "\(periods.year)"
+        case .season: periods.season.name
+        case .month: periods.monthName
+        case .week: weekRange(periods.weekStart)
+        case .today: date(periods.today)
         }
     }
 
@@ -178,8 +214,8 @@ enum DailyCopy {
     /// "November ends on Monday"
     static func periodEnds(_ name: String, lastDay: Date) -> String { "\(name) ends on \(weekday(lastDay))" }
 
-    /// "No piece this winter yet"
-    static func noPiece(_ seasonWord: String) -> String { "No piece this \(seasonWord) yet" }
+    /// The sign's eyebrow over a year goal with nothing under it this season (F29): "No winter goal under this yet".
+    static func noPiece(_ seasonWord: String) -> String { "No \(seasonWord) goal under this yet" }
 
     /// A page's heading: month ("November", "to Monday the 30th"), season ("Winter",
     /// "to Sunday, 28 February"), year ("2027", "The year ahead" or "This year").

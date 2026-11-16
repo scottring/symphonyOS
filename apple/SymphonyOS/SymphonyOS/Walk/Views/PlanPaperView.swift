@@ -24,6 +24,8 @@ struct PlanPaperView: View {
     /// The room the window keeps at its foot (the home indicator), from the window's own safe area: the
     /// list scrolls above it, so its last row is never under it. 28 where the caller does not know it.
     var bottomInset: CGFloat = 28
+    /// The sheet's and "Show the mountain"'s identifiers (the walk's; a page names its own).
+    var ids: (paper: String, close: String) = ("walk.paper", "walk.paper.close")
     let onRow: (UUID) -> Void
     let onClose: () -> Void
 
@@ -66,7 +68,7 @@ struct PlanPaperView: View {
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .accessibilityAction(.escape, onClose)
-        .accessibilityIdentifier("walk.paper")
+        .accessibilityIdentifier(ids.paper)
     }
 
     // MARK: The sheet
@@ -97,7 +99,7 @@ struct PlanPaperView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(WalkCopy.showMountain)
-        .accessibilityIdentifier("walk.paper.close")
+        .accessibilityIdentifier(ids.close)
     }
 
     // MARK: The heading and its count

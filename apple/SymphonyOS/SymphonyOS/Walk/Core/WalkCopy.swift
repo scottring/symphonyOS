@@ -584,7 +584,8 @@ enum WalkCopy {
 
     /// A side post to VoiceOver: the area and how many of the step's flags stand in it ("Health, 4
     /// goals this month", "Work, 1 goal this year", "Home, 3 tasks this week", "No area, 2 goals
-    /// this month"). A count of what stands there, never of what is undone.
+    /// this month"). A month or season that is not the one in force today is named ("Health, 2 goals
+    /// in December", "in winter"). A count of what stands there, never of what is undone.
     static func sideLabel(name: String, count: Int, level: WalkLevel, periods p: WalkPeriods) -> String {
         let tasks = level == .week || level == .today
         let one = tasks ? "task" : "goal"
@@ -592,8 +593,8 @@ enum WalkCopy {
         let when: String
         switch level {
         case .year: when = "this year"
-        case .season: when = "this \(p.seasonWord)"
-        case .month: when = "this month"
+        case .season: when = p.seasonIsCurrent ? "this \(p.seasonWord)" : "in \(p.seasonWord)"
+        case .month: when = p.monthIsCurrent ? "this month" : "in \(p.monthName)"
         case .week, .today: when = "this week"
         }
         return "\(name), \(many) \(when)"

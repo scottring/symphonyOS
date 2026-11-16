@@ -91,6 +91,41 @@ final class LightDailyUITests: XCTestCase {
         XCTAssertTrue(any["walk.lookback.year"].exists)
     }
 
+    /// The pages' paper (F16, "The pages' paper foot"): on Year with the full plan the strip at the foot
+    /// raises the whole year as a list by area (five areas, each a heading); "Show the mountain" lowers
+    /// it and the mountain is back. With nothing planted there is no strip, and the hint says how to begin.
+    @MainActor func testThePaperStripOpensTheList() throws {
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                                 "-SymphonyDailySeed", "full", "-SymphonyDailyPage", "year"])
+        XCTAssertTrue(any["daily.mountain.year"].waitForExistence(timeout: 60), "never reached Year")
+        let strip = any["daily.mountain.paper.strip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 15), "no strip at the foot")
+        XCTAssertTrue(any["walk.standing"].exists, "the mountain has no standing post")
+        strip.tap()
+        let paper = any["daily.mountain.paper"]
+        XCTAssertTrue(paper.waitForExistence(timeout: 10), "the strip did not raise the paper")
+        let headings = paper.descendants(matching: .any)
+            .matching(NSPredicate(format: "label MATCHES %@", "^(Health|Home|People|Work|Money), [0-9]+ goals?$"))
+        XCTAssertEqual(Set(headings.allElementsBoundByIndex.map(\.label)).count, 5, "the list does not show five areas")
+        XCTAssertFalse(any["walk.standing"].isHittable, "the mountain can be touched under the paper")
+        XCTAssertTrue(any["daily.bar.field"].exists, "the bar left the paper's foot")
+        any["daily.mountain.paper.close"].tap()
+        XCTAssertTrue(paper.waitForNonExistence(timeout: 10), "Show the mountain did not lower the paper")
+        XCTAssertTrue(any["walk.standing"].waitForExistence(timeout: 10), "the mountain is not back")
+        XCTAssertTrue(strip.exists, "the strip is gone")
+        app.terminate()
+
+        // Nothing planted: no strip, and the hint says how to begin.
+        let (_, bare) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                                "-SymphonyDailySeed", "empty", "-SymphonyDailyPage", "year"])
+        XCTAssertTrue(bare["daily.mountain.year"].waitForExistence(timeout: 60), "never reached the empty Year")
+        let hint = bare["daily.mountain.hint"]
+        XCTAssertTrue(hint.waitForExistence(timeout: 15), "no hint on the empty page")
+        XCTAssertEqual(hint.label, "Add your first goal with the bar below")
+        XCTAssertFalse(bare["daily.mountain.paper.strip"].exists, "a strip with nothing to read")
+        XCTAssertTrue(bare["daily.bar.field"].exists, "the empty page has no field")
+    }
+
     /// Someone who left the walk part-way and has nothing at all still lands on a page with a way
     /// back into the walk, and a bar that works.
     @MainActor func testAWaitingWalkHasItsLineOnAnEmptyToday() throws {
@@ -118,7 +153,7 @@ final class LightDailyUITests: XCTestCase {
 
     /// The bar's field is always read by its whole sentence, even where the field shows fewer words:
     /// on the real Duo outside screen the page is 382 wide (the 466-point window less the system's
-    /// 84-point column, Task 17), where Month's field shows "Add a goal" (`-TodaySize 382x678`; at the
+    /// 84-point column, Task 17), where Month's field shows "Add for November" (`-TodaySize 382x678`; at the
     /// board's own 466 the field is wide enough for the whole sentence); and the phone's own window at
     /// two text sizes.
     @MainActor func testTheFieldIsReadByItsWholeSentence() throws {
@@ -134,8 +169,9 @@ final class LightDailyUITests: XCTestCase {
             XCTAssertTrue(field.waitForExistence(timeout: 15), "no field")
             XCTAssertEqual(field.label, "Add a goal for November", "at \(size)")
             if extra.first == "-TodaySize" {
-                // The narrow field shows the short form: the label above is not just what is shown.
-                XCTAssertEqual(field.placeholderValue, "Add a goal", "the narrow field does not show the short form")
+                // The narrow field shows the short form (S60: it still says where the goal goes): the label
+                // above is not just what is shown.
+                XCTAssertEqual(field.placeholderValue, "Add for November", "the narrow field does not show the short form")
             }
             app.terminate()
         }

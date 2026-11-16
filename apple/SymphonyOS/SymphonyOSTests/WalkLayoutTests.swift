@@ -364,8 +364,9 @@ struct WalkLayoutTests {
         #expect(layout.sides.map(\.name) == ["Home", "Health", "Work", "Money"])
         #expect(layout.sides.map(\.poleX) == [90, 33, 300, 357])
         #expect(layout.sides.map(\.count) == [3, 4, 4, 3])
-        #expect(layout.sides.map(\.label) == ["Home, 3 goals this month", "Health, 4 goals this month",
-                                              "Work, 4 goals this month", "Money, 3 goals this month"])
+        // On 13 November the walk plans December (task 9, item d: a month ahead is named, not "this month").
+        #expect(layout.sides.map(\.label) == ["Home, 3 goals in December", "Health, 4 goals in December",
+                                              "Work, 4 goals in December", "Money, 3 goals in December"])
         for side in layout.sides {
             #expect(side.pennants.count == min(4, side.count) && side.extra == 0)
             #expect(side.pennants.allSatisfy { $0.level == .month })
@@ -380,8 +381,12 @@ struct WalkLayoutTests {
         #expect(home[0].label == "Home, 6 goals this year")
         #expect(WalkCopy.sideLabel(name: "Work", count: 1, level: .year, periods: WalkPeriods.pick(now: today)) == "Work, 1 goal this year")
         #expect(WalkCopy.sideLabel(name: "Home", count: 3, level: .week, periods: WalkPeriods.pick(now: today)) == "Home, 3 tasks this week")
-        #expect(WalkCopy.sideLabel(name: WalkCopy.noArea, count: 2, level: .month, periods: WalkPeriods.pick(now: today)) == "No area, 2 goals this month")
-        #expect(WalkCopy.sideLabel(name: "Fun", count: 0, level: .season, periods: WalkPeriods.pick(now: today)).hasPrefix("Fun, no goals this "))
+        #expect(WalkCopy.sideLabel(name: WalkCopy.noArea, count: 2, level: .month, periods: WalkPeriods.pick(now: today)) == "No area, 2 goals in December")
+        #expect(WalkCopy.sideLabel(name: "Fun", count: 0, level: .season, periods: WalkPeriods.pick(now: today)) == "Fun, no goals in winter")
+        // The month and season in force today are "this".
+        let tenth = WalkPeriods.pick(now: day(2026, 11, 10))
+        #expect(WalkCopy.sideLabel(name: WalkCopy.noArea, count: 2, level: .month, periods: tenth) == "No area, 2 goals this month")
+        #expect(WalkCopy.sideLabel(name: "Fun", count: 0, level: .season, periods: tenth) == "Fun, no goals this fall")
     }
 
     /// F4: lower down, an area with nothing on this level or the one above has no post; on Year
@@ -439,7 +444,7 @@ struct WalkLayoutTests {
                         #expect(layout.sides.count == 8 && layout.sides.filter { $0.area == nil }.count == 1)
                         let nameless = layout.sides.first { $0.area == nil }!
                         #expect(nameless.pill == nil && nameless.count == 2 && nameless.pennants.count == 2 && WalkLayout.tapEvent(nameless) == .paperOpened)
-                        #expect(nameless.label.hasPrefix(step == 4 ? "No area, 2 tasks this week" : "No area, 2 goals this "))
+                        #expect(nameless.label.hasPrefix(step == 4 ? "No area, 2 tasks this week" : "No area, 2 goals "))
                         let problems = Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7)
                         #expect(problems.isEmpty, "step \(step) in \(standing), wing \(wing), \(footing): \(problems.prefix(3))")
                     }

@@ -22,7 +22,7 @@ extension DemoMode {
     /// (`point`: the sign's row lit; `waiting`: the waiting walk's line, as the demo keeps no stored walk;
     /// `speak` and `undo`: the bar, see `showDaily`; `hear`: the bar's stand-in listener, untapped; `more` and `inbox`: that sheet, `dailyPanel`;
     /// on Week, `select`: a task chosen with its Move to panel up, see `weekChoice`; `unfold`: the fold open;
-    /// `select`, `move` and `zoom` on a mountain page, see `showMountain`; `walkdown` with `select`: Walk it
+    /// `select`, `move`, `zoom` and `paper` on a mountain page, see `showMountain`; `walkdown` with `select`: Walk it
     /// down tapped on that flag; `lookback`: Today's or Week's handle tapped, the sheet lowered over the whole plan).
     static var dailyStates: [String] { dailyStates(in: ProcessInfo.processInfo.arguments) }
 
@@ -98,28 +98,26 @@ extension DemoMode {
     // MARK: The mountain pages
 
     /// Drives a Month, Season or Year page into the states that need a touch, as a person's taps
-    /// would, through the page's own events: `zoom`: on Year a tap on the chosen flag's peak, on
-    /// Season and Month a tap on its parent (or the first flag one level up); `select`: a tap on
-    /// the first flag of the page's level whose panel has a line (nothing under it), else the
-    /// first; `move`: Move to. A bare page is left as it is.
+    /// would, through the page's own events: `zoom`: a tap on the chosen flag's side post (the page
+    /// stands in its area); `select`: the first flag of the page's level whose panel has a line
+    /// (nothing under it), else the first, chosen from the paper's row (so the page stands where it
+    /// is); `move`: Move to; `paper`: the strip tapped, the paper raised. A bare page is left as it is.
     static func showMountain(_ page: inout MountainPage, _ states: [String]) {
         let own = page.items.filter { $0.level == page.level }
         let bare = own.first { flag in
             var trial = page
-            _ = trial.apply(.flag(flag.id))
+            _ = trial.apply(.paper(true))
+            _ = trial.apply(.paperRow(flag.id))
             return trial.panel?.line != nil
         }
         guard let chosen = bare ?? own.first else { return }
-        if states.contains("zoom") {
-            if page.level == .year {
-                if let area = chosen.areaId { _ = page.apply(.peak(area)) }
-            } else if let parent = chosen.parentId
-                        ?? page.items.first(where: { $0.level.rawValue == page.level.rawValue - 1 })?.id {
-                _ = page.apply(.flag(parent))
-            }
+        if states.contains("zoom"), let area = chosen.areaId { _ = page.apply(.peak(area)) }
+        if states.contains("select") {
+            _ = page.apply(.paper(true))
+            _ = page.apply(.paperRow(chosen.id))
         }
-        if states.contains("select") { _ = page.apply(.flag(chosen.id)) }
         if states.contains("move") { _ = page.apply(.moveTapped) }
+        if states.contains("paper") { _ = page.apply(.paper(true)) }
     }
 
     private static func value(after flag: String, in arguments: [String]) -> String? {

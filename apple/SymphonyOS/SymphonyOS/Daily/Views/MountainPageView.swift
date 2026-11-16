@@ -7,22 +7,26 @@ import UIKit
 /// state, scaled to fit the page and centred as `WalkView` does it, its painting running past
 /// the board to the page's edges (clipped there), with `over` drawn in stage points on top. The
 /// layout is the walk's own, planted by hand (`footing: .natural`), made for this page's stage
-/// (its wing). Unlike `WalkWorldView` it is an accessibility container,
+/// (its wing); a page that works out its own stage and layout (Month, Season, Year: F16,
+/// `MountainPage.layout`) hands them in. Unlike `WalkWorldView` it is an accessibility container,
 /// so its peaks and flags are read together, and `over` is given the walk's stage and
 /// keyboard lift as the walk's own controls are.
 struct MountainStage<Over: View>: View {
     let state: WalkState
     let today: Date
+    /// The page's own stage and layout; nil: the walk's stage on the page (`WalkStage(device:)`) and its layout of `state`.
+    let stage: WalkStage?
+    let layout: WalkLayout?
     let actions: (WalkLayout.Banner) -> [(name: String, run: () -> Void)]
     let onLabel: (WalkLayout.Label) -> Void
     let onBanner: (WalkLayout.Banner, WalkLayout.Post) -> Void
-    /// A tap on a side post (the pages wire it later; until then it does nothing).
+    /// A tap on a side post (`WalkLayout.tapEvent(side)`: a named one walks there, the nameless one raises the paper).
     let onSide: (WalkLayout.Side) -> Void
     let over: Over
     /// The keyboard's top edge in screen points, while it is up.
     @State private var keyboardTop: CGFloat?
 
-    init(state: WalkState, today: Date,
+    init(state: WalkState, today: Date, stage: WalkStage? = nil, layout: WalkLayout? = nil,
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void,
@@ -30,6 +34,8 @@ struct MountainStage<Over: View>: View {
          @ViewBuilder over: () -> Over) {
         self.state = state
         self.today = today
+        self.stage = stage
+        self.layout = layout
         self.actions = actions
         self.onLabel = onLabel
         self.onBanner = onBanner
@@ -40,8 +46,9 @@ struct MountainStage<Over: View>: View {
     var body: some View {
         let art = WalkArt.overlookSquare
         GeometryReader { geo in
-            let stage = WalkStage(device: geo.size, stage: art.stage)
-            let layout = WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing, stage: stage)
+            let stage = self.stage ?? WalkStage(device: geo.size, stage: art.stage)
+            let layout = self.layout
+                ?? WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing, stage: stage)
             ZStack(alignment: .topLeading) {
                 WalkWorldView(layout: layout, art: art, step: state.step, stage: stage, actions: actions,
                               onLabel: onLabel, onBanner: onBanner, onSide: onSide)
@@ -72,16 +79,21 @@ struct MountainStage<Over: View>: View {
     }
 }
 
-/// Month, Season or Year for a light household: the walk's own mountain at that level with
-/// the person's flags standing on it (no question, no light), the row of words, the page's
-/// heading, the hint, the add bar at the foot in its night look, and a small panel when a
-/// flag is chosen. Everything it shows is read by `MountainPage`; it fetches the rows,
-/// draws, and sends what is touched to the page and its effects to the model.
+/// Month, Season or Year for a light household: the walk's own mountain at that level, standing in
+/// one area with the person's flags on it (no question, no light), the row of words, the page's
+/// heading, the hint, a small panel when a flag is chosen, and at the foot the paper: its strip,
+/// which raises the whole level as a list by area, and the add bar on it. Everything it shows is
+/// read by `MountainPage` and placed by `DailyMetrics.mountainFoot`; it fetches the rows, draws,
+/// and sends what is touched to the page and its effects to the model.
 ///
-/// The mountain is the stage, scaled; the row of words, the heading, the panel, the hint
-/// and the bar stand in the window's own points where Today's do (`DailyMetrics.today`), so
-/// they keep the safe area and their 44-point touch shapes on every phone.
+/// The mountain is the page's stage (F16: on a short window at full size, between the heading and the
+/// hint); the row of words, the heading, the panel, the hint and the bar stand in the window's own
+/// points, the bar where Today's does, so they keep the safe area and their 44-point touch shapes.
+/// While the paper is raised nothing under it takes a touch or is read.
 struct MountainPageView: View {
+    typealias MountainFoot = (foot: CGRect, strip: CGRect?, oneLine: Bool, bar: DailyMetrics.Bar, hintTop: CGFloat,
+                              paperTop: CGFloat, stage: WalkStage)
+
     let level: WalkLevel
     let model: DailyModel
     let userId: UUID
@@ -119,10 +131,17 @@ struct MountainPageView: View {
     var body: some View {
         let flags = readFlags()
         let m = metrics
+        let paper = page?.paper
+        let foot = DailyMetrics.mountainFoot(size: size, safeTop: safeTop, safeBottom: safeBottom, layout: layout,
+                                             strip: paper != nil)
+        let drawn = page?.layout(today: model.today, stage: foot.stage)
+        let raised = page?.paperOpen == true
         ZStack(alignment: .topLeading) {
-            stage
+            stage(foot.stage, drawn)
+                .allowsHitTesting(!raised)
+                .accessibilityHidden(raised)
                 .accessibilitySortPriority(4)
-            scrim(m)
+            scrim(foot)
             // Opened flat, the spread's four words, so the last ("Week and today") leads back to it,
             // split at the fold as the spread's are, so none crosses it.
             DailyNavRow(current: horizon, gap: m.navGap, words: DailySpread.navWords(on: layout),
@@ -133,19 +152,34 @@ struct MountainPageView: View {
                 .offset(y: m.navTop)
                 .accessibilitySortPriority(6)
             heading(flags.periods, m)
+                .allowsHitTesting(!raised)
+                .accessibilityHidden(raised)
                 .accessibilitySortPriority(5)
-            if let panel = page?.panel, !keyboardUp {
-                let place = DailyMetrics.mountainPanel(size: size, line: m.bar.line, layout: layout)
-                MountainPanel(panel: panel, moving: page?.moving == true, wraps: place.beside, send: apply)
+            if let page, let panel = page.panel, let drawn, !keyboardUp, !raised {
+                let place = DailyMetrics.mountainPanel(size: size, line: foot.bar.line, navTop: m.navTop, stage: foot.stage,
+                                                       chosen: page.chosenCloth(in: drawn, stage: foot.stage),
+                                                       title: panel.title, hasLine: panel.line != nil,
+                                                       chips: MountainPage.chips(panel, moving: page.moving), moving: page.moving)
+                MountainPanel(panel: panel, moving: page.moving, wraps: place.beside || page.moving,
+                              showsLine: !place.dropsLine, send: apply)
                     .frame(width: place.frame.width, height: place.frame.height, alignment: .bottom)
-                    .offset(x: place.frame.minX)
+                    .offset(x: place.frame.minX, y: place.frame.minY)
                     .accessibilitySortPriority(3)
             }
-            MountainHint(model: model, words: DailyCopy.hint(level), bar: m.bar)
-                .accessibilitySortPriority(2)
-            DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(horizon, periods: flags.periods),
-                         shortPlaceholder: DailyCopy.shortPlaceholder(horizon),
-                         listening: DailyCopy.listening(horizon), night: true)
+            if let page, let drawn, !raised {
+                MountainHint(model: model, words: page.hint(drawn), bar: foot.bar)
+                    .accessibilitySortPriority(2)
+            }
+            paperFoot(foot, paper: paper, raised: raised)
+            let up = DailyMetrics.mountainRaisedBar(foot.bar)
+            DailyRaisedPaper(paper: raised ? paper : nil, size: size,
+                             place: DailyMetrics.raisedPaper(size: size, navTop: m.navTop, stage: foot.stage),
+                             bottomInset: size.height - up.listFoot,
+                             ids: ("daily.mountain.paper", "daily.mountain.paper.close"),
+                             onRow: { apply(.paperRow($0)) }, onClose: { apply(.paper(false)) })
+            DailyBarView(model: model, metrics: raised ? up.bar : foot.bar, placeholder: DailyCopy.placeholder(horizon, periods: flags.periods),
+                         shortPlaceholder: DailyCopy.shortPlaceholder(horizon, periods: flags.periods),
+                         shortest: DailyCopy.addAGoal, listening: DailyCopy.listening(horizon), lineNight: !raised)
                 .accessibilitySortPriority(1)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -177,10 +211,11 @@ struct MountainPageView: View {
 
     /// The heading's top under the row of words (the board's 102 under 44).
     private static let headingTop: CGFloat = 58
-    /// The navy scrim starts this far above the bar's field (the board's 650 over 754).
-    private static let scrimAbove: CGFloat = 104
+    /// The navy shade behind the hint: from this far over the hint's top to this far under the foot's top
+    /// (under the paper's rounded corners).
+    private static let scrimAbove: CGFloat = 48, scrimUnder: CGFloat = 22
 
-    /// Today's numbers on this window: the row of words and the bar stand where Today's do.
+    /// Today's numbers on this window: the row of words stands where Today's does.
     private var metrics: DailyMetrics {
         let shape = DailyMetrics.shape(for: layout, height: size.height, safeTop: safeTop, safeBottom: safeBottom,
                                        waiting: false)
@@ -302,18 +337,20 @@ struct MountainPageView: View {
         case .walkDown: DailyCopy.walkItDown
         case .moveTo(let id): DailyCopy.moveTo(page.areas.first { $0.id == id }?.name ?? "")
         case .pullUp: WalkCopy.pullUp
-        case .flag, .peak, .post, .moveTapped, .letGo: ""
+        case .flag, .peak, .moveTapped, .letGo, .paper, .paperRow: ""
         }
     }
 
     // MARK: Pieces
 
-    @ViewBuilder private var stage: some View {
-        if let page {
-            MountainStage(state: page.walkState, today: model.today, actions: actions,
+    /// The page's mountain on its stage, laid out by the page (`MountainPage.layout`): every cloth, side
+    /// post and label sends the walk's own tap (`WalkLayout.tapEvent`) as the page's event.
+    @ViewBuilder private func stage(_ stage: WalkStage, _ drawn: WalkLayout?) -> some View {
+        if let page, let drawn {
+            MountainStage(state: page.walkState, today: model.today, stage: stage, layout: drawn, actions: actions,
                           onLabel: { send(.areaTapped($0.id)) },
                           onBanner: { banner, post in send(WalkLayout.tapEvent(banner, on: post)) },
-                          onSide: { _ in }) {
+                          onSide: { send(WalkLayout.tapEvent($0)) }) {
                 EmptyView()
             }
             .frame(width: size.width, height: size.height)
@@ -373,20 +410,42 @@ struct MountainPageView: View {
         .offset(y: m.navTop + Self.headingTop)
     }
 
-    /// The navy scrim at the foot, under the hint and the bar.
-    private func scrim(_ m: DailyMetrics) -> some View {
-        let top = m.bar.field.minY - Self.scrimAbove
-        return LinearGradient(colors: [DailyPalette.navy.opacity(0), DailyPalette.navy.opacity(0.82)],
+    /// The navy shade behind the hint (and the bar's line in its place), down under the paper's top.
+    private func scrim(_ foot: MountainFoot) -> some View {
+        let top = foot.hintTop - Self.scrimAbove
+        return LinearGradient(colors: [DailyPalette.navy.opacity(0), DailyPalette.navy.opacity(0.7)],
                               startPoint: .top, endPoint: .bottom)
-            .frame(width: size.width, height: max(0, size.height - top))
+            .frame(width: size.width, height: max(0, foot.foot.minY + Self.scrimUnder - top))
             .offset(y: top)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
+
+    /// The paper at the foot ("The pages' paper foot"), and on it the strip that raises the page's paper,
+    /// while the page has one; under the raised paper the strip is covered and not read.
+    @ViewBuilder private func paperFoot(_ foot: MountainFoot, paper: PlanPaper?, raised: Bool) -> some View {
+        UnevenRoundedRectangle(topLeadingRadius: Self.footRadius, topTrailingRadius: Self.footRadius)
+            .fill(DailyPalette.paper)
+            .shadow(color: DailyPalette.navy.opacity(0.35), radius: 22, x: 0, y: -6)
+            .frame(width: size.width, height: foot.foot.height)
+            .offset(y: foot.foot.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        if let strip = foot.strip, let paper {
+            MountainPaperStrip(level: level, count: paper.count, oneLine: foot.oneLine) { apply(.paper(true)) }
+                .frame(width: strip.width, height: strip.height)
+                .offset(x: strip.minX, y: strip.minY)
+                .accessibilityHidden(raised)
+                .accessibilitySortPriority(1.5)
+        }
+    }
+
+    /// The paper foot's top corners, as the raised paper's.
+    private static let footRadius: CGFloat = 22
 }
 
-/// The hint above the bar ("Tap a flag to move it or walk it down"), in the bar's one line
-/// slot while the bar has nothing of its own there: Undo, a note and the listening line
+/// The hint over the paper foot (`MountainPage.hint`: "Tap a post to walk to that area"), in the bar's
+/// one line slot while the bar has nothing of its own there: Undo, a note and the listening line
 /// take its place. Its own view, so the bar's typing redraws only this, not the mountain.
 private struct MountainHint: View {
     let model: DailyModel
@@ -404,23 +463,31 @@ private struct MountainHint: View {
                 .frame(width: max(0, bar.fade.width - 32), height: DailyMetrics.minTouch)
                 .offset(x: bar.fade.minX + 16, y: bar.line - 18)
                 .allowsHitTesting(false)
+                .accessibilityIdentifier("daily.mountain.hint")
         }
     }
 }
 
-/// The chosen flag's panel: its line when the page has one, then Walk it down (where the
-/// page offers it), Move to and Pull it up; with Move to open, the areas it can go to.
-/// Each chip is drawn 36 high and takes a 44-point touch.
+/// The chosen flag's panel: the flag's title, whole (S45), its line when the page has one, then
+/// Walk it down (where the page offers it), Move to and Pull it up; with Move to open, the areas it
+/// can go to. Each chip is drawn 36 high and takes a 44-point touch. VoiceOver reads it by the title.
 private struct MountainPanel: View {
-    let panel: (line: String?, canWalkDown: Bool, moveTo: [WalkArea])
+    let panel: (title: String, line: String?, canWalkDown: Bool, moveTo: [WalkArea])
     let moving: Bool
-    /// Beside the stage (opened flat, `DailyMetrics.mountainPanel`) the chips wrap onto more lines.
+    /// Beside the standing cloths, and while Move to is open (S46), the chips wrap onto more lines.
     var wraps = false
+    /// False where the panel gives its line up to keep clear of the chosen flag (`DailyMetrics.mountainPanel`).
+    var showsLine = true
     let send: (MountainPage.Event) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let line = panel.line {
+            Text(panel.title)
+                .font(DailyPalette.sansSemiBold(15))
+                .foregroundStyle(DailyPalette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(true)                   // the panel's own label
+            if showsLine, let line = panel.line {
                 Text(line)
                     .font(DailyPalette.sans(12.5))
                     .foregroundStyle(DailyPalette.soft)
@@ -429,8 +496,8 @@ private struct MountainPanel: View {
             if wraps {
                 DailyChipFlow(spacing: 6, lineSpacing: 0) { chips }
             } else {
-                // One row that scrolls sideways when the areas do not fit, so the panel keeps its
-                // height and never rises over the peaks' labels.
+                // Walk it down, Move to and Remove on one row, scrolling sideways should a very large
+                // text size ever overflow it, so the panel keeps the height it was placed for.
                 ScrollView(.horizontal) {
                     HStack(spacing: 6) { chips }
                 }
@@ -443,6 +510,7 @@ private struct MountainPanel: View {
         .background(RoundedRectangle(cornerRadius: 18).fill(DailyPalette.paper)
             .shadow(color: DailyPalette.navy.opacity(0.35), radius: 11, x: 0, y: 8))
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(panel.title)
         .accessibilityIdentifier("daily.panel")
     }
 
@@ -465,7 +533,8 @@ private struct MountainPanel: View {
                      ink: DailyPalette.deepGreen) { send(.walkDown) }
             }
             chip(WalkCopy.moveTo, fill: .white, line: DailyPalette.line, ink: DailyPalette.ink) { send(.moveTapped) }
-            chip(WalkCopy.pullUp, fill: DailyPalette.nextFill, line: DailyPalette.nextLine, ink: DailyPalette.rust) {
+            chip(WalkCopy.pullUp, fill: DailyPalette.nextFill, line: DailyPalette.nextLine, ink: DailyPalette.rust,
+                 read: WalkCopy.removeLabel(panel.title)) {
                 send(.pullUp)
             }
         }
@@ -487,6 +556,58 @@ private struct MountainPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(read ?? words)
+    }
+}
+
+/// The strip at the top of the paper foot ("The pages' paper foot"): one button that raises the page's
+/// paper. On a tall window a grabber, "Read the whole year" (Crimson Pro 21) and "17 goals, as a plain list
+/// by area" (DM Sans 12.5, muted); on a window shorter than 700, one line: "Read the whole year · 17 goals".
+/// Its words are on paper, so they follow the person's text size, shrinking a little before they are cut.
+private struct MountainPaperStrip: View {
+    let level: WalkLevel
+    /// `PlanPaper.count`: how many goals stand on the level.
+    let count: String
+    let oneLine: Bool
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            VStack(spacing: 0) {
+                if oneLine {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(DailyPalette.muted)
+                        Text(DailyCopy.paperLine(level, count: count))
+                            .font(DailyPalette.sansMedium(14))
+                            .foregroundStyle(DailyPalette.ink)
+                    }
+                    .frame(maxHeight: .infinity)
+                } else {
+                    Capsule().fill(DailyPalette.grabber)
+                        .frame(width: 40, height: 5)
+                        .padding(.top, 9)
+                    Text(DailyCopy.readWhole(level))
+                        .font(DailyPalette.crimson(21))
+                        .foregroundStyle(DailyPalette.ink)
+                        .padding(.top, 7)
+                    Text(DailyCopy.paperSub(count))
+                        .font(DailyPalette.sans(12.5))
+                        .foregroundStyle(DailyPalette.muted)
+                    Spacer(minLength: 0)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(DailyCopy.paperLine(level, count: count))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("daily.mountain.paper.strip")
     }
 }
 #endif

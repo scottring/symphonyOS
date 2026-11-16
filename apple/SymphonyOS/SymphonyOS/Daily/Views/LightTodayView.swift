@@ -90,7 +90,7 @@ struct LightTodayView: View {
                 if low == nil {
                     DailyPaperFade(fade: m.bar.fade, size: size)
                     DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
-                                 shortPlaceholder: DailyCopy.shortPlaceholder(.today),
+                                 shortPlaceholder: DailyCopy.shortPlaceholder(.today, periods: model.periods),
                                  listening: DailyCopy.listening(.today), lightShown: travel == nil, touched: { interrupt(.touch) })
                 }
                 if let travel {

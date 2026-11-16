@@ -174,24 +174,28 @@ extension DailyMetricsTests {
         #expect(waiting.weekList.minY - waiting.sheetTop == plain.weekList.minY - plain.sheetTop)
     }
 
-    /// Month, Season and Year stay the letterboxed stage opened flat; the chosen flag's panel stands
-    /// beside the stage on the right page, never over the mountain. On the phone it is the board's
-    /// (20, 590) 350 wide, its foot 51 over the bar's line.
-    @Test func aMountainPanelOpenedFlatStandsBesideTheStage() {
-        let phone = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
-        let onPhone = DailyMetrics.mountainPanel(size: CGSize(width: 390, height: 844), line: phone.bar.line,
-                                                 layout: .oneColumn)
-        #expect(onPhone.frame == CGRect(x: 20, y: 0, width: 350, height: phone.bar.line - 51))
-        #expect(!onPhone.beside)
+    /// The chosen flag's panel stands beside the standing cloths (its left edge 16 right of the cloths'
+    /// right edge on the page) wherever that leaves 240 across, as it does opened flat; elsewhere it is the
+    /// board's 20 in from each side. Either way its foot is 51 over the bar's line, its height its estimate.
+    @Test func aMountainPanelStandsBesideTheStandingCloths() {
+        let size = CGSize(width: 390, height: 844)
+        let phone = DailyMetrics.mountainFoot(size: size, safeTop: 44, safeBottom: 34, layout: .oneColumn, strip: true)
+        let onPhone = DailyMetrics.mountainPanel(size: size, line: phone.bar.line, navTop: 44, stage: phone.stage, chosen: nil,
+                                                 title: "Find a gym that fits", hasLine: false,
+                                                 chips: [WalkCopy.moveTo, WalkCopy.pullUp], moving: false)
+        let height = DailyMetrics.mountainPanelHeight(titleLines: 1, hasLine: false, chipRows: 1)
+        #expect(onPhone.frame == CGRect(x: 20, y: phone.bar.line - 51 - height, width: 350, height: height))
+        #expect(!onPhone.beside && !onPhone.dropsLine)
 
-        let m = DailyMetrics.today(size: Board.size, safeTop: 10, safeBottom: 0, shape: .short)
-        let place = DailyMetrics.mountainPanel(size: Board.size, line: m.bar.line, layout: .journal)
-        let flat = place.frame
+        let flat = DailyMetrics.mountainFoot(size: Board.size, safeTop: 10, safeBottom: 0, layout: .journal, strip: true)
+        let place = DailyMetrics.mountainPanel(size: Board.size, line: flat.bar.line, navTop: 10, stage: flat.stage, chosen: nil,
+                                               title: "Find a gym that fits", hasLine: true,
+                                               chips: [DailyCopy.walkItDown, WalkCopy.moveTo, WalkCopy.pullUp], moving: false)
         #expect(place.beside)
-        let stageRight = 890 / 2 + 390 * (626.0 / 844) / 2          // the stage, 626 high, centred
-        #expect(flat.minX >= stageRight && flat.minX > 445)
-        #expect(flat.maxX == 870 && flat.width >= 240)
-        #expect(flat.maxY == m.bar.line - 51)
+        let cloths = flat.stage.toDevice(CGPoint(x: 195 + WalkLayout.standingWidth(wing: flat.stage.wing) / 2, y: 0)).x
+        #expect(place.frame.minX == cloths + 16)
+        #expect(place.frame.maxX == 870 && place.frame.width >= 240)
+        #expect(place.frame.maxY == flat.bar.line - 51)
     }
 
     /// The Move to panel stands over the left page, its foot on the bar's line slot's top.
@@ -435,7 +439,7 @@ extension DailyMetricsTests {
     @Test func theSpreadsPlaceholderFitsItsField() {
         let periods = WalkPeriods.pick(now: PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!)
         let full = DailyCopy.placeholder(.today, periods: periods)
-        let forms = [full, DailyCopy.shortPlaceholder(.today)]
+        let forms = [full, DailyCopy.shortPlaceholder(.today, periods: periods)]
         let phoneRoom = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34).bar.wordsRoom
         for fold in stride(from: CGFloat(435), through: 455, by: 5) {
             let room = spread(fold: fold).bar.wordsRoom

@@ -38,10 +38,10 @@ import SwiftData
     // MARK: Adding
 
     /// Writes what the bar read. A task is a week task (on its day when one was
-    /// said, at its time when one was said, never the first thing). A year goal
-    /// goes under the area the page stands in (`focusArea`, when it is among `kept`);
-    /// a season or month goal under `parent` takes the parent's area and links up as
-    /// the walk's do; with no parent it has no area. Words never place a goal.
+    /// said, at its time when one was said, never the first thing). A goal goes in the
+    /// area the page stands in (`focusArea`, when it is among `kept`); a season or month
+    /// goal under `parent` takes the parent's area instead and links up as the walk's do.
+    /// Standing nowhere and under nothing, it has no area. Words never place a goal.
     /// `periods`, when set (a page for another period), files the row into those periods.
     @discardableResult
     func add(_ add: DailyAdd.Add, kept: [WalkArea] = [], focusArea: UUID? = nil, parent: WalkItem? = nil,
@@ -62,7 +62,7 @@ import SwiftData
         case .goal(let title, let level):
             // A parent counts only when its stored row is mine, and lends its stored area.
             let parent = level == .year ? nil : parent.flatMap(storedParent)
-            let standing = level == .year ? focusArea.flatMap { id in kept.contains { $0.id == id } ? id : nil } : nil
+            let standing = focusArea.flatMap { id in kept.contains { $0.id == id } ? id : nil }
             let areaId = parent?.areaId ?? standing
             if let areaId, let area = kept.first(where: { $0.id == areaId }) { walk.ensureArea(area) }
             let item = WalkItem(id: UUID(), level: level, title: title, areaId: areaId,

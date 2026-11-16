@@ -1,12 +1,15 @@
 import Foundation
+import CoreGraphics
 import SwiftData
 
 /// A Month, Season or Year page in a light household: the walk's own mountain for that
-/// level, with the person's flags, and no question and no light. It is drawn by
-/// `WalkLayout.make(walkState, …, footing: .natural)` at the walk's own step for the
-/// level (1 Year, 2 Season, 3 Month): the walk's camera for that level, peak labels under
-/// their posts, and only the level shown and those above it. (Look back up, step 6, reads one
-/// area top to bottom, every level, the others as side posts (F6); only `lookBack` uses it.)
+/// level, with the person's flags, and no question and no light. It is drawn by `layout(...)`
+/// (the walk's own `WalkLayout.make` of `walkState`) at the walk's own step for the level (1 Year,
+/// 2 Season, 3 Month): the walk's camera for that level, standing in ONE area as the walk does
+/// (its name on its post, its flags in full, on Season and Month the goal above them), every other
+/// area a small post at the side, and only the level shown and those above it. Its `paper` reads the
+/// level whole, as a plain list by area. (Look back up, step 6, reads one area top to bottom, every
+/// level, the others as side posts (F6); only `lookBack` uses it.)
 ///
 /// Pure: what should be written comes back as `Effect`s for the page's model to carry out.
 /// Its flags come from the person's own rows by their links (`flags(...)`), and every one may
@@ -21,9 +24,18 @@ struct MountainPage: Equatable {
     /// The saved walk's kept areas as ids of this ridge (`kept(items:areas:saved:savedAreas:)`):
     /// `kept` is these and every area a flag stands in, worked out again whenever a flag moves or goes.
     var saved: [UUID] = []
-    var selected: UUID?; var focus: UUID?              // focus: a flag one level up (Season, Month)
-    var focusArea: UUID?                               // a zoomed peak (Year)
-    var expanded: WalkPostKey?; var moving = false
+    /// `focus`: the goal above the page stands on (Season, Month), as the walk's `focus[level]`.
+    var selected: UUID?; var focus: UUID?
+    /// The area the page stands in, on every level (the walk's `focusArea`): at first the first kept area
+    /// with a flag on the page's level, else the first kept; kept valid by `settle()`. Nil with none kept.
+    var focusArea: UUID?
+    /// The person has walked (a side post, a row on the paper, the goal above switched, a flag chosen):
+    /// until then the page keeps starting where its flags are as rows arrive (a goal the walk just wrote
+    /// can reach the page after it first drew); after, it stays where it was walked to.
+    private(set) var walked = false
+    var moving = false
+    /// The paper is raised over the mountain (F7): the page's level read whole (`paper`).
+    var paperOpen = false
     /// The page's own periods (`periods(level:selected:today:seasons:)`), used by `panel` and `hanging`.
     var periods: WalkPeriods?
     /// The flags of the periods "Walk it down" plans in (`DailyPeriods.walking`), the only ones it opens.
@@ -48,7 +60,7 @@ struct MountainPage: Equatable {
 
     /// Takes in what the rows say now (at first, and each time they change): every item
     /// the person's own, nothing below the page's level drawn, the kept areas worked out
-    /// again. A choice, a focus or a zoom whose flag or peak has gone is let go.
+    /// again. A choice or a goal above that has gone is let go, and the page stands somewhere (`settle`).
     mutating func read(items: [WalkItem], areas: [WalkArea], saved: [UUID], savedAreas: [WalkArea] = []) {
         let own = items.map { item -> WalkItem in
             var item = item
@@ -63,19 +75,72 @@ struct MountainPage: Equatable {
     }
 
     /// `read(items:…)` with what `flags(...)` found, and the walk's flags and the page's periods with them.
+    /// Another period (the heading's tap) is a fresh page: it stands afresh where its own flags are, with
+    /// nothing chosen and the paper down. The same period read again keeps where it stands.
     mutating func read(_ flags: Flags, areas: [WalkArea], saved: [UUID], savedAreas: [WalkArea] = []) {
+        if let periods, periods != flags.periods {
+            focusArea = nil
+            focus = nil
+            walked = false
+            selected = nil
+            moving = false
+            paperOpen = false
+        }
         read(items: flags.items, areas: areas, saved: saved, savedAreas: savedAreas)
         walkItems = flags.walk
         periods = flags.periods
         walkPeriods = flags.walkPeriods
     }
 
-    /// After the flags change: kept areas again, and nothing left pointing at what has gone.
+    /// After the flags change: kept areas again, nothing left pointing at what has gone, and the page
+    /// standing where the walk's own rule (`WalkState.settled`) puts it: in a kept area (at first, the first
+    /// with a flag on the page's level, else the first kept), on Season and Month on a goal above there.
+    /// The paper comes down when nothing is left on it.
     private mutating func settle() {
         kept = Self.kept(items: items, areas: areas, saved: saved)
         if let id = selected, item(id) == nil { selected = nil; moving = false }
         if let id = focus, item(id) == nil { focus = nil }
-        if let id = focusArea, !kept.contains(id) { focusArea = nil }
+        if !walked || (focusArea.map { !kept.contains($0) } ?? true) {
+            let held = Set(items.filter { $0.level == level }.compactMap(\.areaId))
+            focusArea = kept.first(where: held.contains) ?? kept.first
+            if !walked { focus = nil }
+        }
+        if level != .year, let id = focus, item(id)?.level.rawValue != level.rawValue - 1 { focus = nil }
+        adopt(walk.settled)
+        if !items.contains(where: { $0.level == level }) { paperOpen = false }
+    }
+
+    /// The walk's state for this page, before it settles: the page's own standing, goal above and choice.
+    private var walk: WalkState {
+        var s = WalkState()
+        s.step = level.rawValue
+        s.ground = false
+        s.depth = .quick
+        s.areas = areas
+        s.kept = kept
+        s.items = items
+        s.focusArea = focusArea
+        if level != .year, let focus { s.focus = [level: focus] }
+        s.selected = selected
+        s.taught = true
+        return s
+    }
+
+    /// Takes where the walk stands, and its goal above, as the page's own.
+    private mutating func adopt(_ s: WalkState) {
+        focusArea = s.standing
+        focus = level == .year ? nil : s.focus[level]
+    }
+
+    /// One of the walk's own taps on the walk's state for this page (`WalkState.apply`), so the page walks
+    /// exactly where the walk would: its standing, goal above and choice come back. Nothing is planted.
+    private mutating func walk(_ event: WalkEvent, paperUp: Bool = false) {
+        var s = walk
+        s.paperOpen = paperUp
+        let p = periods ?? WalkPeriods.pick(now: Date())
+        _ = s.apply(event, WalkEnv(periods: p, now: p.today))
+        adopt(s.settled)
+        selected = s.selected
     }
 
     // MARK: Periods and areas
@@ -243,25 +308,56 @@ struct MountainPage: Equatable {
 
     // MARK: What is drawn
 
-    /// The walk's state for this page: the level's own step, off the ground, with this page's
-    /// focus, zoom, open post and choice. No examples, no typing, no lesson: the view draws the
-    /// world alone (`WalkWorldView`), never the question, the light or the controls under it.
-    var walkState: WalkState {
-        var s = WalkState()
-        s.step = level.rawValue
-        s.ground = false
-        s.depth = .quick
-        s.areas = areas
-        s.kept = kept
-        s.items = items
-        s.focusArea = level == .year ? focusArea : nil
-        if level != .year, let focus { s.focus = [level: focus] }
-        s.selected = selected
-        s.expanded = expanded
-        s.taught = true
-        return s
+    /// The walk's state for this page, settled: the level's own step, off the ground, standing where the
+    /// page stands, on its goal above, with its choice. No examples, no typing, no lesson: the view draws
+    /// the world alone (`WalkWorldView`), never the question, the light or the controls under it. The page
+    /// is kept settled (`settle()`), so this is the state the layout draws, the labels read and the taps
+    /// act on: one source.
+    var walkState: WalkState { walk.settled }
+
+    /// What the page draws (`WalkLayout.make` of `walkState` with the page's periods, for the side posts'
+    /// words, on the page's stage): the walk's world alone, none of its controls. A page with nowhere to
+    /// stand and nothing on it (no area kept, no flag) has no post at all, rather than a bare pole.
+    func layout(today: Date, art: WalkArt = .overlookSquare, footing: WalkFooting = .natural,
+                stage: WalkStage? = nil) -> WalkLayout {
+        let made = WalkLayout.make(walkState, today: today, art: art, footing: footing, wing: stage?.wing ?? 0,
+                                   periods: periods, stage: stage)
+        let bare = made.labels.isEmpty && made.posts.allSatisfy(\.banners.isEmpty)
+        return WalkLayout(camera: made.camera, labels: made.labels, posts: bare ? [] : made.posts, sides: made.sides,
+                          needleDown: made.needleDown)
     }
 
+    /// The chosen flag's cloth as drawn, in page points through the page's stage; nil with none chosen
+    /// or not drawn.
+    func chosenCloth(in layout: WalkLayout, stage: WalkStage) -> CGRect? {
+        guard let id = selected, let cloth = layout.posts.flatMap(\.banners).first(where: { $0.itemId == id })?.drawn
+        else { return nil }
+        let a = stage.toDevice(CGPoint(x: cloth.minX, y: cloth.minY)), b = stage.toDevice(CGPoint(x: cloth.maxX, y: cloth.maxY))
+        return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
+    }
+
+    /// The line over the page's foot (`DailyCopy.hint`): how to begin with no flag on the page's level;
+    /// that a post walks while a named one stands at the side; else what a flag does.
+    func hint(_ layout: WalkLayout) -> String {
+        DailyCopy.hint(level, sides: layout.sides.contains { $0.area != nil }, empty: !items.contains { $0.level == level })
+    }
+
+    // MARK: The paper
+
+    /// The page's level read whole (F7): its own flags as a plain list by area, titled with the page's
+    /// period (`DailyCopy.paperTitle`), each row saying what its tap does (`WalkState.paperRowTap`). Nil
+    /// when the page has no flag on its level.
+    var paper: PlanPaper? {
+        guard items.contains(where: { $0.level == level }) else { return nil }
+        let s = walkState
+        let title = periods.map { DailyCopy.paperTitle(level, periods: $0) } ?? WalkCopy.levelName(level)
+        return PlanPaper.make(level: level, items: items, areas: areas, kept: kept, title: title,
+                              today: periods?.today ?? Date())
+            .hinted { id in
+                let does = s.paperRowTap(id)
+                return WalkCopy.paperRowHint(walks: does.walks, chooses: does.chooses, lookingBack: false)
+            }
+    }
     /// Look back up (step 6): every level of the area it stands in, top to bottom; every other kept area
     /// holding a flag a side post (F6). It stands where the walk's own rule puts it (`WalkState.settled`).
     static func lookBack(items: [WalkItem], areas: [WalkArea], kept: [UUID]) -> WalkState {
@@ -278,22 +374,32 @@ struct MountainPage: Equatable {
 
     // MARK: Taps
 
-    enum Event: Equatable { case flag(UUID), peak(UUID), post(WalkPostKey), moveTapped, moveTo(UUID), pullUp, walkDown, letGo }
+    /// `paper(true)` raises the paper, `paper(false)` lowers it; `paperRow` is a row tapped on it.
+    enum Event: Equatable {
+        case flag(UUID), peak(UUID), moveTapped, moveTo(UUID), pullUp, walkDown, letGo, paper(Bool), paperRow(UUID)
+    }
     enum Effect: Equatable { case setArea(UUID, WalkLevel, to: UUID?, from: UUID?), pullUp(UUID, WalkLevel), walkDown(UUID), open(Horizon) }
 
-    /// What a tap the walk's layout reads (`WalkLayout.tapEvent`, or a peak's label) means here.
+    /// What a tap the walk's layout reads (`WalkLayout.tapEvent`: a cloth, a side post) means here: a
+    /// flag or the goal above by its id, a side post walks there, "+n more" and the nameless post raise
+    /// the paper; on the paper a row, and "Show the mountain".
     static func event(for tap: WalkEvent) -> Event? {
         switch tap {
         case .bannerTapped(let id): return .flag(id)
-        case .stubTapped(let key): return .post(key)
         case .areaTapped(let id): return .peak(id)
+        case .paperOpened: return .paper(true)
+        case .paperClosed: return .paper(false)
+        case .paperRow(let id): return .paperRow(id)
         default: return nil
         }
     }
 
-    /// A flag of this page's level is chosen, and let go on a second tap; one a level up
-    /// (Season, Month) is focused, or let go; a peak on Year is zoomed, or back out. Move to,
-    /// Pull it up and Walk it down act on the chosen flag. Anything else is ignored.
+    /// A flag of this page's level is chosen, and let go on a second tap; the goal above (Season, Month)
+    /// switches to the next one in the area stood in (`WalkState.nextGoalAbove`). A side post stands there,
+    /// on every level, as the walk's own tap does (on Season and Month on that area's newest goal above);
+    /// a chosen flag left behind is let go. Move to, Pull it up and Walk it down act on the chosen flag.
+    /// The paper rises while there is something on it (letting the choice go) and comes down; a row on it
+    /// closes it, stands the page where that flag stands and chooses it. Anything else is ignored.
     mutating func apply(_ event: Event) -> [Effect] {
         switch event {
         case .flag(let id):
@@ -301,17 +407,36 @@ struct MountainPage: Equatable {
             if item.level == level {
                 selected = selected == id ? nil : id
                 moving = false
-            } else if item.level.rawValue == level.rawValue - 1 {
-                focus = focus == id ? nil : id
+                walked = true                            // a flag chosen here keeps the page where it is
+            } else if level != .year, id == focus {
+                walk(.bannerTapped(id))
+                if focus != id { walked = true }
             }
             return []
         case .peak(let id):
-            guard level == .year, kept.contains(id) else { return [] }
-            focusArea = focusArea == id ? nil : id
+            guard walkState.walksThere(id) else { return [] }
+            let before = focusArea
+            walk(.areaTapped(id))
+            walked = true
+            if focusArea != before, let chosen = item(selected), chosen.areaId != focusArea {
+                selected = nil
+                moving = false
+            }
             return []
-        case .post(let key):
-            guard key.level.rawValue <= level.rawValue else { return [] }
-            expanded = expanded == key ? nil : key
+        case .paper(let up):
+            guard up != paperOpen, !up || paper != nil else { return [] }
+            paperOpen = up
+            if up {
+                selected = nil
+                moving = false
+            }
+            return []
+        case .paperRow(let id):
+            guard paperOpen, let row = item(id), row.level == level else { return [] }
+            walk(.paperRow(id), paperUp: true)
+            walked = true
+            paperOpen = false
+            moving = false
             return []
         case .moveTapped:
             guard let item = chosen, !moveTargets(for: item.id).isEmpty else { return [] }
@@ -346,14 +471,22 @@ struct MountainPage: Equatable {
 
     // MARK: The panel
 
-    /// The chosen flag's panel; nil with nothing chosen. The line says when nothing hangs
-    /// under it one level down (it needs `periods` for its words); the areas show once
-    /// Move to is open.
-    var panel: (line: String?, canWalkDown: Bool, moveTo: [WalkArea])? {
+    /// The chosen flag's panel; nil with nothing chosen. It names the flag (S45: its title, whole);
+    /// the line says when nothing hangs under it one level down (it needs `periods` for its words);
+    /// the areas show once Move to is open.
+    var panel: (title: String, line: String?, canWalkDown: Bool, moveTo: [WalkArea])? {
         guard let item = chosen else { return nil }
         let bare = !below.contains { $0.parentId == item.id }
         let line = bare ? periods.map { DailyCopy.nothingUnder(item.level, periods: $0) } : nil
-        return (line, Self.canWalkDown(item, in: walkItems), moving ? moveTargets(for: item.id) : [])
+        return (item.title, line, Self.canWalkDown(item, in: walkItems), moving ? moveTargets(for: item.id) : [])
+    }
+
+    /// The panel's chips' words, in order, for its height by estimate (`DailyMetrics.mountainPanel`):
+    /// Walk it down (where offered), Move to and Remove; with Move to open its label and the areas.
+    static func chips(_ panel: (title: String, line: String?, canWalkDown: Bool, moveTo: [WalkArea]),
+                      moving: Bool) -> [String] {
+        moving ? [WalkCopy.moveTo.uppercased()] + panel.moveTo.map(\.name)
+            : (panel.canWalkDown ? [DailyCopy.walkItDown] : []) + [WalkCopy.moveTo, WalkCopy.pullUp]
     }
 
     /// The areas a flag can move to: every area but its own.
@@ -380,14 +513,13 @@ struct MountainPage: Equatable {
         return apply(event)
     }
 
-    /// Where a goal added from the bar on this page hangs: the kept areas, the zoomed peak
-    /// (Year), the focused flag (Season, Month), and this page's own periods, so it files into
-    /// the period on screen, not the walk's, under that flag whatever period the flag is in.
-    /// Nil until `periods` is set.
+    /// Where a goal added from the bar on this page hangs: the kept areas, the area the page stands in
+    /// (every level), the goal above it stands on (Season, Month), and this page's own periods, so it files
+    /// into the period on screen, not the walk's, under that flag whatever period the flag is in. With no
+    /// goal above it still lands in the area the page stands in. Nil until `periods` is set.
     var hanging: (kept: [WalkArea], focusArea: UUID?, parent: WalkItem?, periods: WalkPeriods)? {
         guard let periods else { return nil }
-        return (areas.filter { kept.contains($0.id) }, level == .year ? focusArea : nil,
-                level == .year ? nil : item(focus), periods)
+        return (areas.filter { kept.contains($0.id) }, focusArea, level == .year ? nil : item(focus), periods)
     }
 
     // MARK: Walk it down

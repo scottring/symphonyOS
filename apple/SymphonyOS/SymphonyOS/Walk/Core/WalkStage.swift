@@ -37,6 +37,41 @@ struct WalkStage: Equatable {
         bleed = Bleed(left: wing + left / scale, right: wing + right / scale, top: sliver, bottom: sliver)
     }
 
+    /// A Month, Season or Year page's stage (F16): the board between the page's heading and its hint.
+    /// `field` is that room down the page, in page points. Where the board fitted to the window would
+    /// draw the mountain smaller than the room needs (a window about 670 high), it is drawn at full size,
+    /// or as wide as the window allows: `scale = min(width / 390, max(height / 844, min(1, field / 282)))`.
+    /// There the standing post's foot (556) stands `pageFootAbove` over the field's foot, and the board is
+    /// cropped at its top and foot (its bleed there is negative: the window is the page, no more). Where
+    /// the board fitted to the window is already that large (a phone), it is the walk's own stage.
+    init(page: CGSize, field: ClosedRange<CGFloat>, stage: CGSize = WalkArt.stageSize) {
+        let down = page.height / stage.height
+        let room = field.upperBound - field.lowerBound
+        let scale = min(page.width / stage.width, max(down, min(1, room / Self.pageRoom)))
+        guard scale > down else {
+            self.init(device: page, stage: stage)
+            return
+        }
+        let origin = CGPoint(x: (page.width - stage.width * scale) / 2,
+                             y: field.upperBound - Self.pageFootAbove - WalkLayout.standingFoot * scale)
+        let wing = max(0, (page.width / scale - stage.width) / 2)
+        self.init(scale: scale, origin: origin, board: stage, wing: wing,
+                  bleed: Bleed(left: wing, right: wing, top: origin.y / scale,
+                               bottom: (page.height - origin.y) / scale - stage.height))
+    }
+
+    private init(scale: CGFloat, origin: CGPoint, board: CGSize, wing: CGFloat, bleed: Bleed) {
+        self.scale = scale
+        self.origin = origin
+        self.board = board
+        self.wing = wing
+        self.bleed = bleed
+    }
+
+    /// The pages' stage: a field this long (or longer) draws the board at full size; the standing post's
+    /// foot stands this far over the field's foot.
+    static let pageRoom: CGFloat = 282, pageFootAbove: CGFloat = 12
+
     /// How much wider the stage is than the board: 1 on a phone.
     var stretch: CGFloat { (board.width + 2 * wing) / board.width }
 

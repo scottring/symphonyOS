@@ -154,6 +154,27 @@ struct DailyWriterTests {
         #expect(loose.areaId == nil)
     }
 
+    /// F2 and item b: below Year a goal from the bar with no goal above lands in the area the page stands
+    /// in, whatever its words, not in no area (this replaces `aGoalWithNoParentHasNoArea`, which pinned the
+    /// bug); with a goal above, the goal above's own area wins.
+    @Test func aGoalBelowYearWithNothingAboveGoesWhereThePageStands() throws {
+        let ctx = try walkTestContext()
+        let w = writer(ctx)
+        let season = w.add(.goal(title: "Lift twice a week", level: .season), kept: [health, home], focusArea: home.id)
+        #expect(season.areaId == home.id)
+        #expect(task(ctx, season.id)?.areaId == home.id)
+        let month = w.add(.goal(title: "Find a gym", level: .month), kept: [health, home], focusArea: health.id)
+        #expect(task(ctx, month.id)?.areaId == health.id)
+        // An area not kept is no place to stand: no area.
+        let away = w.add(.goal(title: "Fix the bike", level: .month), kept: [health], focusArea: home.id)
+        #expect(away.areaId == nil)
+        // Under a goal above, that goal's area.
+        let year = w.add(.goal(title: "Run a marathon", level: .year), kept: [health, home], focusArea: health.id)
+        let under = w.add(.goal(title: "Build to ten miles", level: .season), kept: [health, home], focusArea: home.id,
+                          parent: flag(year, "Run a marathon"))
+        #expect(under.areaId == health.id)
+    }
+
     @Test func aGoalUnderAFlagLinksUp() throws {
         let ctx = try walkTestContext()
         let w = writer(ctx)
@@ -221,15 +242,6 @@ struct DailyWriterTests {
         #expect(PlanCalendar.sameDay(task(ctx, added.id)?.scheduledFor, realToday))
         #expect(focus(ctx).isEmpty)
         #expect(!pending(ctx).contains { $0.tableName == "task_focus" })
-    }
-
-    /// F2: below Year a goal takes its parent's area; with no parent it has none, whatever its words.
-    @Test func aGoalWithNoParentHasNoArea() throws {
-        let ctx = try walkTestContext()
-        let added = writer(ctx).add(.goal(title: "Fix the garden fence", level: .month), kept: [health, home],
-                                    focusArea: health.id)
-        #expect(added.areaId == nil)
-        #expect(task(ctx, added.id)?.areaId == nil)
     }
 
     /// Finding 1: a goal added on another period's page files into that period.

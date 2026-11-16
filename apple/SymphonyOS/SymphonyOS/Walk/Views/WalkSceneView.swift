@@ -239,7 +239,7 @@ struct WalkWorldView: View {
             // From the window's top edge (the band's top strength held over the bleed above the board), side to side.
             VStack(spacing: 0) {
                 WalkPalette.navyBand.opacity(bandTop)
-                    .frame(height: stage.bleed.top)
+                    .frame(height: max(0, stage.bleed.top))      // a page's cropped stage has none (F16)
                 band
             }
             .frame(width: stage.window.width)

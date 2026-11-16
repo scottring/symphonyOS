@@ -13,11 +13,16 @@ struct DailyBarView: View {
     let model: DailyModel
     let metrics: DailyMetrics.Bar
     let placeholder: String
-    /// The placeholder in fewer words, shown where `placeholder` would be cut short (`DailyCopy.fitting`).
+    /// The placeholder in fewer words, shown where `placeholder` would be cut short (`DailyCopy.fitting`),
+    /// and in the fewest, where not even that fits (a mountain page's "Add a goal").
     let shortPlaceholder: String?
+    let shortest: String?
     let listening: String
-    /// On the mountain pages: a paper field with a plank-ink line, the icons and the line white.
+    /// A night look: a paper field with a plank-ink line, the icons and the line white.
     let night: Bool
+    /// The line above the bar (listening, a note, Undo) in the night look over the mountain (a page whose
+    /// line slot stands over the painting, its bar on paper); `night`'s look when nil.
+    let lineNight: Bool?
     /// More and Inbox beside the field (not where the page has no room for them).
     let icons: Bool
     /// The field's words (the half-open display's taller field reads larger).
@@ -30,14 +35,16 @@ struct DailyBarView: View {
     let touched: () -> Void
 
     init(model: DailyModel, metrics: DailyMetrics.Bar, placeholder: String, shortPlaceholder: String? = nil,
-         listening: String, night: Bool = false, icons: Bool = true, textSize: CGFloat = 16, lightShown: Bool = true,
-         touched: @escaping () -> Void = {}) {
+         shortest: String? = nil, listening: String, night: Bool = false, lineNight: Bool? = nil, icons: Bool = true,
+         textSize: CGFloat = 16, lightShown: Bool = true, touched: @escaping () -> Void = {}) {
         self.model = model
         self.metrics = metrics
         self.placeholder = placeholder
         self.shortPlaceholder = shortPlaceholder
+        self.shortest = shortest
         self.listening = listening
         self.night = night
+        self.lineNight = lineNight
         self.icons = icons
         self.textSize = textSize
         self.lightShown = lightShown
@@ -151,14 +158,15 @@ struct DailyBarView: View {
     }
 
     /// The placeholder that fits the field's words' room at the field's text size (measured here,
-    /// chosen by `DailyCopy.fitting`): the full one, else the short one, never cut short.
+    /// chosen by `DailyCopy.fitting`): the full one, else the short one, else the shortest, never cut short.
     private var shown: String {
-        guard let shortPlaceholder else { return placeholder }
+        let forms = [placeholder] + [shortPlaceholder, shortest].compactMap { $0 }
+        guard forms.count > 1 else { return placeholder }
         let base = UIFont(name: "DMSans-Regular", size: textSize) ?? .systemFont(ofSize: textSize)
         // Measured at the size the field's words are drawn: the person's, up to the bar's largest.
         let drawn = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(min(typeSize, DailyPalette.largestChrome)))
         let font = UIFontMetrics.default.scaledFont(for: base, compatibleWith: drawn)
-        return DailyCopy.fitting([placeholder, shortPlaceholder], room: metrics.wordsRoom) {
+        return DailyCopy.fitting(forms, room: metrics.wordsRoom) {
             ($0 as NSString).size(withAttributes: [.font: font]).width
         }
     }
@@ -224,10 +232,13 @@ struct DailyBarView: View {
     private func line(_ words: String) -> some View {
         Text(words)
             .font(DailyPalette.sans(12.5))
-            .foregroundStyle(night ? Color.white : DailyPalette.muted)
+            .foregroundStyle(lineIsNight ? Color.white : DailyPalette.muted)
+            .shadow(color: lineIsNight && !night ? DailyPalette.navy.opacity(0.9) : .clear, radius: 3, x: 0, y: 1)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
     }
+
+    private var lineIsNight: Bool { lineNight ?? night }
 
     private var undoButton: some View {
         Button { model.send(.undoTapped) } label: {
@@ -237,11 +248,11 @@ struct DailyBarView: View {
                 Text(WalkCopy.undo)
                     .font(DailyPalette.sansSemiBold(13))
             }
-            .foregroundStyle(night ? Color.white : DailyPalette.deepGreen)
+            .foregroundStyle(lineIsNight ? Color.white : DailyPalette.deepGreen)
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .background(Capsule().fill(night ? DailyPalette.navy.opacity(0.6) : Color.white))
-            .overlay(Capsule().strokeBorder(night ? Color.white.opacity(0.55) : DailyPalette.line, lineWidth: 1))
+            .background(Capsule().fill(lineIsNight ? DailyPalette.navy.opacity(0.6) : Color.white))
+            .overlay(Capsule().strokeBorder(lineIsNight ? Color.white.opacity(0.55) : DailyPalette.line, lineWidth: 1))
             .frame(minWidth: DailyMetrics.minTouch, minHeight: DailyMetrics.minTouch)
             .contentShape(Rectangle())
         }

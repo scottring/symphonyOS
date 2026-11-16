@@ -788,3 +788,166 @@ struct DailyMetricsTests {
         #expect(outside.wordsRoom == outside.typing.width - DailyMetrics.wordsInset)
     }
 }
+
+// MARK: - The pages' paper foot (Month, Season, Year)
+
+/// The windows the mountain pages open in, with the insets each meets: the phone, the narrow phone, the
+/// Duo's outside screen (its whole 466 and the page beside the system's column, 382), half the inside
+/// screen as Scott held it, the inside screen upright, and opened flat.
+private let pageWindows: [(name: String, size: CGSize, top: CGFloat, bottom: CGFloat, layout: TodayLayout)] = [
+    ("phone", CGSize(width: 393, height: 852), 59, 34, .oneColumn),
+    ("narrow", CGSize(width: 375, height: 667), 20, 0, .oneColumn),
+    ("outside", CGSize(width: 466, height: 678), 22, 0, .glance),
+    ("outside page", CGSize(width: 382, height: 678), 22, 0, .glance),
+    ("half", CGSize(width: 484, height: 669), 0, 0, .oneColumn),
+    ("upright", CGSize(width: 669, height: 951), 24, 20, .oneColumn),
+    ("spread", CGSize(width: 951, height: 669), 10, 0, .journal),
+]
+
+/// Numbers written from "The pages' paper foot" and F16, not read from the code under test.
+private enum Foot {
+    static let strip: CGFloat = 78, oneLine: CGFloat = 44, short: CGFloat = 700
+    static let hintAbove: CGFloat = 38, paperBelowWords: CGFloat = 72
+    static let headingFoot: CGFloat = 144       // the field's top, under the row of words' top
+    static let footAbove: CGFloat = 12          // the standing foot stands 12 above the field's foot
+    static let fieldAboveHint: CGFloat = 4
+}
+
+private func foot(_ w: (name: String, size: CGSize, top: CGFloat, bottom: CGFloat, layout: TodayLayout), strip: Bool = true)
+    -> (foot: CGRect, strip: CGRect?, oneLine: Bool, bar: DailyMetrics.Bar, hintTop: CGFloat, paperTop: CGFloat, stage: WalkStage) {
+    DailyMetrics.mountainFoot(size: w.size, safeTop: w.top, safeBottom: w.bottom, layout: w.layout, strip: strip)
+}
+
+extension DailyMetricsTests {
+    /// The paper foot on every window the pages open in: the strip and the bar inside the window and
+    /// clear of its safe area's foot, the strip over the bar and its icons, one line on a window under
+    /// 700 high, the hint 38 above the foot with the bar's line slot in its place, the raised paper 72
+    /// under the row of words; with no goals on the page, no strip.
+    @Test func thePaperFootFitsEveryWindow() throws {
+        for w in pageWindows {
+            let f = foot(w)
+            let strip = try #require(f.strip, "\(w.name)")
+            let window = CGRect(origin: .zero, size: w.size)
+            #expect(f.oneLine == (w.size.height < Foot.short), "\(w.name)")
+            #expect(strip.height == (f.oneLine ? Foot.oneLine : Foot.strip), "\(w.name)")
+            #expect(window.contains(strip) && window.contains(f.bar.field), "\(w.name)")
+            #expect(strip.width == w.size.width && strip.minY == f.foot.minY, "\(w.name)")
+            #expect(f.foot.maxY == w.size.height && f.foot.minX == 0 && f.foot.width == w.size.width, "\(w.name)")
+            #expect(f.bar.field.maxY <= w.size.height - w.bottom, "\(w.name)")
+            #expect(strip.maxY <= f.bar.field.minY && strip.maxY <= f.bar.more.minY && strip.maxY <= f.bar.inbox.minY,
+                    "\(w.name)")
+            #expect(strip.minY >= w.top + DailyMetrics.navHeight, "\(w.name)")
+            #expect(f.hintTop == f.foot.minY - Foot.hintAbove, "\(w.name)")
+            #expect(f.hintTop > w.top + Foot.headingFoot, "\(w.name)")
+            // The bar's one line slot (Undo, a note, listening) stands where the hint does, above the foot.
+            let slot = CGRect(x: 0, y: f.bar.line - 18, width: w.size.width, height: DailyMetrics.minTouch)
+            #expect(slot.maxY <= f.foot.minY && slot.minY >= w.top + Foot.headingFoot, "\(w.name)")
+            #expect(f.paperTop == w.top + Foot.paperBelowWords, "\(w.name)")
+            // Raised, the line slot is over the field again (30 over it, as Today's) and the list ends above it.
+            let up = DailyMetrics.mountainRaisedBar(f.bar)
+            #expect(up.bar.field == f.bar.field && up.bar.line == f.bar.field.minY - 30, "\(w.name)")
+            #expect(up.listFoot + DailyMetrics.minTouch <= f.bar.field.minY && up.listFoot < f.bar.more.minY, "\(w.name)")
+            // The bar itself is Today's on that window.
+            let shape = DailyMetrics.shape(for: w.layout, height: w.size.height, safeTop: w.top, safeBottom: w.bottom,
+                                           waiting: false)
+            let today = DailyMetrics.today(size: w.size, safeTop: w.top, safeBottom: w.bottom, shape: shape).bar
+            #expect(f.bar.field == today.field && f.bar.more == today.more && f.bar.inbox == today.inbox, "\(w.name)")
+
+            let bare = foot(w, strip: false)
+            #expect(bare.strip == nil && bare.bar.field == f.bar.field, "\(w.name)")
+            #expect(bare.foot.minY > f.foot.minY && bare.foot.minY <= f.bar.more.minY, "\(w.name)")
+            #expect(bare.hintTop == bare.foot.minY - Foot.hintAbove, "\(w.name)")
+        }
+    }
+
+    /// F16: on a short window the page draws its mountain at full size (or as wide as the window allows),
+    /// showing only the board between the heading and the hint: the standing foot 12 above the field's
+    /// foot, the ceiling (282) at or below the heading's foot.
+    @Test func aShortWindowDrawsThePagesMountainAtFullSize() {
+        let expected: [String: CGFloat] = ["half": 1.0, "spread": 1.0, "narrow": 0.9615, "outside page": 0.979]
+        for w in pageWindows {
+            guard let scale = expected[w.name] else { continue }
+            let f = foot(w)
+            #expect(abs(f.stage.scale - scale) < 0.0005, "\(w.name): \(f.stage.scale)")
+            #expect(f.stage.scale > w.size.height / 844, "\(w.name)")
+            let ceiling = f.stage.toDevice(CGPoint(x: 195, y: WalkLayout.question)).y
+            let standing = f.stage.toDevice(CGPoint(x: 195, y: WalkLayout.standingFoot)).y
+            #expect(ceiling >= w.top + Foot.headingFoot - 0.01, "\(w.name): ceiling at \(ceiling)")
+            #expect(abs(standing - (f.hintTop - Foot.fieldAboveHint - Foot.footAbove)) < 0.01, "\(w.name)")
+            #expect(standing < f.hintTop, "\(w.name)")
+            // The board is centred across and its midline on the window's.
+            #expect(abs(f.stage.toDevice(CGPoint(x: 195, y: 0)).x - w.size.width / 2) < 0.01, "\(w.name)")
+            // The window, in stage points, is the page: the picture covers it and no more.
+            let window = f.stage.window
+            #expect(abs(window.width * f.stage.scale - w.size.width) < 0.01
+                    && abs(window.height * f.stage.scale - w.size.height) < 0.01, "\(w.name)")
+        }
+        // The 669-high windows at full size: a wing only where the window is wider than the board.
+        #expect(foot(pageWindows[4]).stage.wing == 47)
+        #expect(foot(pageWindows[1]).stage.wing == 0)
+    }
+
+    /// On a tall window the page's mountain is where it always was: the walk's own stage on that window.
+    @Test func aPhoneKeepsThePagesMountainWhereItWas() {
+        for w in pageWindows where ["phone", "upright"].contains(w.name) {
+            #expect(foot(w).stage == WalkStage(device: w.size), "\(w.name)")
+            #expect(foot(w, strip: false).stage == WalkStage(device: w.size), "\(w.name)")
+        }
+        #expect(WalkStage(page: CGSize(width: 390, height: 844), field: 200...640) == WalkStage(device: CGSize(width: 390, height: 844)))
+    }
+
+    /// S23: the chosen flag's panel never covers that flag: every Month and Year flag of the full demo
+    /// plan chosen (from the paper, so the page stands where it is) on four windows, the panel's box does
+    /// not meet the chosen cloth; or, where it can neither stand bottom-anchored nor above the flag under
+    /// the row of words, it stays bottom-anchored and drops its line, as the rule says.
+    @Test func thePanelNeverCoversTheChosenFlag() throws {
+        let today = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!
+        let areas = ["Health", "Home", "People", "Work", "Money", "Fun"].map { WalkArea(id: UUID(), name: $0) }
+        var items: [WalkItem] = []
+        for (level, words, name) in DemoStress.full.script {
+            guard let said = WalkWords.said(words, level: level, today: today) else { continue }
+            let area = areas.first { $0.name == name }
+            let parent = items.first { $0.level.rawValue == level.rawValue - 1 && $0.areaId == area?.id }
+            items.append(WalkItem(id: UUID(), level: level, title: said.title, areaId: area?.id, parentId: parent?.id,
+                                  day: said.day, mine: true))
+        }
+        var checked = 0, dropped = 0
+        for w in pageWindows where ["phone", "narrow", "outside", "half"].contains(w.name) {
+            let f = foot(w)
+            for level in [WalkLevel.month, .year] {
+                for flag in items where flag.level == level {
+                    var page = MountainPage(level: level, items: items, areas: areas, saved: [])
+                    page.periods = MountainPage.periods(level: level, selected: today, today: today, seasons: nil)
+                    _ = page.apply(.paper(true))
+                    _ = page.apply(.paperRow(flag.id))
+                    let panel = try #require(page.panel, "\(w.name) \(flag.title)")
+                    let layout = page.layout(today: today, stage: f.stage)
+                    let chosen = try #require(page.chosenCloth(in: layout, stage: f.stage), "\(w.name) \(flag.title)")
+                    let place = DailyMetrics.mountainPanel(size: w.size, line: f.bar.line, navTop: w.top, stage: f.stage,
+                                                           chosen: chosen, title: panel.title, hasLine: panel.line != nil,
+                                                           chips: MountainPage.chips(panel, moving: page.moving), moving: page.moving)
+                    let foot = f.bar.line - DailyMetrics.mountainPanelAbove
+                    #expect(place.frame.minX >= 0 && place.frame.maxX <= w.size.width, "\(w.name) \(flag.title)")
+                    if place.dropsLine {
+                        dropped += 1
+                        #expect(place.frame.maxY == foot, "\(w.name) \(flag.title)")
+                    } else {
+                        #expect(!place.frame.intersects(chosen), "\(w.name) \(flag.title): \(place.frame) meets \(chosen)")
+                        #expect(place.frame.maxY == foot || place.frame.maxY == chosen.minY - 8, "\(w.name) \(flag.title)")
+                        #expect(place.frame.minY >= w.top + DailyMetrics.navHeight + 8 || place.frame.maxY == foot,
+                                "\(w.name) \(flag.title)")
+                    }
+                    checked += 1
+                }
+            }
+        }
+        #expect(checked > 100, "\(checked)")
+        #expect(dropped < checked / 4, "\(dropped) of \(checked) dropped their line")
+    }
+
+    /// The panel's height by estimate: 18 + 20 a title line + 19 for its line + 4 + 44 a row of chips.
+    @Test func thePanelsHeightIsCountedFromItsLines() {
+        #expect(DailyMetrics.mountainPanelHeight(titleLines: 1, hasLine: false, chipRows: 1) == 86)
+        #expect(DailyMetrics.mountainPanelHeight(titleLines: 2, hasLine: true, chipRows: 2) == 169)
+    }
+}

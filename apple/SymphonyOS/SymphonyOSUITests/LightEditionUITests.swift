@@ -222,7 +222,8 @@ final class LightEditionUITests: XCTestCase {
         let any = app.descendants(matching: .any)
         let sign = any["daily.signpost"]
         XCTAssertTrue(sign.waitForExistence(timeout: 60), "no sign")
-        XCTAssertTrue(sign.label.hasPrefix("No piece"), "not the No piece sign: \(sign.label)")
+        // F29 (S38): the sign names the season ("No fall goal under this yet"); "piece" has gone.
+        XCTAssertTrue(sign.label.hasPrefix("No fall goal under this yet"), "not the No piece sign: \(sign.label)")
         sign.tap()
 
         let orb = app.buttons["walk.orb"]

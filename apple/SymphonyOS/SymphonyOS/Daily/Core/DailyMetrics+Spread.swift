@@ -236,31 +236,6 @@ extension DailyMetrics {
     static let spreadFlagSlots: [FlagSlot] = [FlagSlot(x: 190 / 445, foot: 162, length: 64),
                                               FlagSlot(x: 352 / 445, foot: 156, length: 70)]
 
-    // MARK: Month, Season and Year opened flat
-
-    /// Where a mountain page's panel for the chosen flag may stand (`MountainPageView`): it grows up
-    /// from this frame's foot, `mountainPanelAbove` over the bar's `line` (the board's 673 over 724),
-    /// so it never reaches the hint or the bar. On the phone it stands 20 in from each side (the
-    /// board's (20, 590) 350 wide). Opened flat the stage is letterboxed narrow in the middle of a
-    /// short window, where a window-wide panel would cover its lower flags, the chosen one among
-    /// them: there it stands beside the stage on the right, over the letterbox, wholly on the right page,
-    /// and (`beside`) its chips wrap onto more lines, since growing up there covers no peak.
-    static func mountainPanel(size: CGSize, line: CGFloat, layout: TodayLayout) -> (frame: CGRect, beside: Bool) {
-        let height = max(0, line - mountainPanelAbove)
-        let wide = CGRect(x: mountainPanelInset, y: 0, width: size.width - 2 * mountainPanelInset, height: height)
-        guard layout == .journal else { return (wide, false) }
-        let stage = WalkStage(device: size)
-        let left = stage.origin.x + WalkArt.overlookSquare.stage.width * stage.scale + 16
-        let width = size.width - mountainPanelInset - left
-        guard width >= mountainPanelBeside else { return (wide, false) }
-        return (CGRect(x: left, y: 0, width: width, height: height), true)
-    }
-
-    static let mountainPanelInset: CGFloat = 20
-    static let mountainPanelAbove: CGFloat = 51
-    /// Beside the stage only where the letterbox leaves at least this much room.
-    static let mountainPanelBeside: CGFloat = 240
-
     /// The spread's field: 48 high, at least 12 above the window's foot (the board's 566 of 626).
     static let spreadField: CGFloat = 48
     static let spreadBarFoot: CGFloat = 12

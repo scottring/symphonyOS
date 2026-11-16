@@ -96,7 +96,7 @@ struct LightSpreadView: View {
                         .accessibilitySortPriority(4.5)
                 }
                 DailyBarView(model: model, metrics: s.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
-                             shortPlaceholder: DailyCopy.shortPlaceholder(.today), listening: DailyCopy.listening(.today))
+                             shortPlaceholder: DailyCopy.shortPlaceholder(.today, periods: model.periods), listening: DailyCopy.listening(.today))
                     .accessibilitySortPriority(3)
                 #if DEBUG
                 Color.clear.frame(width: 0, height: 0)

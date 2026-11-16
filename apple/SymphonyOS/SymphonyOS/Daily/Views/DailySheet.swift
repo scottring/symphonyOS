@@ -130,31 +130,43 @@ struct DailyWholePlan: View {
 }
 
 /// The paper a Look back up cloth opened behind Today's or Week's lowered sheet (F21), over it, from
-/// 72 under the row of words: Task 7's `PlanPaperView`, its words in the reading column of the stage
-/// the whole plan stands on (`WalkLayout.column(wing:)`), following the person's text size. A row
-/// stands the plan in its area and closes it; "Show the mountain" closes it, and the handle then
-/// raises the sheet as before. It rises in 0.3 s; with Reduce Motion it fades.
+/// 72 under the row of words (`DailyRaisedPaper`, on the stage the whole plan stands on). A row stands
+/// the plan in its area and closes it; "Show the mountain" closes it, and the handle then raises the
+/// sheet as before.
 struct DailyWholePlanPaper: View {
     @Binding var lookBack: DailyLookBack
     let paper: PlanPaper?
     let size: CGSize
     let navTop: CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// The paper's top: 72 under the row of words' top (the walk's 116 on the phone board).
-    static let belowWords: CGFloat = 72
 
     var body: some View {
-        let stage = WalkStage(device: size, stage: WalkArt.overlookSquare.stage)
-        let column = WalkLayout.column(wing: stage.wing)
-        let left = stage.toDevice(CGPoint(x: column.lowerBound, y: 0)).x
-        let right = stage.toDevice(CGPoint(x: column.upperBound, y: 0)).x
+        DailyRaisedPaper(paper: paper, size: size,
+                         place: DailyMetrics.raisedPaper(size: size, navTop: navTop,
+                                                         stage: WalkStage(device: size, stage: WalkArt.overlookSquare.stage)),
+                         onRow: { id in if let paper { lookBack.rowTapped(id, on: paper) } },
+                         onClose: { lookBack.tap(.paperClosed) })
+    }
+}
+
+/// The paper raised over a light page (Task 7's `PlanPaperView`), placed by `DailyMetrics.raisedPaper`:
+/// its words in the reading column of the stage the page's mountain stands on, following the person's
+/// text size, from `place.top` to the page's foot, its list scrolling above `bottomInset`. It rises in
+/// 0.3 s; with Reduce Motion it fades. Behind Today and Week (the whole plan) and on Month, Season and Year.
+struct DailyRaisedPaper: View {
+    let paper: PlanPaper?
+    let size: CGSize
+    let place: DailyMetrics.RaisedPaper
+    var bottomInset: CGFloat = 28
+    var ids: (paper: String, close: String) = ("walk.paper", "walk.paper.close")
+    let onRow: (UUID) -> Void
+    let onClose: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         ZStack(alignment: .topLeading) {
             if let paper {
-                PlanPaperView(paper: paper, column: max(0, left)...min(size.width, right), top: navTop + Self.belowWords,
-                              touch: max(DailyMetrics.minTouch, stage.touch * stage.scale),
-                              inset: WalkLayout.paperInset * min(1, stage.scale),
-                              onRow: { lookBack.rowTapped($0, on: paper) }, onClose: { lookBack.tap(.paperClosed) })
+                PlanPaperView(paper: paper, column: place.column, top: place.top, touch: place.touch, inset: place.inset,
+                              bottomInset: bottomInset, ids: ids, onRow: onRow, onClose: onClose)
                     .frame(width: size.width, height: size.height)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom))
             }

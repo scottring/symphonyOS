@@ -56,9 +56,15 @@ struct DailyCopyTests {
         #expect(DailyCopy.pastDays([]) == "Earlier")
     }
 
-    @Test func periodEndsAndNoPiece() {
+    @Test func periodEnds() {
         #expect(DailyCopy.periodEnds("November", lastDay: day(2026, 11, 30)) == "November ends on Monday")
-        #expect(DailyCopy.noPiece("winter") == "No piece this winter yet")
+    }
+
+    /// F29 (S38): the sign names the year goal with nothing under it this season; "piece" goes.
+    @Test func theSignSaysNoGoalUnderThisYet() {
+        #expect(DailyCopy.noPiece("winter") == "No winter goal under this yet")
+        #expect(DailyCopy.noPiece(periods.seasonWord) == "No fall goal under this yet")
+        #expect(!DailyCopy.noPiece("winter").lowercased().contains("piece"))
     }
 
     @Test func headings() {
@@ -83,17 +89,25 @@ struct DailyCopyTests {
         #expect(DailyCopy.placeholder(.today, periods: periods) == "Add to today")
         #expect(DailyCopy.placeholder(.week, periods: periods) == "Add to this week")
         #expect(DailyCopy.placeholder(.month, periods: periods) == "Add a goal for November")
-        #expect(DailyCopy.placeholder(.season, periods: periods) == "Add a goal for fall")
+        #expect(DailyCopy.placeholder(.season, periods: periods) == "Add a goal for this fall")
         #expect(DailyCopy.placeholder(.year, periods: periods) == "Add a goal for 2027")
     }
 
-    /// A goal page's placeholder has a shorter form for a narrow field; Today's and Week's are short already.
-    @Test func shortPlaceholders() {
-        #expect(DailyCopy.shortPlaceholder(.month) == "Add a goal")
-        #expect(DailyCopy.shortPlaceholder(.season) == "Add a goal")
-        #expect(DailyCopy.shortPlaceholder(.year) == "Add a goal")
-        #expect(DailyCopy.shortPlaceholder(.today) == DailyCopy.placeholder(.today, periods: periods))
-        #expect(DailyCopy.shortPlaceholder(.week) == DailyCopy.placeholder(.week, periods: periods))
+    /// S60: a goal page's shorter form still says where a goal goes ("Add for November"); only where
+    /// even that does not fit does the field say "Add a goal". Today's and Week's are short already.
+    @Test func theBarSaysWhereAGoalGoesInFewerWords() {
+        #expect(DailyCopy.shortPlaceholder(.month, periods: periods) == "Add for November")
+        #expect(DailyCopy.shortPlaceholder(.season, periods: periods) == "Add for this fall")
+        #expect(DailyCopy.shortPlaceholder(.year, periods: periods) == "Add for 2027")
+        #expect(DailyCopy.shortPlaceholder(.today, periods: periods) == DailyCopy.placeholder(.today, periods: periods))
+        #expect(DailyCopy.shortPlaceholder(.week, periods: periods) == DailyCopy.placeholder(.week, periods: periods))
+        #expect(DailyCopy.addAGoal == "Add a goal")
+        // The three forms, longest first: each one shorter than the one before it.
+        for h in [Horizon.month, .season, .year] {
+            let forms = [DailyCopy.placeholder(h, periods: periods), DailyCopy.shortPlaceholder(h, periods: periods),
+                         DailyCopy.addAGoal]
+            #expect(zip(forms, forms.dropFirst()).allSatisfy { $0.count > $1.count }, "\(forms)")
+        }
     }
 
     /// The bar's words are never cut short: the first form that fits the field's room, as the view
@@ -101,22 +115,56 @@ struct DailyCopyTests {
     @Test func thePlaceholderThatFitsIsChosen() {
         let width: (String) -> CGFloat = { CGFloat($0.count) * 8 }    // 8 points a letter
         let month = DailyCopy.placeholder(.month, periods: periods)    // "Add a goal for November": 23 letters, 184
-        let forms = [month, DailyCopy.shortPlaceholder(.month)]
+        let forms = [month, DailyCopy.shortPlaceholder(.month, periods: periods), DailyCopy.addAGoal]
         #expect(DailyCopy.fitting(forms, room: 184, width: width) == month)          // just fits
-        #expect(DailyCopy.fitting(forms, room: 183.9, width: width) == "Add a goal")
+        #expect(DailyCopy.fitting(forms, room: 183.9, width: width) == "Add for November")   // 16 letters, 128
+        #expect(DailyCopy.fitting(forms, room: 127.9, width: width) == "Add a goal")
         #expect(DailyCopy.fitting(forms, room: 10, width: width) == "Add a goal")    // nothing fits: the shortest
         #expect(DailyCopy.fitting(["Add to today"], room: 10, width: width) == "Add to today")
         #expect(DailyCopy.fitting([], room: 100, width: width) == "")
     }
 
-    @Test func listeningAndHints() {
+    @Test func listening() {
         #expect(DailyCopy.listening(.today) == "Listening. Say a day and it goes there.")
         #expect(DailyCopy.listening(.week) == "Listening. Say a day and it goes there.")
         #expect(DailyCopy.listening(.month) == "Listening.")
         #expect(DailyCopy.listening(.year) == "Listening.")
-        #expect(DailyCopy.hint(.year) == "Tap a peak to look closer")
-        #expect(DailyCopy.hint(.season) == "Tap a flag to move it or walk it down")
-        #expect(DailyCopy.hint(.month) == "Tap a flag to move it or walk it down")
+    }
+
+    /// The line over a mountain page's foot: with side posts it says they walk; else what a flag does,
+    /// on every level (the zoom has gone, so nothing says "look closer").
+    @Test func noHintNamesTheZoom() {
+        for level in [WalkLevel.year, .season, .month] {
+            #expect(DailyCopy.hint(level, sides: true, empty: false) == "Tap a post to walk to that area")
+            #expect(DailyCopy.hint(level, sides: false, empty: false) == "Tap a flag to move it or walk it down")
+            for sides in [true, false] {
+                #expect(!DailyCopy.hint(level, sides: sides, empty: false).contains("peak"))
+                #expect(!DailyCopy.hint(level, sides: sides, empty: false).contains("closer"))
+            }
+        }
+    }
+
+    /// S22: a page with no goal on its level says how to begin, whatever stands at the side.
+    @Test func anEmptyPageSaysHowToBegin() {
+        for level in [WalkLevel.year, .season, .month] {
+            for sides in [true, false] {
+                #expect(DailyCopy.hint(level, sides: sides, empty: true) == "Add your first goal with the bar below")
+            }
+        }
+    }
+
+    /// The pages' paper: the strip's words, two lines tall and one line short, and the paper's heading.
+    @Test func thePagesPaperSaysWhatItReads() {
+        #expect(DailyCopy.readWhole(.year) == "Read the whole year")
+        #expect(DailyCopy.readWhole(.season) == "Read the whole season")
+        #expect(DailyCopy.readWhole(.month) == "Read the whole month")
+        let count = WalkCopy.paperCount(17, level: .year)
+        #expect(DailyCopy.paperSub(count) == "17 goals, as a plain list by area")
+        #expect(DailyCopy.paperLine(.year, count: count) == "Read the whole year · 17 goals")
+        #expect(DailyCopy.paperLine(.month, count: WalkCopy.paperCount(1, level: .month)) == "Read the whole month · 1 goal")
+        #expect(DailyCopy.paperTitle(.year, periods: periods) == "2027")
+        #expect(DailyCopy.paperTitle(.season, periods: periods) == "Fall")
+        #expect(DailyCopy.paperTitle(.month, periods: periods) == "November")
     }
 
     @Test func nothingUnderAFlag() {
