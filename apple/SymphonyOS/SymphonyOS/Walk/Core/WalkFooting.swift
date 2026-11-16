@@ -1,31 +1,42 @@
 import Foundation
 import CoreGraphics
 
-/// How the posts stand. `.level` is the ruled geometry of the mockup contract: every
-/// post on its band line, upright, its cloth square. `.natural` (the app's) plants each
-/// post by hand: its base a little above or below the line, its bare pole a little
-/// longer or shorter, the post a little off upright, each cloth hanging a little askew.
+/// How the posts stand. `.level` is the board's ruled numbers: every post upright in its
+/// place, its cloth square. `.natural` (the app's) plants each by hand: the standing post's
+/// bare pole a little longer, the post a little off upright, each cloth hanging a little askew
+/// and a little off the pole; a side post leaning, and standing a little off its row; a chip
+/// on the ground a little higher than its row.
 ///
 /// The hand is fixed, not random: a pure function of identity (a post by its key, a
 /// banner by its item, an example by its words), the same on every launch, every device
-/// and every step. Where there is no room for it, a post's hand shrinks toward level.
+/// and every step. It takes only the room the ruled layout leaves it (`WalkStanding.hand`), so it
+/// never breaks a guarantee: where there is no room for it, it shrinks toward level.
 enum WalkFooting: Equatable {
     case level, natural
 
-    // MARK: The hand's amplitudes, at drawn scale 1 (a distant level's are scaled with it)
+    // MARK: The hand's amplitudes
 
-    /// A post's base stands at most this far above or below its band line.
-    static let ground: CGFloat = 10
-    /// Neighbouring posts on one level stand at least this far apart in height.
-    static let apart: CGFloat = 6
-    /// The bare pole under the lowest banner (level: `WalkLayout.pole`).
-    static let pole: ClosedRange<CGFloat> = 18...34
-    /// A post leans at most this many degrees either way about its base.
-    static let lean: Double = 1.5
+    /// The standing post's bare pole is this much longer than the ruled one (`WalkLayout.pole`),
+    /// while there is room above its stack: the whole stack stands that much higher.
+    static let standingLift: ClosedRange<CGFloat> = 2...8
+    /// The standing post leans at most this many degrees either way about its foot. (It was 1.5
+    /// while posts were short; a post up to 274 tall carries its top cloth 7 points aside at
+    /// that, past the side post beside it.)
+    static let standingLean: Double = 0.4
     /// A cloth hangs at most this many degrees off its post's line,
     static let tilt: Double = 0.9
     /// and sits at most this far left or right of the pole line.
     static let shift: CGFloat = 2.5
+    /// The furthest a turned cloth's corner rises or dips (a 150-wide cloth, shifted, turned by
+    /// the lean and the tilt together): the room a turning stack needs above it, and what the
+    /// lift gives back under it.
+    static let turnRoom: CGFloat = 2
+    /// A side post leans at most this many degrees either way about its foot,
+    static let sideLean: Double = 1.2
+    /// and stands at most this far off its row: lower on the low row, higher on the high row.
+    static let sideStep: CGFloat = 3
+    /// A chip on the ground stands at most this much higher than its row.
+    static let chipRise: CGFloat = 3
 
     /// A fixed value in −1…1 for an identity and a trait: FNV-1a over the UTF-8 bytes
     /// of "trait:id", mixed (SplitMix64's finaliser) so ids differing only at the end spread.

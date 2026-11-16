@@ -154,14 +154,6 @@ extension WalkLayout {
         return CGRect(x: 10, y: WalkOrb.centre.y - ring - 8 - teachHeight, width: 370, height: teachHeight)
     }
 
-    // MARK: Example tags
-
-    /// The banner width the long example tag needs (8.5 pt, by estimate, inside the cloth's padding).
-    static let exampleTagRoom: CGFloat = 116
-    static func exampleTag(forWidth width: CGFloat) -> String {
-        width >= exampleTagRoom ? WalkCopy.exampleTag : WalkCopy.exampleTagShort
-    }
-
     // MARK: The compass points' words
 
     /// One line of a point's words: its label (12 pt) or its second line (13 pt), and where it stands.

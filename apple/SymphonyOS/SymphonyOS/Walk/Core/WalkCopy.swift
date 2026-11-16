@@ -375,7 +375,8 @@ enum WalkCopy {
     /// How many more flags a banner on Look back up stands for: "+2 more".
     static func more(_ count: Int) -> String { "+\(count) more" }
     /// What a folded stub says: the 26-point pennant has room for the count only ("+2").
-    static func stubCount(_ count: Int) -> String { "+\(count)" }
+    /// "+n more" to VoiceOver, while a tap on it does nothing yet (the paper it opens is Task 7's).
+    static func moreLabel(_ count: Int) -> String { "\(count) more" }
     /// An example flag's tag, and the shorter one where the flag is too narrow for it.
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
@@ -504,6 +505,29 @@ enum WalkCopy {
         if ground { return kept ? "Tap to let go" : "Tap to keep" }
         return focused ? "You are here" : "Tap to walk there"
     }
+
+    /// A side post to VoiceOver: the area and how many of the step's flags stand in it ("Health, 4
+    /// goals this month", "Work, 1 goal this year", "Home, 3 tasks this week", "No area, 2 goals
+    /// this month"). A count of what stands there, never of what is undone.
+    static func sideLabel(name: String, count: Int, level: WalkLevel, periods p: WalkPeriods) -> String {
+        let tasks = level == .week || level == .today
+        let one = tasks ? "task" : "goal"
+        let many = count == 0 ? "no \(one)s" : (count == 1 ? "1 \(one)" : "\(count) \(one)s")
+        let when: String
+        switch level {
+        case .year: when = "this year"
+        case .season: when = "this \(p.seasonWord)"
+        case .month: when = "this month"
+        case .week, .today: when = "this week"
+        }
+        return "\(name), \(many) \(when)"
+    }
+    /// Look back up, where a side post stands for every flag of its area.
+    static func sideLabelWholePlan(name: String, count: Int) -> String {
+        "\(name), \(count == 0 ? "nothing" : "\(count)") in your plan"
+    }
+    /// The nameless post's name, to VoiceOver.
+    static let noArea = "No area"
 
     static func rowLabel(_ title: String, forGoal: String?) -> String {
         forGoal.map { "\(title), for \($0)" } ?? title

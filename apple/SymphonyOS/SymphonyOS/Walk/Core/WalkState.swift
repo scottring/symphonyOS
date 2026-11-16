@@ -429,6 +429,14 @@ struct WalkState: Equatable {
         return parents.first { $0.id == lastPlanted[level] } ?? parents.last
     }
 
+    /// The walk as it stands after any touch (`settleStanding`). The layout draws this, so a place
+    /// opened mid-walk (a resume, a preview, a page) is laid out where the next touch would find it.
+    var settled: WalkState {
+        var s = self
+        s.settleStanding()
+        return s
+    }
+
     /// After every event and action the walk stands somewhere, never on a post with no way on.
     /// Year: in a kept area. Steps 2 to 5: in the focused goal's area; with no focused goal,
     /// on the area's remembered or newest goal above; an area with nothing above but a flag

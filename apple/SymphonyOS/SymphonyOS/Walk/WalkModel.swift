@@ -31,7 +31,9 @@ extension Dictation: WalkListening {}
     /// The painting the scene draws and the layout measures against.
     let art: WalkArt = .overlookSquare
     /// The layout on a stage with this much room beside the board (`WalkStage.wing`, from `\.walkStage`).
-    func layout(wing: CGFloat) -> WalkLayout { WalkLayout.make(state, today: periods.today, art: art, wing: wing) }
+    func layout(wing: CGFloat) -> WalkLayout {
+        WalkLayout.make(state, today: periods.today, art: art, wing: wing, periods: periods)
+    }
     var onEnd: ((WalkStatus) -> Void)?
 
     @ObservationIgnored private let userId: UUID
@@ -101,7 +103,9 @@ extension Dictation: WalkListening {}
             resuming.restored(for: periods, existing: Set(state.items.map(\.id))).apply(to: &state)
         }
 
-        self.state = state
+        // A walk opened part-way (a resume, a walk down, a preview) stands where its first touch would
+        // find it, so its words and its layout are of one area from the first frame.
+        self.state = state.settled
         self.periods = periods
         self.planted = planted
         self.userId = userId

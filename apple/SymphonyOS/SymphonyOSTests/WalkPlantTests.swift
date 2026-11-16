@@ -1098,12 +1098,12 @@ struct WalkPlantTests {
     /// What an area's label says a tap does, off the ground.
     private func areaHint(_ s: WalkState, _ id: UUID) -> String? { WalkCopy.areaHint(s, id) }
 
-    /// Every Today state a tap (on a drawn flag or a kept area) or the Next line's "Start with this
-    /// one" can reach from the seeds, searched breadth first to the end (a seed may not pass
-    /// `cap` states). In each: a flag's role and an area's hint say exactly what the reducer does,
-    /// a tap never changes the first thing, and taps alone lead back to the first thing as the goal
-    /// above with the Next line reading Finish. The nameless post has no label to tap, so it is
-    /// reached only through its flags.
+    /// Every Today state a tap (on a drawn flag or a side post the layout draws) or the Next line's
+    /// "Start with this one" can reach from the seeds, searched breadth first to the end (a seed may
+    /// not pass `cap` states). In each: a flag's role says exactly what the reducer does, every side
+    /// post drawn walks to its area and no other kept area takes a walk, a tap never changes the
+    /// first thing, and taps alone lead back to the first thing as the goal above with the Next line
+    /// reading Finish. The nameless post takes no tap yet, so it is reached only through the goal above.
     @Test func onTodayEveryStateATapReachesKeepsItsWord() throws {
         let cap = 3000
         let walkThere = WalkCopy.areaHint(ground: false, kept: true, focused: false)
@@ -1149,17 +1149,32 @@ struct WalkPlantTests {
                         if after != s { let i = index(of: after); tapEdges[next].append(i) }
                     }
                 }
-                for id in s.kept {
+                // The area taps there are: the side posts the layout draws. Each one's tap walks there.
+                for side in layout.sides {
+                    guard let event = WalkLayout.tapEvent(side), case .areaTapped(let id) = event else {
+                        #expect(side.area == nil && !side.taps, "\(seed.name): \(side.name) is drawn and takes no tap")
+                        continue
+                    }
+                    var after = s
+                    _ = after.apply(event, m.env)
+                    #expect(after.standing == id, "\(seed.name): \(side.name) is a post, yet a tap did not walk there")
+                    #expect(after.firstThing == s.firstThing, "\(seed.name): a tap on \(side.name) changed the first thing")
+                    #expect(areaHint(s, id) == walkThere, "\(seed.name): \(side.name)")
+                    if after != s { let i = index(of: after); tapEdges[next].append(i) }
+                }
+                // A kept area with no post takes no walk; and on a first walk every kept area that holds a
+                // week task is where the walk stands or one of the posts drawn (on a walk down only the
+                // areas on its own line are).
+                for id in s.kept where id != s.standing && !layout.sides.contains(where: { $0.area == id }) {
+                    let name = s.area(id)?.name ?? "?"
                     var after = s
                     _ = after.apply(.areaTapped(id), m.env)
-                    let name = s.area(id)?.name ?? "?"
-                    if areaHint(s, id) == walkThere {
-                        #expect(after.standing == id, "\(seed.name): \(name) says it can be walked to")
-                    } else {
-                        #expect(after == s, "\(seed.name): \(name) takes no walk, yet a tap changed the walk")
+                    #expect(after == s, "\(seed.name): \(name) has no post, yet a tap changed the walk")
+                    #expect(areaHint(s, id) == nil, "\(seed.name): \(name)")
+                    if s.walkingDown.isEmpty {
+                        #expect(!s.items(on: .week).contains { s.column(of: $0) == id },
+                                "\(seed.name): \(name) holds a week task and cannot be stood in")
                     }
-                    #expect(after.firstThing == s.firstThing, "\(seed.name): a tap on \(name) changed the first thing")
-                    if after != s { let i = index(of: after); tapEdges[next].append(i) }
                 }
                 if WalkCopy.nextLine(s, m.env.periods)?.action == .startThere {
                     var after = s
@@ -1205,7 +1220,7 @@ struct WalkPlantTests {
         return roles.first { WalkCopy.bannerLabel(banner.text, level: banner.level, tag: banner.tag, role: $0) == banner.label }
     }
 
-    /// Every Today state the seed's taps (on drawn flags and kept areas) reach, and the taps between them.
+    /// Every Today state the seed's taps (on drawn flags and the side posts drawn) reach, and the taps between them.
     private func tapSearch(_ seed: WalkState) -> (states: [WalkState], edges: [[Int]]) {
         var states = [seed], edges: [[Int]] = [[]], next = 0
         while next < states.count {
@@ -1216,7 +1231,10 @@ struct WalkPlantTests {
                 guard let event = WalkLayout.tapEvent(banner, on: post), case .bannerTapped = event else { continue }
                 var after = s; _ = after.apply(event, m.env); afters.append(after)
             } }
-            for id in s.kept { var after = s; _ = after.apply(.areaTapped(id), m.env); afters.append(after) }
+            for side in layout.sides {
+                guard let event = WalkLayout.tapEvent(side) else { continue }
+                var after = s; _ = after.apply(event, m.env); afters.append(after)
+            }
             for var after in afters where after != s {
                 after.undo = []; after.undoShowing = false
                 if let i = states.firstIndex(of: after) { edges[next].append(i) } else {

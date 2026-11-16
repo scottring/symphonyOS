@@ -446,7 +446,7 @@ struct WalkCopyTests {
         said += WalkLevel.allCases.map(WalkCopy.levelName)
         said += [WalkCopy.wordmark, WalkCopy.welcomeSub, WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard,
                  WalkCopy.speakNow, WalkCopy.ridgeFull, WalkCopy.undo, WalkCopy.moveTo, WalkCopy.pullUp,
-                 WalkCopy.typePlaceholder, WalkCopy.typeAdd, WalkCopy.typeClose, WalkCopy.backWord, WalkCopy.firstThingTag, WalkCopy.more(2), WalkCopy.stubCount(2),
+                 WalkCopy.typePlaceholder, WalkCopy.typeAdd, WalkCopy.typeClose, WalkCopy.backWord, WalkCopy.firstThingTag, WalkCopy.more(2), WalkCopy.moreLabel(2), WalkCopy.noArea,
                  WalkCopy.exampleTag, WalkCopy.exampleTagShort, WalkCopy.groundWhy, WalkCopy.focusAbove,
                  WalkCopy.heresToday, WalkCopy.showMyDay, WalkCopy.lookBackHandle, WalkCopy.todayEyebrow,
                  WalkCopy.walkAnother, WalkCopy.goToToday, WalkCopy.thatsTheDay, WalkCopy.nothingToday,
@@ -542,10 +542,10 @@ struct WalkCopyTests {
         #expect(WalkCopy.typePlaceholder == "Type it, then tap Add"); #expect(WalkCopy.firstThingTag == "FIRST THING")
         #expect(WalkCopy.typeAdd == "Add"); #expect(WalkCopy.typeClose == "Close without adding")
         #expect(WalkCopy.finish == "Finish the walk")
-        #expect(WalkCopy.more(2) == "+2 more"); #expect(WalkCopy.stubCount(2) == "+2")
+        #expect(WalkCopy.more(2) == "+2 more"); #expect(WalkCopy.moreLabel(2) == "2 more"); #expect(WalkCopy.noArea == "No area")
         #expect(WalkCopy.exampleTag == "EXAMPLE · TAP TO USE"); #expect(WalkCopy.exampleTagShort == "TAP TO USE")
-        #expect(WalkLayout.exampleTag(forWidth: 124) == "EXAMPLE · TAP TO USE")
-        #expect(WalkLayout.exampleTag(forWidth: 99) == "TAP TO USE")
+        #expect(WalkLayout.exampleTag(forWidth: 226.5) == "EXAMPLE · TAP TO USE")
+        #expect(WalkLayout.exampleTag(forWidth: 150) == "TAP TO USE")
         #expect(WalkCopy.lookBack == "Look back up: that’s your plan."); #expect(WalkCopy.heresToday == "Here’s today.")
         #expect(WalkCopy.showMyDay == "Show my day"); #expect(WalkCopy.lookBackHandle == "See my whole plan")
         #expect(WalkCopy.todayEyebrow == "Today"); #expect(WalkCopy.walkAnother == "Plan another goal down to today")

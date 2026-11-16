@@ -153,13 +153,13 @@ struct MountainPageTests {
             let banners = layout.banners
             #expect(!banners.isEmpty, "\(level)")
             #expect(banners.contains { $0.level == level }, "\(level)")
-            // A small flag stays on its pole and the screen clips it, as on the walk; every other cloth is inside.
-            for b in banners where b.kind != .tip {
-                #expect(b.drawn.minX >= WalkLayout.edges.lowerBound - 0.01
-                        && b.drawn.maxX <= WalkLayout.edges.upperBound + 0.01, "\(level) \(b.id) \(b.drawn)")
+            // Every cloth is inside the edges, and under the question.
+            for b in banners {
+                #expect(b.drawn.minX >= WalkLayout.edges(wing: 0).lowerBound - 0.01
+                        && b.drawn.maxX <= WalkLayout.edges(wing: 0).upperBound + 0.01, "\(level) \(b.id) \(b.drawn)")
             }
             for b in banners {
-                #expect(b.drawn.minY >= WalkLayout.flagCeiling - 0.01, "\(level) \(b.id) at \(b.drawn.minY)")
+                #expect(b.drawn.minY >= WalkLayout.question - 0.01, "\(level) \(b.id) at \(b.drawn.minY)")
             }
             let own = banners.filter { $0.level == level }
             for i in own.indices { for j in own.indices where j > i {
@@ -219,7 +219,7 @@ struct MountainPageTests {
         #expect(season.focus == y.id)
         #expect(season.selected == nil)
         #expect(season.walkState.focus[.season] == y.id)
-        #expect(WalkLayout.make(season.walkState, today: day(2026, 11, 14)).camera.k == WalkLayout.zoomK)
+        #expect(WalkLayout.make(season.walkState, today: day(2026, 11, 14)).camera == WalkArt.overlookSquare.stops[2])   // no zoom
         _ = season.apply(.flag(y.id))
         #expect(season.focus == nil)
         #expect(season.walkState.focus.isEmpty)
@@ -241,7 +241,7 @@ struct MountainPageTests {
         _ = year.apply(.peak(area("Home").id))
         #expect(year.focusArea == area("Home").id)
         #expect(year.walkState.focusArea == area("Home").id)
-        #expect(WalkLayout.make(year.walkState, today: day(2026, 11, 14)).camera.k == WalkLayout.zoomK)
+        #expect(WalkLayout.make(year.walkState, today: day(2026, 11, 14)).camera == WalkArt.overlookSquare.stops[1])     // no zoom
         _ = year.apply(.peak(area("Home").id))
         #expect(year.focusArea == nil)
 

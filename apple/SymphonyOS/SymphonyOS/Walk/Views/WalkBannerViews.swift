@@ -129,8 +129,8 @@ struct WalkBannerView: View {
 
     private var flutters: Bool {
         switch banner.kind {
-        case .full, .compact, .ghost: return true
-        case .tip, .stub: return false
+        case .full, .parent, .compact, .ghost: return true
+        case .more: return false
         }
     }
 
@@ -138,9 +138,8 @@ struct WalkBannerView: View {
         switch banner.kind {
         case .full: full.overlay(alignment: .topTrailing) { moreBadge }
         case .ghost: ghost.overlay(alignment: .topTrailing) { moreBadge }
-        case .compact: compact
-        case .tip: tip.overlay(alignment: .topLeading) { moreBadge.offset(x: poleX - banner.frame.minX + 26 * banner.frame.height / 20) }
-        case .stub(let count): stub(count)
+        case .compact, .parent: compact
+        case .more(let count): stub(count)
         }
     }
 

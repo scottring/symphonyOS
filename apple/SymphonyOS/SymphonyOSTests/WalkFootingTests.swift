@@ -3,8 +3,9 @@ import Foundation
 import CoreGraphics
 @testable import Symphony
 
-// The posts stand on uneven ground and their cloth hangs by hand (`WalkFooting.natural`),
-// fixed by identity, within small bounds, and never at the cost of the layout's rules.
+// The posts are planted by hand (`WalkFooting.natural`): fixed by identity, small, and given only
+// the room the ruled layout leaves, so it never costs the layout a guarantee (the sweep in
+// `WalkLayoutTests.nothingOverlaps` measures every one of them on what is drawn, for both footings).
 
 private let today = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 13))!
 
@@ -16,458 +17,185 @@ private let names = ["Health", "Home", "People", "Work", "Money", "Fun", "Faith"
 private let ridge = names.enumerated().map { WalkArea(id: uid(1000 + $0.offset), name: $0.element) }
 private func area(_ name: String) -> UUID { ridge.first { $0.name == name }!.id }
 
-/// `count` areas kept, one flag (or `perPost`) on each on every level to `step`; or the ground.
-private func walk(step: Int, areas count: Int, perPost: Int = 1, ground: Bool = false) -> WalkState {
+/// Year, these areas kept, `titles` planted in `standing`, one goal in every other area.
+private func year(kept: [String], standing: String, titles: [String]) -> WalkState {
     var s = WalkState()
-    s.areas = Array(ridge.prefix(count))
-    s.kept = ground ? [] : s.areas.map(\.id)
-    s.step = step
-    s.ground = ground
+    s.areas = ridge
+    s.kept = kept.map(area)
+    s.step = 1
+    s.focusArea = area(standing)
     var n = 0
-    for raw in 1...max(1, min(step, 4)) {
-        for a in s.areas { for i in 0..<perPost {
-            n += 1
-            s.items.append(WalkItem(id: uid(5000 + n), level: WalkLevel(rawValue: raw)!, title: "Flag \(n) \(i)", areaId: a.id))
-        } }
-    }
-    if step >= 5, let week = s.items(on: .week).last { s.firstThing = week.id }
-    return s
+    for title in titles { n += 1; s.items.append(WalkItem(id: uid(5000 + n), level: .year, title: title, areaId: area(standing))) }
+    for name in kept where name != standing { n += 1; s.items.append(WalkItem(id: uid(5000 + n), level: .year, title: "Goal", areaId: area(name))) }
+    return s.settled
 }
 
-/// `areas` kept in this order, one flag on each on every level to `step` except the levels each
-/// area skips; ids depend only on the area and the level, so adding an area changes no other id.
-private func ridgeWalk(step: Int, areas: [WalkArea], skip: [UUID: Set<WalkLevel>] = [:], from: Int = 1) -> WalkState {
-    var s = WalkState()
-    s.areas = areas
-    s.kept = areas.map(\.id)
-    s.step = step
-    for raw in from...min(step, 4) {
-        let level = WalkLevel(rawValue: raw)!
-        for a in areas where !(skip[a.id]?.contains(level) ?? false) {
-            let n = Int(a.id.uuidString.suffix(4), radix: 16)! * 10 + raw
-            s.items.append(WalkItem(id: uid(60_000 + n), level: level, title: "Flag", areaId: a.id))
-        }
-    }
-    return s
-}
-
-/// The maximal monotone runs of a row of footings, as sets of indices (an extreme closes two).
-private func runs(_ f: [CGFloat]) -> [Set<Int>] {
-    guard f.count > 1 else { return [Set(f.indices)] }
-    var ends = [0]
-    for t in 1..<(f.count - 1) where (f[t] > f[t - 1]) != (f[t + 1] > f[t]) { ends.append(t) }
-    ends.append(f.count - 1)
-    return zip(ends, ends.dropFirst()).map { Set($0...$1) }
-}
-
-/// Ids from a seeded SplitMix64, so the property test's id sets are the same on every run.
-private struct SeededIds {
-    var state: UInt64
-    init(seed: UInt64) { state = seed }
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
-    }
-    mutating func uuid() -> UUID {
-        let a = next(), b = next()
-        return UUID(uuidString: String(format: "%08X-%04X-%04X-%04X-%012llX", UInt32(a >> 32), UInt16((a >> 16) & 0xFFFF),
-                                       UInt16(a & 0xFFFF), UInt16(b >> 48), b & 0xFFFF_FFFF_FFFF))!
-    }
-}
-
-private func post(_ layout: WalkLayout, _ level: WalkLevel, _ column: UUID?) -> WalkLayout.Post? {
-    layout.posts.first { $0.key == WalkPostKey(level: level, column: column) }
-}
+private func natural(_ s: WalkState, wing: CGFloat = 0) -> WalkLayout { WalkLayout.make(s, today: today, footing: .natural, wing: wing) }
+private func ruled(_ s: WalkState, wing: CGFloat = 0) -> WalkLayout { WalkLayout.make(s, today: today, footing: .level, wing: wing) }
 
 struct WalkFootingTests {
 
     @Test func theSameWalkLooksTheSameTwice() {
-        let s = walk(step: 1, areas: 3, perPost: 2)
-        #expect(WalkLayout.make(s, today: today) == WalkLayout.make(s, today: today))
-        // The hand is a fixed function of the id's bytes: these numbers never change between launches.
-        #expect(WalkFooting.hand("1-00000000-0000-0000-0000-0000000003E8", "lean") == -0.9556318672293687)
-        #expect(WalkFooting.hand("00000000-0000-0000-0000-000000001389", "tilt") == 0.41381061405602515)
-        // A lone kept area on Year: its post stands exactly here.
-        let lone = WalkLayout.make(walk(step: 1, areas: 1), today: today)
-        let p = post(lone, .year, area("Health"))!
-        #expect(!p.squeezed)
-        #expect(abs(p.footing - -6.327964598602134) < 0.0001 && abs(p.lean - -1.433447800844053) < 0.0001
-                && abs(p.pole - 18.081164561140767) < 0.0001,
-                "\(p.footing) \(p.lean) \(p.pole)")
+        let s = year(kept: ["Health", "Home", "People"], standing: "Home", titles: ["Run a 5K", "Sleep by ten"])
+        #expect(natural(s) == natural(s))
+        #expect(WalkFooting.hand("a", "tilt") == WalkFooting.hand("a", "tilt"))
+        #expect(WalkFooting.hand("a", "tilt") != WalkFooting.hand("b", "tilt"))
+        let hands = (0..<500).map { WalkFooting.hand("item-\($0)", "tilt") }
+        #expect(hands.allSatisfy { (-1...1).contains($0) })
+        #expect(hands.min()! < -0.9 && hands.max()! > 0.9)
     }
 
-    @Test func neighboursNeverStandOnOneLine() {
-        for ground in [false, true] {
-            for count in 2...8 {
-                let layout = WalkLayout.make(walk(step: 1, areas: count, ground: ground), today: today)
-                let posts = layout.posts.filter { $0.key.level == .year }.sorted { $0.base.x < $1.base.x }
-                #expect(posts.count == count, "ground \(ground) \(count)")
-                // Up to five posts the 6 pt holds for every pair, squeezed or not; from six, the label rows may squeeze.
-                for (a, b) in zip(posts, posts.dropFirst()) where count <= 5 || (!a.squeezed && !b.squeezed) {
-                    #expect(abs(a.base.y - b.base.y) >= WalkFooting.apart - 0.001,
-                            "ground \(ground) \(count): \(a.id) \(a.base.y) beside \(b.id) \(b.base.y)")
-                }
-                #expect(Set(posts.map(\.lean)).count > 1, "ground \(ground) \(count): every post leans alike")
-                #expect(Set(posts.map(\.base.y)).count > 1, "ground \(ground) \(count): every post on one line")
-                // Up to five areas there is always room: nobody is squeezed, so the 6 pt above is checked for every pair.
-                #expect(count >= 6 || posts.allSatisfy { !$0.squeezed }, "ground \(ground) \(count): \(posts.filter(\.squeezed).map(\.id))")
+    /// Ruled, nothing leans, turns, shifts or stands off its place.
+    @Test func levelIsTheBoard() {
+        for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
+            for post in layout.posts {
+                guard post.lean == 0, post.base == CGPoint(x: 195, y: 556), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
+                else { Issue.record("\(Generated.describe(s)): the ruled post is not ruled"); return }
+                if let lowest = post.banners.last, lowest.frame.maxY != 532 { Issue.record("\(Generated.describe(s)): lowest cloth at \(lowest.frame.maxY)"); return }
             }
+            guard layout.sides.allSatisfy({ $0.lean == 0 }), layout.labels.allSatisfy({ $0.footing == 0 })
+            else { Issue.record("\(Generated.describe(s)): a ruled side post or chip is off its place"); return }
         }
-        // Season and below, a column with no post between two posts: the two posts are the neighbours.
-        var pairs = 0
-        for count in 3...5 {
-            for gap in 1..<(count - 1) {
-                for step in 2...4 {
-                    let areas = Array(ridge.prefix(count))
-                    let skip = [areas[gap].id: Set([WalkLevel.season, .month, .week])]
-                    let layout = WalkLayout.make(ridgeWalk(step: step, areas: areas, skip: skip), today: today)
-                    for raw in 2...step {
-                        let posts = layout.posts.filter { $0.key.level.rawValue == raw }.sorted { $0.base.x < $1.base.x }
-                        #expect(posts.count == count - 1)
-                        // On Season's own step nothing crowds them, so no one may be squeezed and every pair is
-                        // checked. Further down a post may be damped (its hand halved or more) where it would
-                        // otherwise meet the small flags above it, which is a rule the hand would break; such a
-                        // pair is excused there, and only there.
-                        #expect(step > 2 || posts.allSatisfy { !$0.squeezed }, "\(count) areas, gap \(gap), step \(step), level \(raw)")
-                        for (a, b) in zip(posts, posts.dropFirst()) where step == 2 || (!a.squeezed && !b.squeezed) {
-                            pairs += 1
-                            #expect(abs(a.footing - b.footing) >= WalkFooting.apart * scale(of: layout, raw) - 0.001,
-                                    "\(count) areas, gap \(gap), step \(step), level \(raw): \(a.id) \(a.footing) beside \(b.id) \(b.footing)")
-                        }
-                    }
-                }
-            }
-        }
-        #expect(pairs >= 30, "\(pairs) pairs checked")
     }
 
-    /// A level's drawn scale, read off a small flag (20 pt tall at scale 1); 1 for anything else.
-    private func scale(of layout: WalkLayout, _ raw: Int) -> CGFloat {
-        layout.posts.first { $0.key.level.rawValue == raw }?.banners.first { $0.kind == .tip }.map { $0.frame.height / 20 } ?? 1
+    /// With room, the hand shows: the stack stands 2 to 8 higher on a longer pole, the pole leans a
+    /// little, each cloth hangs a little askew and a little off the pole; all within their bounds.
+    @Test func theHandIsSeenAndSmall() {
+        let s = year(kept: ["Health", "Home", "People"], standing: "Home", titles: ["Run a 5K", "Sleep by ten", "Cook at home"])
+        let hand = natural(s), board = ruled(s)
+        let post = hand.posts[0]
+        #expect((26...32).contains(post.pole) && post.lean != 0 && abs(post.lean) <= WalkFooting.standingLean)
+        #expect(post.base == CGPoint(x: 195, y: 556))
+        let lift = post.pole - 24
+        for (b, r) in zip(post.banners, board.posts[0].banners) {
+            #expect(b.id == r.id)
+            #expect(b.tilt != 0 && abs(b.tilt) <= WalkFooting.tilt && b.shift != 0 && abs(b.shift) <= WalkFooting.shift)
+            #expect(abs(b.turn - (post.lean + b.tilt)) < 1e-9)
+            #expect(abs(b.frame.minY - (r.frame.minY - lift)) < 0.05 && abs(b.frame.minX - r.frame.minX) <= WalkFooting.shift + 2)
+            #expect(b.frame.size == r.frame.size)
+        }
+        #expect(Set(post.banners.map(\.tilt)).count == 3)
+        // The pill rides the leaning pole, lifted with the stack.
+        let pill = hand.standingPill!, ruledPill = board.standingPill!
+        #expect(abs(pill.frame.minY - (ruledPill.frame.minY - lift)) < 0.001 && abs(pill.frame.midX - 195) <= 4)
+        // Side posts lean, and stand a little lower than their row (the low row).
+        for (side, r) in zip(hand.sides, board.sides) {
+            #expect(side.lean != 0 && abs(side.lean) <= WalkFooting.sideLean)
+            let off = side.poleFoot - r.poleFoot
+            #expect((0...WalkFooting.sideStep).contains(off) && side.pill!.minY - r.pill!.minY == off && side.pill!.minX == r.pill!.minX)
+            #expect(side.poleX == r.poleX && abs(side.poleFoot - side.poleTop - 60) < 0.001)
+        }
     }
 
-    /// An arrival moves only the posts of the monotone runs it touches: those the newcomer stands in
-    /// now, and the one its two new neighbours shared before (a footing depends on the ranks within
-    /// its own run, an extreme on the two runs it closes). Every other post keeps its footing. Only the
-    /// step's own flags stand here: the room the flags of another level leave above a post is room,
-    /// and it moves with the columns when an area arrives (as the ruled layout's columns do).
-    @Test func anArrivingAreaMovesOnlyItsRuns() {
-        let newcomer = ridge[7]
-        var compared = 0
-        for count in 2...7 {
-            for at in [0, 1, count / 2] {
-                for step in 2...4 {
-                    let before = Array(ridge.prefix(count))
-                    var after = before
-                    after.insert(newcomer, at: at)
-                    let a = WalkLayout.make(ridgeWalk(step: step, areas: before, from: step), today: today)
-                    let b = WalkLayout.make(ridgeWalk(step: step, areas: after, from: step), today: today)
-                    for raw in step...step {
-                        let level = WalkLevel(rawValue: raw)!
-                        let drawnB = b.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
-                        let drawnA = a.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
-                        guard let i = drawnB.firstIndex(where: { $0.key.column == newcomer.id }) else { Issue.record("no newcomer post"); continue }
-                        var moving = Set(runs(drawnB.map(\.footing)).filter { $0.contains(i) }.flatMap { $0 }.map { drawnB[$0].key.column })
-                        let beside = Set([i - 1, i + 1].filter(drawnB.indices.contains).map { drawnB[$0].key.column })
-                        let besideBefore = drawnA.indices.filter { beside.contains(drawnA[$0].key.column) }
-                        for run in runs(drawnA.map(\.footing)) where besideBefore.count == 2 && besideBefore.allSatisfy(run.contains) {
-                            moving.formUnion(run.map { drawnA[$0].key.column })
-                        }
-                        // A post damped to keep a rule (columns move sideways when an area arrives) is not this test's business.
-                        for p in drawnA where !moving.contains(p.key.column) && !p.squeezed {
-                            let q = post(b, level, p.key.column)!
-                            guard !q.squeezed else { continue }
-                            compared += 1
-                            #expect(abs(p.footing - q.footing) < 0.0001,
-                                    "\(count) areas, newcomer at \(at), step \(step), \(level): \(p.id) \(p.footing) → \(q.footing)")
-                        }
-                    }
-                }
-            }
-        }
-        #expect(compared > 50, "\(compared) posts compared")
-    }
-
-    /// For any ids, 2 to 5 drawn posts on a level stand at least 6 pt from each drawn neighbour,
-    /// nobody squeezed, all within ±10: on the ground, Year (step 1), Season (step 2), Month (step 3)
-    /// and Week (step 4), each with flags on every level above, with and without an empty column
-    /// between two of them. (Where a lean would meet the small flags above, the turn is damped first and
-    /// the footing stands; a post rises only half the gap to the flags above, so nobody is squeezed for it.)
-    ///
-    /// Month and Week fall short for a real reason of room: the small flags of the level above leave a
-    /// Month post 5.9 pt to rise and a Week post 2.5 (half the gap, less 0.5), so between −5.9 and +10
-    /// (−2.5 and +10) a run of four posts in one rising order cannot take three 6 pt steps (it needs 18).
-    /// Smallest example: Month, four posts ranked in one order, footings −5.88, −0.59, 4.71, 10.00. There,
-    /// and only where four or more neighbours stand in one order, the run is spaced evenly, reported
-    /// squeezed, and the weaker thing that always holds is asserted: never within 3 pt of a neighbour. The one exception is five posts whose hands rank in one
-    /// rising (or falling) run: ±10 cannot hold four 6 pt steps, so they stand 4.5 pt apart, evenly.
-    @Test func neighboursStandApartWhateverTheirIds() {
-        // The 10,000 states first, drawing the ids in the order they always were; then their layouts,
-        // on every core; then every check, in the same order.
-        var rng = SeededIds(seed: 0x5EED_F007)
-        var cases: [(set: Int, step: Int, level: WalkLevel, count: Int, gap: Int?, state: WalkState)] = []
-        for set in 0..<2000 {
-            let count = 2 + set % 4
-            let gap: Int? = set % 3 == 0 && count <= 4 ? 1 + Int(rng.next() % UInt64(count - 1)) : nil
-            let columns = count + (gap == nil ? 0 : 1)
-            let areas = (0..<columns).map { WalkArea(id: rng.uuid(), name: "Area \($0)") }
-            for step in 0...4 {                                         // 0: the ground
-                let level = WalkLevel(rawValue: max(1, step))!
-                var s = WalkState()
-                s.areas = areas
-                s.kept = areas.map(\.id)
-                s.step = max(1, step)
-                s.ground = step == 0
-                for (i, a) in areas.enumerated() {
-                    for raw in 1...max(1, step) where raw < level.rawValue || i != gap {
-                        s.items.append(WalkItem(id: rng.uuid(), level: WalkLevel(rawValue: raw)!, title: "Flag", areaId: a.id))
-                    }
-                }
-                cases.append((set, step, level, count, gap, s))
-            }
-        }
-        let layouts = Generated.parallel(cases.count) { WalkLayout.make(cases[$0].state, today: today) }
-        var checked = 0, limited = 0
-        for ((set, step, level, count, gap, _), layout) in zip(cases, layouts) {
-            let posts = layout.posts.filter { $0.key.level == level }.sorted { $0.base.x < $1.base.x }
-            let what = "set \(set), \(level), \(count) posts, gap \(String(describing: gap)): \(posts.map { String(format: "%.2f", $0.footing) })"
-            #expect(posts.count == count, "\(what)")
-            #expect(posts.allSatisfy { abs($0.footing) <= WalkFooting.ground + 0.0001 }, "\(what)")
-            #expect(step >= 3 || posts.allSatisfy { !$0.squeezed }, "\(what)")
-            let steps = zip(posts, posts.dropFirst()).map { $1.footing - $0.footing }
-            let oneRun = count == 5 && (steps.allSatisfy { $0 > 0 } || steps.allSatisfy { $0 < 0 })
-            let runOfFour = steps.count >= 3 && (0...(steps.count - 3)).contains { i in
-                (steps[i] > 0) == (steps[i + 1] > 0) && (steps[i + 1] > 0) == (steps[i + 2] > 0)
-            }
-            if step >= 3 && runOfFour {
-                #expect(steps.allSatisfy { abs($0) >= 3 - 0.0001 }, "\(what)")
-                limited += 1
+    /// The hand changes no count, no word and no line: which flags show, how many lines each takes,
+    /// "+n more", and which side posts stand where are the ruled layout's.
+    @Test func theHandChangesNoCountOrWord() {
+        var checked = 0
+        for wing: CGFloat in [0, 110.3] {
+            for s in Generated.all {
+                let hand = natural(s, wing: wing), board = ruled(s, wing: wing)
+                let a = hand.posts.flatMap(\.banners), b = board.posts.flatMap(\.banners)
+                guard a.map(\.id) == b.map(\.id), a.map(\.kind) == b.map(\.kind), a.map(\.lines) == b.map(\.lines),
+                      a.map(\.text) == b.map(\.text), a.map(\.frame.size) == b.map(\.frame.size),
+                      hand.sides.map(\.id) == board.sides.map(\.id), hand.sides.map(\.poleX) == board.sides.map(\.poleX),
+                      hand.sides.map(\.count) == board.sides.map(\.count), hand.sides.map { $0.pill?.size } == board.sides.map { $0.pill?.size },
+                      hand.labels.map(\.id) == board.labels.map(\.id), hand.labels.map(\.frame.size) == board.labels.map(\.frame.size)
+                else { Issue.record("\(Generated.describe(s)), wing \(wing): the hand changed what shows"); return }
                 checked += 1
-                continue
-            }
-            #expect(steps.allSatisfy { abs($0) >= (oneRun ? 4.5 : WalkFooting.apart) - 0.0001 }, "\(what)")
-            checked += 1
-        }
-        #expect(checked == 10_000)
-        #expect(limited < 600, "\(limited) Month and Week levels with a run of four or more")
-    }
-
-    /// Year, appending an area at the right end: only the post that was last can move (it gains a
-    /// neighbour); everyone else keeps their footing. Below four areas there are no label rows.
-    @Test func appendingOnTheRightMovesOnlyThePreviousLastPost() {
-        for count in 1...2 {
-            let before = WalkLayout.make(ridgeWalk(step: 1, areas: Array(ridge.prefix(count))), today: today)
-            let after = WalkLayout.make(ridgeWalk(step: 1, areas: Array(ridge.prefix(count + 1))), today: today)
-            for p in before.posts where p.key.column != ridge[count - 1].id {
-                #expect(post(after, .year, p.key.column)!.footing == p.footing, "\(count) → \(count + 1): \(p.id)")
             }
         }
+        #expect(checked > 8000)
     }
 
-    /// Year, three areas to four: the peak labels switch to two staggered rows, so every Year post
-    /// may move. With rows, which of two neighbours stands lower is the row's, not the hand's: the
-    /// upper row's posts stand above the line (−10…−6), the lower row's on or below it (0…+10),
-    /// so neighbours stay 6 pt apart and a lower label never rises into the upper one.
-    @Test func theLabelRowsDecideTheYearFootingFromFourAreas() {
-        let three = WalkLayout.make(ridgeWalk(step: 1, areas: Array(ridge.prefix(3))), today: today)
-        let four = WalkLayout.make(ridgeWalk(step: 1, areas: Array(ridge.prefix(4))), today: today)
-        #expect(Set(three.labels.map { $0.frame.minY - $0.footing }).count == 1)        // one row
-        let tops = four.labels.map { $0.frame.minY - $0.footing }
-        let upper = tops.min()!
-        for label in four.labels {
-            let p = post(four, .year, label.id)!
-            if abs(label.frame.minY - label.footing - upper) < 0.01 {
-                #expect(p.footing <= -WalkFooting.apart + 0.0001, "\(label.name) upper row: \(p.footing)")
-            } else {
-                #expect(p.footing >= 0, "\(label.name) lower row: \(p.footing)")
-            }
+    /// A stack that fills its room to the question neither rises nor turns: the lift and the turning
+    /// shrink with the room above the stack, and with none they are gone. Its cloths still sit a
+    /// little off the pole each, which costs no room above or below.
+    @Test func aFullStackNeitherRisesNorTurns() {
+        // 23 + 6 + 36 + 3 × 53 + 3 × 4 = 236 of 250: 14 of room, the whole hand.
+        let roomy = year(kept: ["Fun"], standing: "Fun", titles: ["Call Mum", "Plan a pancake Sunday", "Book train tickets to Gran", "Pick a date for dinner"])
+        #expect(ruled(roomy).standingPill?.frame.minY == 296)
+        #expect(natural(roomy).posts[0].pole >= 26 && natural(roomy).posts[0].banners.contains { $0.turn != 0 })
+        // The same on Week with a day on the first: 250 of 250.
+        var full = roomy
+        full.step = 4
+        full.items = roomy.items.enumerated().map {
+            WalkItem(id: $0.element.id, level: .week, title: $0.element.title, areaId: $0.element.areaId, day: $0.offset == 0 ? today : nil)
         }
+        full = full.settled
+        #expect(ruled(full).standingPill?.frame.minY == 282)
+        let post = natural(full).posts[0]
+        #expect(post.pole == 24 && post.lean == 0 && post.banners.allSatisfy { $0.turn == 0 && $0.drawn == $0.frame })
+        #expect(post.banners.map(\.frame.minY) == ruled(full).posts[0].banners.map(\.frame.minY))
+        #expect(post.banners.allSatisfy { $0.shift != 0 && abs($0.frame.minX - 120) <= WalkFooting.shift })
+        #expect(natural(full).labels == ruled(full).labels)
     }
 
-    /// One crowded post never levels the rest: a natural layout equals the ruled one only where every
-    /// post was squeezed, and no generated state ends with every post level. (A layout that did not
-    /// settle would trip an `assertionFailure`, failing this run outright.)
-    @Test func oneCrowdedPostNeverLevelsTheRest() {
-        var flattened: [String] = []
-        for (i, s) in Generated.all.enumerated() {
-            let natural = Generated.naturalLayouts[i]
-            guard !natural.posts.isEmpty else { continue }
-            let level = Generated.levelLayouts[i]
-            let same = zip(natural.posts, level.posts).allSatisfy { $0.base == $1.base && $0.lean == 0 && $0.banners.map(\.frame) == $1.banners.map(\.frame) }
-            #expect(!same || natural.posts.allSatisfy(\.squeezed), "\(Generated.describe(s))")
-            if natural.posts.allSatisfy({ $0.lean == 0 && $0.footing == 0 }) { flattened.append(Generated.describe(s)) }
+    /// Across, a cloth keeps only the room the side post beside it leaves: beside a side pill at its
+    /// widest (1 point away) it hangs all but still, and stays clear of it; with no post beside it, freely.
+    @Test func besideAWidePillAClothKeepsStill() {
+        let titles = ["Run a 5K", "Sleep by ten", "Cook at home", "Stretch"]
+        // People (a 58-wide pill, inner low, 271 to 329 at the right) beside Health's lowest cloths.
+        let tight = year(kept: ["Health", "People"], standing: "Health", titles: titles)
+        let free = year(kept: ["Health"], standing: "Health", titles: titles)
+        let pill = ruled(tight).sides[0].pill!
+        #expect(ruled(tight).sides[0].name == "People" && pill.minX == 271 && pill.width == 58)
+        let beside = natural(tight).posts[0].banners.last!, alone = natural(free).posts[0].banners.last!
+        #expect(beside.id == alone.id)
+        let sidePill = natural(tight).sides[0].pill!
+        #expect(!Invariants.overlap(beside.drawn, sidePill), "\(beside.drawn) and \(sidePill)")
+        if beside.drawn.maxY > sidePill.minY {
+            #expect(abs(beside.shift) < 0.4 && abs(beside.tilt) <= abs(alone.tilt) / 4, "\(beside.shift) \(beside.tilt) for \(alone.shift) \(alone.tilt)")
+            #expect(beside.drawn.maxX <= sidePill.minX - 0.5)
         }
-        #expect(flattened.isEmpty, "\(flattened)")
+        // A cloth higher up, above the pill's reach, hangs as freely as with no post there.
+        #expect(natural(tight).posts[0].banners[0].tilt == natural(free).posts[0].banners[0].tilt)
     }
 
-    @Test func everythingStaysWithinItsBounds() {
-        // The amplitudes settled on stay inside the owner's bounds (10 pt, 18…34, 2°, 1.2°, 2.5 pt).
-        #expect(WalkFooting.ground <= 10 && WalkFooting.pole.lowerBound >= 18 && WalkFooting.pole.upperBound <= 34
-                && WalkFooting.lean <= 2 && WalkFooting.tilt <= 1.2 && WalkFooting.shift <= 2.5)
-        // The hand itself, over a few hundred ids: within −1…1, both ways, not bunched.
-        let values = (0..<400).map { WalkFooting.hand(uid(77_000 + $0 * 31).uuidString, "footing") }
-        #expect(values.allSatisfy { (-1...1).contains($0) })
-        #expect(values.filter { $0 < -0.5 }.count > 50 && values.filter { $0 > 0.5 }.count > 50)
-        // Every post and banner of every generated state.
-        var posts = 0, leaning = 0
-        for layout in Generated.naturalLayouts {
-            for p in layout.posts {
-                posts += 1
-                if p.lean != 0 && p.footing != 0 { leaning += 1 }
-                #expect(abs(p.footing) <= WalkFooting.ground + 0.0001 && WalkFooting.pole.contains(p.pole)
-                        && abs(p.lean) <= WalkFooting.lean + 0.0001, "\(p.id): \(p.footing) \(p.pole) \(p.lean)")
-                for b in p.banners {
-                    #expect(abs(b.tilt) <= WalkFooting.tilt + 0.0001 && abs(b.shift) <= WalkFooting.shift + 0.0001
-                            && abs(b.turn - (p.lean + b.tilt)) < 0.0001, "\(b.id): \(b.tilt) \(b.shift)")
-                }
-            }
+    /// A wider cloth turns less, so its corners move no further than a phone's.
+    @Test func aWiderClothTurnsLess() {
+        let s = year(kept: ["Health"], standing: "Health", titles: ["Run a 5K", "Sleep by ten"])
+        let phone = natural(s).posts[0], half = natural(s, wing: 110.3).posts[0]
+        for (a, b) in zip(phone.banners, half.banners) {
+            #expect(abs(abs(b.tilt) - abs(a.tilt) * 150 / 226.5) < 1e-9)
+            #expect(b.drawn.height - b.frame.height <= 2 * WalkFooting.turnRoom && a.drawn.height - a.frame.height <= 2 * WalkFooting.turnRoom)
         }
-        #expect(posts > 10_000)
-        #expect(leaning > posts * 3 / 4, "\(leaning) of \(posts) posts planted by hand")
+        #expect(abs(abs(half.lean) - abs(phone.lean) * 150 / 226.5) < 1e-9)
     }
 
-    @Test func plantingElsewhereDoesNotChangeAPost() {
-        var s = walk(step: 1, areas: 3)
-        s.items.append(WalkItem(id: uid(9001), level: .year, title: "Second", areaId: area("Health")))
-        let before = WalkLayout.make(s, today: today)
-        s.items.append(WalkItem(id: uid(9002), level: .year, title: "Planted on Home", areaId: area("Home")))
-        s.items.append(WalkItem(id: uid(9003), level: .year, title: "And on People", areaId: area("People")))
-        let after = WalkLayout.make(s, today: today)
-        let a = post(before, .year, area("Health"))!, b = post(after, .year, area("Health"))!
-        #expect(a.lean != 0 && a.lean == b.lean && a.pole == b.pole && a.footing == b.footing)
-        #expect(a.banners.map(\.tilt) == b.banners.map(\.tilt) && a.banners.map(\.shift) == b.banners.map(\.shift))
-        #expect(a.banners.contains { $0.tilt != 0 })
+    /// Two side posts on one pole line only ever part: the low row's stands a little lower, the high
+    /// row's a little higher. On the ground a chip stands a little higher than its row, never lower.
+    @Test func sidePostsAndChipsOnlyPart() {
+        var s = WalkState()
+        s.areas = ridge
+        s.kept = ridge.map(\.id)
+        s.step = 1
+        s.focusArea = area("Health")
+        let hand = natural(s.settled), board = ruled(s.settled)
+        #expect(hand.sides.count == 7)
+        var moved = 0
+        for (side, r) in zip(hand.sides, board.sides) {
+            let high = r.pill!.minY < 500
+            let off = side.poleFoot - r.poleFoot
+            #expect(high ? (-WalkFooting.sideStep...0).contains(off) : (0...WalkFooting.sideStep).contains(off), "\(side.name): \(off)")
+            if off != 0 { moved += 1 }
+        }
+        #expect(moved >= 5)
+
+        var ground = WalkState()
+        ground.areas = ridge; ground.step = 1; ground.ground = true
+        let chips = natural(ground).labels, places = ruled(ground).labels
+        #expect(zip(chips, places).allSatisfy { (-WalkFooting.chipRise...0).contains($0.footing) && $0.frame.minY == $1.frame.minY + $0.footing })
+        #expect(chips.contains { $0.footing < -0.5 } && chips.allSatisfy { $0.frame.maxY <= 556 })
     }
 
-    @Test func aPostKeepsItsCharacterDownTheMountain() {
-        let health = area("Health")
-        var leans: [Double] = []
-        for step in 1...6 {
-            let layout = WalkLayout.make(walk(step: step, areas: 2), today: today)
-            guard let p = post(layout, .year, health) else { Issue.record("step \(step): no Year post"); continue }
-            #expect(!p.squeezed, "step \(step)")
-            leans.append(p.lean)
-            #expect(abs(p.lean - WalkFooting.hand(p.id, "lean") * WalkFooting.lean) < 0.0001, "step \(step)")
-        }
-        #expect(leans.count == 6 && Set(leans).count == 1 && leans[0] != 0, "\(leans)")
-    }
-
-    @Test func labelsMoveWithTheirPosts() {
-        for ground in [false, true] {
-            for count in [1, 3, 6] {
-                let s = walk(step: 1, areas: count, ground: ground)
-                let natural = WalkLayout.make(s, today: today), level = WalkLayout.make(s, today: today, footing: .level)
-                #expect(natural.labels.count == count)
-                for label in natural.labels {
-                    let p = post(natural, .year, label.id)!
-                    let flat = level.labels.first { $0.id == label.id }!
-                    #expect(label.footing == p.footing, "\(label.name)")
-                    #expect(abs(label.frame.minY - flat.frame.minY - p.footing) < 0.001, "\(label.name)")
-                    #expect(abs(p.base.y - post(level, .year, label.id)!.base.y - p.footing) < 0.001)
-                }
-                #expect(natural.labels.contains { $0.footing != 0 }, "ground \(ground) \(count)")
-            }
-        }
-    }
-
-    @Test func aCrowdedRidgeStaysOrderly() {
-        for count in [7, 8] {
-            for step in 1...6 {
-                for perPost in [1, 3] {
-                    let s = walk(step: step, areas: count, perPost: perPost)
-                    let layout = WalkLayout.make(s, today: today)
-                    let problems = Invariants.check(layout, s)
-                    #expect(problems.isEmpty, "\(count) areas, step \(step), \(perPost) each: \(problems.prefix(3))")
-                    for p in layout.posts {
-                        // A lean is reduced only by its own turning share, and never past its hand.
-                        let hand = WalkFooting.hand(p.id, "lean") * WalkFooting.lean
-                        #expect(abs(p.lean - hand * Double(p.turning)) < 0.0001 && abs(p.lean) <= abs(hand) + 0.0001, "\(p.id)")
-                    }
-                    #expect(layout.posts.contains { !$0.squeezed || $0.lean != 0 }, "\(count) areas, step \(step): no hand left")
-                    #expect(layout.posts.allSatisfy { [0, 0.25, 0.5, 1].contains($0.turning) })
-                }
-            }
-        }
-    }
-
-    /// Folds, counts, words, sizes, which post is open and what a tap does are the ruled layout's:
-    /// the hand only moves and turns what was stacked.
-    @Test func theHandChangesNoFoldOrWord() {
-        for (i, s) in Generated.all.enumerated() {
-            let natural = Generated.naturalLayouts[i], level = Generated.levelLayouts[i]
-            #expect(natural.posts.map(\.id) == level.posts.map(\.id) && natural.labels.map(\.id) == level.labels.map(\.id))
-            for (n, l) in zip(natural.posts.flatMap(\.banners), level.posts.flatMap(\.banners)) {
-                guard n.id == l.id, n.kind == l.kind, n.itemId == l.itemId, n.lines == l.lines, n.more == l.more,
-                      n.text == l.text, n.tag == l.tag, n.label == l.label, n.taps == l.taps, n.glows == l.glows,
-                      n.frame.size == l.frame.size else {
-                    Issue.record("\(Generated.describe(s)): \(n.id) \(n.kind) \(n.lines) \(String(describing: n.more)) ≠ \(l.id) \(l.kind) \(l.lines) \(String(describing: l.more))")
-                    return
-                }
-            }
-        }
-    }
-
-    /// Whatever the rules allow, the hand never makes two posts' flags (one level or two) meet that the ruled layout
-    /// keeps apart, nor (but for the step's own flags, in front of the peaks by design) covers more
-    /// of a label than it does (4 pt² forgiven).
-    @Test func theHandNeverPilesOneThingOnAnother() {
-        func area(_ a: CGRect, _ b: CGRect) -> CGFloat {
-            let i = a.intersection(b)
-            return i.isNull || !Invariants.overlap(a, b) ? 0 : i.width * i.height
-        }
-        // Each state's first finding, worked out on every core; the first state with one is recorded.
-        let states = Generated.all
-        let found: [String?] = Generated.parallel(states.count) { n in
-            let s = states[n], natural = Generated.naturalLayouts[n], level = Generated.levelLayouts[n]
-            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, Measured($0)) } }
-            let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
-            for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && area(a.1.drawn, b.1.drawn) > 0 {
-                guard let ra = ruled[a.1.id], let rb = ruled[b.1.id], area(ra, rb) == 0 else { continue }
-                return "\(Generated.describe(s)): \(a.1.id) piled on \(b.1.id)"
-            } }
-            for label in natural.labels {
-                guard let flat = level.labels.first(where: { $0.id == label.id }) else { continue }
-                for (_, b) in drawn where b.level != s.level && ruled[b.id].map({ area(label.frame, b.drawn) > area(flat.frame, $0) + 4 }) == true {
-                    return "\(Generated.describe(s)): \(b.id) covers label \(label.name)"
-                }
-            }
-            return nil
-        }
-        if let first = found.compactMap({ $0 }).first { Issue.record("\(first)") }
-    }
-
-    /// Steps 1 to 5: no drawn cloth lies over another post's cloth on another level unless the ruled
-    /// layout of the same state already lays that same pair over each other (a leaning flag never
-    /// touches the small flags above it).
-    @Test func aLeaningFlagNeverTouchesTheFlagsAbove() {
-        // Each state's pairs and first finding, worked out on every core; then counted and recorded in order.
-        let states = Generated.all
-        let indices = states.indices.filter { (1...5).contains(states[$0].step) && !states[$0].ground }
-        let found: [(pairs: Int, issue: String?)] = Generated.parallel(indices.count) { n in
-            let s = states[indices[n]], natural = Generated.naturalLayouts[indices[n]], level = Generated.levelLayouts[indices[n]]
-            var pairs = 0
-            let ruled = Dictionary(level.posts.flatMap(\.banners).map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
-            let drawn = natural.posts.flatMap { p in p.banners.map { (p.id, Measured($0)) } }
-            for (i, a) in drawn.enumerated() { for b in drawn[(i + 1)...] where a.0 != b.0 && a.1.level != b.1.level {
-                pairs += 1
-                guard Invariants.overlap(a.1.drawn, b.1.drawn), let ra = ruled[a.1.id], let rb = ruled[b.1.id],
-                      !Invariants.overlap(ra, rb) else { continue }
-                return (pairs, "\(Generated.describe(s)): \(a.1.id) \(a.1.drawn) over \(b.1.id) \(b.1.drawn)")
-            } }
-            return (pairs, nil)
-        }
-        var pairs = 0
-        for state in found {
-            pairs += state.pairs
-            if let issue = state.issue {
-                Issue.record("\(issue)")
-                return
-            }
-        }
-        #expect(pairs > 10_000)
+    /// Planting another flag leaves a flag's own hand as it was (its identity's, while there is room).
+    @Test func plantingElsewhereDoesNotChangeACloth() {
+        let before = year(kept: ["Home", "Work"], standing: "Home", titles: ["Run a 5K"])
+        let after = year(kept: ["Home", "Work"], standing: "Home", titles: ["Run a 5K", "Sleep by ten"])
+        let a = natural(before).posts[0].banners[0], b = natural(after).posts[0].banners[0]
+        #expect(a.itemId == b.itemId && a.tilt == b.tilt && a.shift == b.shift)
+        #expect(natural(before).posts[0].lean == natural(after).posts[0].lean && natural(before).posts[0].pole == natural(after).posts[0].pole)
+        #expect(natural(before).sides == natural(after).sides)
     }
 
     @Test func turnedOutlinesMeetOnlyWhenTheyOverlap() {
@@ -478,4 +206,8 @@ struct WalkFootingTests {
         #expect(WalkTurn.meet(a, touching))
         #expect(WalkTurn.bounds(below).height > 40)      // a turned cloth's box is larger than the cloth
     }
+}
+
+private extension WalkLayout {
+    var standingPill: Label? { labels.first { $0.standing } }
 }
