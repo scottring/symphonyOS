@@ -444,10 +444,11 @@ struct WalkStepsTests {
         _ = s.act(.examples, m.env)
         #expect(s.examplesOn == [3])
         _ = s.act(.next, m.env)
+        #expect(s.examplesOn.isEmpty)                   // a new step is a fresh ask (P24)
         _ = s.act(.examples, m.env)
-        #expect(s.examplesOn == [3, 4])
+        #expect(s.examplesOn == [4])
         _ = s.act(.examples, m.env)
-        #expect(s.examplesOn == [3])
+        #expect(s.examplesOn.isEmpty)
 
         var today = m.at(5)
         _ = today.act(.examples, m.env)

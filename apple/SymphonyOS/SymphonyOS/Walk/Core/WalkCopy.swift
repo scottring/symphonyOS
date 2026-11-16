@@ -221,7 +221,7 @@ enum WalkCopy {
     /// The choices on the light. Welcome's two sit upper-left and upper-right, with room under each
     /// for its second line (the light itself is the quick start). On steps 1 to 5 at most three, in
     /// this order: Type it on the left ("Type your own" on the ground), the examples (steps 1 to 4 off
-    /// the ground, while the area stood in has some for the step, F27) or, on Today while it is
+    /// the ground, while the area stood in has one left unused for the step, F27, P23) or, on Today while it is
     /// offered, the calendar on the right, and Undo at the top
     /// once there is something to undo. Back, Next and Leave for now have their own controls.
     static func points(_ s: WalkState, _ p: WalkPeriods) -> [Point] {
@@ -241,7 +241,7 @@ enum WalkCopy {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
-            } else if !s.examplesHere.isEmpty {
+            } else if !s.examplesLeft(today: p.today).isEmpty {
                 out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
                                  action: .examples, symbol: "lightbulb"))
             }
@@ -283,7 +283,7 @@ enum WalkCopy {
         "health": [
             .year: ["Feel strong again", "Sleep seven hours most nights", "Run a 5K"],
             .season: ["Lift twice a week", "Walk every morning before work"],
-            .month: ["Find a gym that fits", "Book a check-up"],
+            .month: ["Find a gym that fits", "Book a checkup"],
             .week: ["Tour the gym on Tuesday", "Buy proper running shoes on Saturday"],
         ],
         "home": [
@@ -293,10 +293,10 @@ enum WalkCopy {
             .week: ["Call the tile shop on Monday", "Measure the bathroom window today"],
         ],
         "people": [
-            .year: ["More slow weekends together", "See old friends each season", "Call Mum every Sunday"],
+            .year: ["More slow weekends together", "See old friends each season", "Call Mom every Sunday"],
             .season: ["One slow Sunday a month", "Dinner with old friends"],
-            .month: ["Keep one Sunday free", "Invite friends round for dinner"],
-            .week: ["Put the free Sunday on the calendar today", "Text friends about Friday, today"],
+            .month: ["Keep one Sunday free", "Invite friends over for dinner"],
+            .week: ["Put the free Sunday on the calendar today", "Text friends about Friday dinner today"],
         ],
         "work": [
             .year: ["Sign one more client", "Ask for a raise", "Protect two focus mornings a week"],
@@ -305,9 +305,9 @@ enum WalkCopy {
             .week: ["Draft the first proposal on Wednesday", "Email the client on Thursday"],
         ],
         "money": [
-            .year: ["Pay off the car", "Save an emergency fund", "Sort the pension"],
-            .season: ["Clear a third of the car loan", "Spend less on takeaways"],
-            .month: ["Set up a bigger monthly payment", "Call the pension line"],
+            .year: ["Pay off the car", "Save an emergency fund", "Sort out retirement savings"],
+            .season: ["Clear a third of the car loan", "Spend less on takeout"],
+            .month: ["Set up a bigger monthly payment", "Call about the retirement account"],
             .week: ["Call the bank about the payment on Monday", "Cancel unused subscriptions today"],
         ],
         "fun": [

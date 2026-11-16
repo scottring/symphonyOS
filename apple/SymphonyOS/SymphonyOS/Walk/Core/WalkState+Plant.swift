@@ -22,18 +22,14 @@ extension WalkState {
 
     // MARK: Examples (F27)
 
-    /// The examples the area stood in has for this step's level (steps 1 to 4 off the ground): none
-    /// on the nameless post or in an area of the person's own. Whether Show examples is offered.
-    var examplesHere: [String] {
+    /// The one question about examples (F27, P23): the area stood in's examples for this step's
+    /// level (steps 1 to 4 off the ground) not yet used, that is, not already planted on this level
+    /// (the same title ignoring case; on Week the same day too). None on the nameless post or in an
+    /// area of the person's own. The examples point is offered, the action acts and the layout draws
+    /// examples only from this; while they are on it is exactly what shows.
+    func examplesLeft(today: Date) -> [String] {
         guard let level, !ground, (1...4).contains(step) else { return [] }
-        return WalkCopy.examples(level, area: area(standing)?.name)
-    }
-
-    /// The examples shown while they are on for this step: the area's, less any already planted on
-    /// this level (the same title ignoring case; on Week the same day too). A used example comes down.
-    func examplesShown(today: Date) -> [String] {
-        guard let level, examplesOn.contains(step) else { return [] }
-        return examplesHere.filter { text in
+        return WalkCopy.examples(level, area: area(standing)?.name).filter { text in
             guard let said = Self.exampleSaid(text, level, today) else { return false }
             return !items(on: level).contains {
                 $0.title.caseInsensitiveCompare(said.title) == .orderedSame
@@ -51,7 +47,7 @@ extension WalkState {
     /// goal above (`plantFlag`); never under another area's goal. Once planted it comes down, so
     /// another tap does nothing.
     mutating func plantExample(_ text: String, _ env: WalkEnv) -> [WalkEffect] {
-        guard let level, examplesShown(today: env.periods.today).contains(text),
+        guard let level, examplesOn.contains(step), examplesLeft(today: env.periods.today).contains(text),
               let said = Self.exampleSaid(text, level, env.periods.today) else { return [] }
         if level != .year, let parent = item(focus[level]), column(of: parent) != standing { return [] }
         return [.sound(.poles, afterMs: 0)] + plantFlag(said, on: level, plantSoundMs: 160, env)
@@ -89,6 +85,8 @@ extension WalkState {
             undo.append(.plant(item.id))
         }
         lastPlanted[level] = item.id
+        // The last example left here was just used, as an example or in the person's own words (P23).
+        if examplesLeft(today: env.periods.today).isEmpty { examplesOn.remove(step) }
         selected = nil
         expanded = nil                      // the post just planted on is the open one, not one opened before
         undoShowing = true

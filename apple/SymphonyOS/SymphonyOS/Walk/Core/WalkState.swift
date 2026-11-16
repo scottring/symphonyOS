@@ -70,9 +70,11 @@ struct WalkState: Equatable {
         guard !ended else { return [] }
         // Any touch puts the lesson away (a press on the light does it in `orbDown`, a tap on the veil below).
         if teaching, !event.leavesAWaitingFlag, event != .orbDown, event != .moreTapped { teaching = false }
+        let place = placeForExamples
         let planted = event.leavesAWaitingFlag ? [] : plantWaitingFlag(env)
         let effects = planted + respond(to: event, env)
         settleStanding()
+        askAfresh(since: place)
         return effects
     }
 
@@ -146,9 +148,11 @@ struct WalkState: Equatable {
     mutating func act(_ action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
         teaching = false                    // a compass point chosen through VoiceOver puts the lesson away
+        let place = placeForExamples
         let planted = plantWaitingFlag(env)
         let effects = planted + respond(to: action, env)
         settleStanding()
+        askAfresh(since: place)
         return effects
     }
 
@@ -161,11 +165,11 @@ struct WalkState: Equatable {
         case .leave: return (1...5).contains(step) ? end(.paused) : []
         case .next: return walkOn(env)
         case .back: return backUp(env)
-        // Only while the area stood in has examples for the step (F27). A place opened mid-walk (the
-        // demo's preview) may not have settled yet, so it settles first, as it would after any touch.
+        // Only while the area stood in has one left unused for the step (F27, P23). A place opened
+        // mid-walk (the demo's preview) may not have settled yet, so it settles first, as after any touch.
         case .examples:
             settleStanding()
-            guard !examplesHere.isEmpty else { return [] }
+            guard !examplesLeft(today: env.periods.today).isEmpty else { return [] }
             if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
             return []
         case .undo: return undoLast(env)
@@ -464,6 +468,24 @@ struct WalkState: Equatable {
         default:
             return
         }
+    }
+
+    // MARK: Examples, a fresh ask (P24)
+
+    /// While examples are on, the step and the area the walk stands in once settled; nil while they are off.
+    private var placeForExamples: (step: Int, standing: UUID?)? {
+        guard !examplesOn.isEmpty else { return nil }
+        var settled = self
+        settled.settleStanding()
+        return (settled.step, settled.standing)
+    }
+
+    /// Examples are asked for in one area on one step: when the walk stands somewhere else (a tap on
+    /// another area, a whole-year walk going on, anything that moves `standing`) or the step changes,
+    /// they turn off, so the next area's never appear unasked.
+    private mutating func askAfresh(since place: (step: Int, standing: UUID?)?) {
+        guard let place, place.step != step || place.standing != standing else { return }
+        examplesOn = []
     }
 
     // MARK: Areas and the goal above

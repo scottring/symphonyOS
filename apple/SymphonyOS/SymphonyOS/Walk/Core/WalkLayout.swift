@@ -180,8 +180,8 @@ private struct Builder {
         let labeledIds = Set(labeled.map(\.id))
         let column = { (item: WalkItem) -> UUID? in item.areaId.flatMap { labeledIds.contains($0) ? $0 : nil } }
 
-        // Examples: while on for the step, the area stood in's not yet planted (F27), on its post.
-        let ghosts = Array(s.examplesShown(today: today).prefix(3))
+        // Examples: while on for the step, the area stood in's left unused (F27), on its post.
+        let ghosts = s.examplesOn.contains(s.step) ? Array(s.examplesLeft(today: today).prefix(3)) : []
         let ghostColumn = s.standing
         self.ghosts = ghosts
         self.ghostColumn = ghostColumn

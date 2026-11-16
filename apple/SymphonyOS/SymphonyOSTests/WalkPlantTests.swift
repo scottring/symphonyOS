@@ -404,11 +404,14 @@ struct WalkPlantTests {
         s.focusArea = m.home.id
         s.focus[.season] = m.bathroom.id
         s.examplesOn = [2]
-        #expect(s.examplesShown(today: m.today) == home)
+        #expect(s.examplesLeft(today: m.today) == home)
         _ = s.apply(.exampleTapped(home[0]), m.env)
         #expect(s.items.last?.title == home[0] && s.items.last?.parentId == m.bathroom.id)
-        #expect(s.examplesShown(today: m.today) == [home[1]])
-        #expect(!s.examplesShown(today: m.today).contains(home[0]))
+        #expect(s.examplesLeft(today: m.today) == [home[1]])
+        let ghosts = { (s: WalkState) in
+            WalkLayout.make(s, today: m.today, footing: .level).posts.flatMap(\.banners).filter { $0.kind == .ghost }.map(\.text)
+        }
+        #expect(ghosts(s) == [home[1]])
 
         // On Week the same words on another day are another task: that example stays up.
         var week = m.on(4, items: [m.tile, WalkItem(id: UUID(), level: .week, title: "call the tile shop",
@@ -416,14 +419,77 @@ struct WalkPlantTests {
         week.focusArea = m.home.id
         week.focus[.week] = m.tile.id
         week.examplesOn = [4]
-        #expect(week.examplesShown(today: m.today) == WalkCopy.examples(.week, area: "Home"))
+        #expect(week.examplesLeft(today: m.today) == WalkCopy.examples(.week, area: "Home"))
         _ = week.apply(.exampleTapped("Call the tile shop on Monday"), m.env)
-        #expect(week.examplesShown(today: m.today) == ["Measure the bathroom window today"])
+        #expect(week.examplesLeft(today: m.today) == ["Measure the bathroom window today"])
 
         // Examples off: none shown.
         var off = s
         off.examplesOn = []
-        #expect(off.examplesShown(today: m.today).isEmpty)
+        #expect(ghosts(off).isEmpty)
+    }
+
+    /// P23: the examples point is offered only while it would do something. Show while one is left
+    /// unused, Hide while they are on and one shows; the last one used turns them off; Undo brings it back.
+    @Test func showExamplesIsOfferedOnlyWhileItShowsSomething() {
+        let home = WalkCopy.examples(.season, area: "Home")
+        #expect(home.count == 2)
+        var s = m.on(2, items: [m.bathroom])
+        s.focusArea = m.home.id
+        s.focus[.season] = m.bathroom.id
+        func examplesPoint() -> String? { WalkCopy.points(s, m.env.periods).first { $0.at == .e }?.label }
+        #expect(examplesPoint() == "Show examples")
+        _ = s.act(.examples, m.env)
+        #expect(examplesPoint() == "Hide examples")
+        _ = s.apply(.exampleTapped(home[0]), m.env)
+        #expect(examplesPoint() == "Hide examples" && s.examplesOn.contains(2))     // one left, on
+        _ = s.act(.examples, m.env)
+        #expect(examplesPoint() == "Show examples" && !s.examplesOn.contains(2))    // one left, off
+        _ = s.act(.examples, m.env)
+        _ = s.apply(.exampleTapped(home[1]), m.env)
+        #expect(examplesPoint() == nil)                                             // both used
+        #expect(!s.examplesOn.contains(2))
+        _ = s.act(.examples, m.env)
+        #expect(!s.examplesOn.contains(2))                                          // the action does nothing either
+        _ = s.apply(.undo, m.env)
+        #expect(examplesPoint() == "Show examples" && s.examplesLeft(today: m.today) == [home[1]])
+    }
+
+    /// P24: each area is a fresh ask. Examples turn off when the walk stands somewhere else (a
+    /// whole-year walk moving on, a tap on another area) and when the step changes.
+    @Test func eachAreaIsAFreshAsk() {
+        let noGhosts = { (s: WalkState) in
+            WalkLayout.make(s, today: m.today, footing: .level).posts.flatMap(\.banners).allSatisfy { $0.kind != .ghost }
+        }
+        // Year on a whole-year walk: Next goes on to the next area.
+        var year = m.on(1, depth: .full)
+        year.focusArea = m.health.id
+        year.tour = [m.home.id, m.people.id]
+        _ = year.act(.examples, m.env)
+        #expect(year.examplesOn.contains(1) && !noGhosts(year))
+        _ = year.act(.next, m.env)
+        #expect(year.step == 1 && year.standing == m.home.id)
+        #expect(year.examplesOn.isEmpty && noGhosts(year))
+
+        // Month: a tap on another area.
+        let homeSeason = WalkItem(id: UUID(), level: .season, title: "Bathroom tiled and plumbed",
+                                  areaId: m.home.id, parentId: m.bathroom.id)
+        var month = m.on(3, items: [m.strong, m.bathroom, m.lift, homeSeason])
+        month.focusArea = m.health.id
+        month.focus[.month] = m.lift.id
+        _ = month.act(.examples, m.env)
+        #expect(month.examplesOn.contains(3) && !noGhosts(month))
+        _ = month.apply(.areaTapped(m.home.id), m.env)
+        #expect(month.standing == m.home.id)
+        #expect(month.examplesOn.isEmpty && noGhosts(month))
+
+        // A new step: off as well.
+        var season = m.on(2, items: [m.bathroom])
+        season.focusArea = m.home.id
+        season.focus[.season] = m.bathroom.id
+        _ = season.act(.examples, m.env)
+        _ = season.act(.next, m.env)
+        #expect(season.step == 3 && season.examplesOn.isEmpty)
     }
 
     // MARK: Selecting, moving, pulling up

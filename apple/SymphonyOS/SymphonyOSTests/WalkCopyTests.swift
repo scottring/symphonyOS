@@ -119,7 +119,12 @@ struct WalkCopyTests {
         #expect(WalkCopy.examples(.week, area: "Home") == ["Call the tile shop on Monday", "Measure the bathroom window today"])
         #expect(WalkCopy.examples(.year, area: "Health") == ["Feel strong again", "Sleep seven hours most nights", "Run a 5K"])
         #expect(WalkCopy.examples(.week, area: "People") == ["Put the free Sunday on the calendar today",
-                                                            "Text friends about Friday, today"])
+                                                            "Text friends about Friday dinner today"])
+        #expect(WalkCopy.examples(.year, area: "Money") == ["Pay off the car", "Save an emergency fund", "Sort out retirement savings"])
+        #expect(WalkCopy.examples(.month, area: "Money") == ["Set up a bigger monthly payment", "Call about the retirement account"])
+        // Week's day comes off the end; the title keeps the rest.
+        let friday = WalkWords.said("Text friends about Friday dinner today", level: .week, today: nov13.today)
+        #expect(friday == WalkWords.Said(title: "Text friends about Friday dinner", day: nov13.today))
         // Keyed by the name as `phrase(for:)` reads it: without case.
         #expect(WalkCopy.examples(.year, area: "home") == WalkCopy.examples(.year, area: "Home"))
         #expect(WalkCopy.examples(.year, area: "HOME") == WalkCopy.examples(.year, area: "Home"))

@@ -615,6 +615,12 @@ struct WalkLayoutTests {
         #expect(layout.posts.count == 1)
         let post = layout.posts[0]
         #expect(post.pale && post.key == WalkPostKey(level: .year, column: area("Health").id))
+        // On the land: its base, taken back into the world, is Year's band, inside Year's ground. (Standing
+        // in Health zooms on its column, so the base sits at the zoom's 520, not the unzoomed 535.5.)
+        let worldY = (post.base.y - post.footing) / layout.camera.k + layout.camera.y
+        #expect(abs(worldY - art.bandY(.year)) <= 0.5)
+        #expect(art.land[.year]!.contains((worldY - art.image.minY) / art.image.height))
+        #expect(near(post.base.y, 520))
         #expect(post.banners.filter { $0.kind == .ghost }.map(\.text) == WalkCopy.examples(.year, area: "Health"))
 
         s.items = [flag(.year, "Run a 5K", in: "Health")]
@@ -1578,7 +1584,8 @@ enum Invariants {
             for l in layout.labels where orbDistance(l.frame) < 74 { problems.append("label \(l.name) \(l.frame) on the light") }
         }
         // Examples on for a step where the area stood in has some not yet planted: at least one shows.
-        if !s.examplesShown(today: today).isEmpty, !banners.contains(where: { $0.kind == .ghost }) {
+        let shows = s.examplesOn.contains(s.step) && !s.examplesLeft(today: today).isEmpty
+        if shows, !banners.contains(where: { $0.kind == .ghost }) {
             problems.append("examples on, none shows")
         }
         // No label sits in the question; looking back up, where a label may head its column, none above the header line.
@@ -1615,7 +1622,7 @@ enum Invariants {
         for level in drawn {
             let has = level == .today ? s.item(s.firstThing) != nil : s.items(on: level).contains { item in
                 !s.ground || item.areaId.map { id in s.areas.contains { $0.id == id } } ?? false
-            } || (level == s.level && !s.examplesShown(today: today).isEmpty)
+            } || (level == s.level && s.examplesOn.contains(s.step) && !s.examplesLeft(today: today).isEmpty)
             let base = (art.bandY(level) - cam.y) * cam.k
             let waits = zoomed && base - ceiling(level, s, cam) < 20
             let shows = layout.posts.contains { $0.key.level == level }
