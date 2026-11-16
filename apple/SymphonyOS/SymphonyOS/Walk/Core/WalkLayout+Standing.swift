@@ -31,7 +31,6 @@ extension WalkLayout {
     /// By estimate: a capital in the standing pill (11 pt, tracked) and one in a side pill (9.5 pt,
     /// tracked). A title's lines are counted from the face itself (`WalkLayout+Lines.swift`).
     static let pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3
-    static let softHyphen = "\u{00AD}"
 
     // MARK: The side posts' numbers
 
@@ -131,7 +130,8 @@ struct WalkStanding {
     struct Piece {
         let id: String; let who: String; let kind: L.Kind; let item: WalkItem?; let level: WalkLevel
         let text: String; let tag: String?; let glows: Bool; let label: String; let taps: Bool
-        let lines: Int; let size: CGSize
+        /// The lines the cloth draws (`WalkLayout.setLines`), and how many it is high for.
+        let words: [String]; let lines: Int; let size: CGSize
     }
 
     let s: WalkState
@@ -184,7 +184,7 @@ struct WalkStanding {
             let (piece, ruled) = pair
             var b = L.Banner(id: piece.id, itemId: piece.item?.id, level: piece.level, kind: piece.kind,
                              frame: ruled.offsetBy(dx: 0, dy: -hand.lift), lines: piece.lines, text: piece.text,
-                             tag: piece.tag, glows: piece.glows, label: piece.label, taps: piece.taps)
+                             words: piece.words, tag: piece.tag, glows: piece.glows, label: piece.label, taps: piece.taps)
             b.tilt = hand.tilts[i]
             b.shift = hand.shifts[i]
             // The cloth goes with its leaning pole, sits its shift off it, and turns about where it meets it.
@@ -330,8 +330,9 @@ struct WalkStanding {
         let across = L.parentWidth(wing: wing)
         let role = L.role(item, in: s, firstThing: false)
         return Piece(id: "\(postId)-above-\(item.id.uuidString)", who: item.id.uuidString, kind: .parent, item: item,
-                     level: item.level, text: L.drawnTitle(item.title, width: across, face: .parent), tag: nil, glows: false,
+                     level: item.level, text: L.normalised(item.title), tag: nil, glows: false,
                      label: WalkCopy.bannerLabel(item.title, level: item.level, tag: nil, role: role), taps: role.taps,
+                     words: L.setLines(item.title, face: .parent, width: across - L.Face.parent.inset, limit: lines),
                      lines: lines, size: CGSize(width: across, height: L.parentPad + L.parentLine * CGFloat(lines)))
     }
 
@@ -341,27 +342,30 @@ struct WalkStanding {
         let tag: String? = first ? WalkCopy.firstThingTag
             : (level == .week ? item.day.map { WalkWords.tag(for: $0, today: today) } : nil)
         let role = L.role(item, in: s, firstThing: first)
-        let lines = lines ?? L.lines(for: item.title, width: width)
+        let words = L.setLines(item.title, face: .flag, width: width - L.Face.flag.inset, limit: lines ?? 3)
+        let lines = lines ?? max(1, words.count)
         // A chosen flag glows, and so does a first thing that is the goal above.
         let glows = s.selected == item.id || (first && s.focus[.today] == item.id)
         return Piece(id: "\(postId)-\(item.id.uuidString)", who: item.id.uuidString, kind: .full, item: item, level: level,
-                     text: L.drawnTitle(item.title, width: width), tag: tag, glows: glows,
+                     text: L.normalised(item.title), tag: tag, glows: glows,
                      label: WalkCopy.bannerLabel(item.title, level: level, tag: tag, role: role), taps: role.taps,
-                     lines: lines, size: flagSize(lines: lines, tagged: tag != nil))
+                     words: words, lines: lines, size: flagSize(lines: lines, tagged: tag != nil))
     }
 
     func ghostPiece(_ text: String, _ level: WalkLevel) -> Piece {
-        let lines = L.lines(for: text, width: width)
+        let words = L.setLines(text, face: .flag, width: width - L.Face.flag.inset, limit: 3)
+        let lines = max(1, words.count)
+        // `text` is the example as written: a tap plants exactly it.
         return Piece(id: "\(postId)-example-\(text)", who: "example:\(text)", kind: .ghost, item: nil, level: level,
-                     text: L.drawnTitle(text, width: width), tag: L.exampleTag(forWidth: width), glows: false,
+                     text: text, tag: L.exampleTag(forWidth: width), glows: false,
                      label: WalkCopy.bannerLabel(text, level: level, tag: nil, role: .example), taps: true,
-                     lines: lines, size: flagSize(lines: lines, tagged: true))
+                     words: words, lines: lines, size: flagSize(lines: lines, tagged: true))
     }
 
     func morePiece(_ hidden: Int, _ level: WalkLevel) -> Piece {
         Piece(id: "\(postId)-more", who: "\(postId)-more", kind: .more(hidden), item: nil, level: level == .today ? .week : level,
               text: WalkCopy.more(hidden), tag: nil, glows: false, label: WalkCopy.moreLabel(hidden), taps: false,
-              lines: 1, size: L.moreSize)
+              words: [WalkCopy.more(hidden)], lines: 1, size: L.moreSize)
     }
 
     func flagSize(lines: Int, tagged: Bool) -> CGSize {

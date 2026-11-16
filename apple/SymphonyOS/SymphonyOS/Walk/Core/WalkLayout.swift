@@ -17,9 +17,10 @@ struct WalkLayout: Equatable {
     /// about. `compact`: a Look back up cloth. `more(n)`: "+n more", the flags not shown. `ghost`: an example.
     enum Kind: Equatable { case full, parent, compact, more(Int), ghost }
     struct Banner: Equatable, Identifiable { let id: String; let itemId: UUID?; let level: WalkLevel; let kind: Kind
-        /// `text` is the drawn form (`WalkLayout.drawnTitle`: a long word carries soft hyphens);
-        /// `label`, VoiceOver's, keeps the title as written.
-        var frame: CGRect; let lines: Int; let text: String; let tag: String?; let glows: Bool; let label: String
+        /// `text` is the title, its words one space apart (`WalkLayout.normalised`); `words` the lines
+        /// the cloth draws, broken by the layout (F39: the view draws each as given, and `lines` is
+        /// how many the cloth is high for); `label`, VoiceOver's, keeps the title as written.
+        var frame: CGRect; let lines: Int; let text: String; let words: [String]; let tag: String?; let glows: Bool; let label: String
         /// Look back up: a cloth that also stands for this many older flags ("+n more").
         var more: Int? = nil
         /// A tap does something (its label says what); VoiceOver reads one that does not as plain text.
@@ -194,7 +195,7 @@ struct WalkLayout: Equatable {
     static func tapEvent(_ banner: Banner, on post: Post) -> WalkEvent? {
         switch banner.kind {
         case .more, .compact: return nil
-        case .ghost: return .exampleTapped(banner.text.replacingOccurrences(of: softHyphen, with: ""))
+        case .ghost: return .exampleTapped(banner.text)
         case .full, .parent: return banner.itemId.map { .bannerTapped($0) }
         }
     }

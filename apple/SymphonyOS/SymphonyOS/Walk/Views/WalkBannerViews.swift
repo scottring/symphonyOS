@@ -170,8 +170,8 @@ struct WalkBannerView: View {
     /// The words of a flag or an example, then its tag, from 6 under the cloth's top.
     private func flagWords(ink: Color, italic: Bool, tagInk: Color) -> some View {
         VStack(spacing: 0) {
-            WalkClothWords(text: banner.text, face: .flag, width: banner.frame.width - WalkLayout.Face.flag.inset,
-                           lines: banner.lines, italic: italic)
+            WalkClothWords(words: banner.words, face: .flag, width: banner.frame.width - WalkLayout.Face.flag.inset,
+                           italic: italic)
                 .foregroundStyle(ink)
             if let tag = banner.tag { tagLine(tag, colour: tagInk) }
         }
@@ -201,8 +201,7 @@ struct WalkBannerView: View {
 
     /// The goal above the step is about, in its own level's colour, on the lines the layout gives it.
     private var parent: some View {
-        WalkClothWords(text: banner.text, face: .parent, width: banner.frame.width - WalkLayout.Face.parent.inset,
-                       lines: banner.lines)
+        WalkClothWords(words: banner.words, face: .parent, width: banner.frame.width - WalkLayout.Face.parent.inset)
             .foregroundStyle(.white)
             .opacity(words)
             .padding(.top, Self.parentTop)
@@ -214,8 +213,7 @@ struct WalkBannerView: View {
     /// Look back up: the newest flag's words, and "+n more" on a line of its own where the level holds more.
     private var compact: some View {
         VStack(spacing: 0) {
-            WalkClothWords(text: banner.text, face: .lookBack, width: banner.frame.width - WalkLayout.Face.lookBack.inset,
-                           lines: banner.lines)
+            WalkClothWords(words: banner.words, face: .lookBack, width: banner.frame.width - WalkLayout.Face.lookBack.inset)
             if let more = banner.more {
                 Text(WalkCopy.more(more))
                     .font(WalkClothFace.font(.tag))

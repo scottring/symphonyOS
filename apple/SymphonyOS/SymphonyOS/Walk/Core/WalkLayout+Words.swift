@@ -7,8 +7,9 @@ import CoreGraphics
 /// numbers", "The words"; F30). The block never ends below `wordsFootLimit`: a question that would take
 /// more than `questionMaxLines` lines at its normal size is set one size smaller, and if the block still
 /// would not end by the limit the why line is not drawn; only if it still would not, the quoted goal is
-/// cut at a word (it is otherwise whole up to `WalkCopy.shortLength`). The question's lines are
-/// counted from Crimson Pro's own widths; the why line's by estimate, as the compass points' words are.
+/// cut at a word (it is otherwise whole up to `WalkCopy.shortLength`). The question's lines are broken
+/// here, by Crimson Pro's own widths, and drawn as given (F39); the why line's are counted by estimate,
+/// as the compass points' words are.
 extension WalkLayout {
     /// The question block's width: the board less 28 each side, and on a wider window up to 166 wider,
     /// centred on x 195 ("On a wider window").
@@ -20,10 +21,10 @@ extension WalkLayout {
     /// How the block is set: the question's size and lines, the why line's lines (0 when it is not drawn),
     /// and the block's foot by estimate.
     struct Words: Equatable {
-        /// The question as the block draws it.
+        /// The question as the block says it (VoiceOver reads it whole), and the lines it is drawn on.
         let question: String
         let questionSize: CGFloat
-        let questionLines: Int
+        let questionLines: [String]
         let whyLines: Int
         let foot: CGFloat
         var showsWhy: Bool { whyLines > 0 }
@@ -42,31 +43,10 @@ extension WalkLayout {
     static let questionLineRatio: CGFloat = 1.111
     static let whyLine: CGFloat = 19.53, whySpacing: CGFloat = 1.5, whyChar: CGFloat = 7.0
     static let eyebrowLine: CGFloat = 15.62, blockGap: CGFloat = 8
-    /// How many lines the question takes at `size` in the block's width: its words wrapped greedily at
-    /// spaces, as the text system wraps them, by Crimson Pro's own widths. Never fewer lines than the
-    /// text takes (`WalkLayoutTests.theQuestionsLinesAreTheRealFaces` holds it to TextKit).
-    static func questionLines(_ question: String, size: CGFloat, wing: CGFloat) -> Int {
-        let room = wordsWidth(wing: wing)
-        var lines = 0
-        var used: CGFloat = 0                    // the width of the line so far
-        var last: Character?                      // and its last character
-        for word in question.split(whereSeparator: { $0.isWhitespace }) {
-            if used > 0 {
-                let across = questionWidth(" " + word, size: size, after: last)
-                if used + across <= room {
-                    used += across
-                    last = word.last
-                    continue
-                }
-            }
-            // The word starts a line; one wider than a line runs on.
-            let alone = questionWidth(word, size: size)
-            let over = alone > room ? Int((alone / room).rounded(.down)) : 0
-            lines += 1 + over
-            used = alone - CGFloat(over) * room
-            last = word.last
-        }
-        return lines
+    /// The lines the question is drawn on at `size` in the block's width: broken by the cloths' own
+    /// breaker (`breakLines`, F39) with Crimson Pro's widths, every one, so each is no wider than the block.
+    static func questionLines(_ question: String, size: CGFloat, wing: CGFloat) -> [String] {
+        breakLines(question, room: wordsWidth(wing: wing), limit: .max) { questionWidth($0, size: size, after: $1) }
     }
 
     // MARK: Crimson Pro's widths
@@ -175,14 +155,14 @@ extension WalkLayout {
     static func words(question: String, why: String, wing: CGFloat) -> Words {
         var size = questionSize
         var lines = questionLines(question, size: size, wing: wing)
-        if lines > questionMaxLines {
+        if lines.count > questionMaxLines {
             size = questionSmallSize
             lines = questionLines(question, size: size, wing: wing)
         }
         var whys = why.isEmpty ? 0 : whyLines(why, wing: wing)
-        if wordsFoot(questionSize: size, questionLines: lines, whyLines: whys) > wordsFootLimit { whys = 0 }
+        if wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys) > wordsFootLimit { whys = 0 }
         return Words(question: question, questionSize: size, questionLines: lines, whyLines: whys,
-                     foot: wordsFoot(questionSize: size, questionLines: lines, whyLines: whys))
+                     foot: wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys))
     }
 
     /// The block for a step, from its own words. The last resort (P20): a block that still ends below

@@ -39,8 +39,10 @@ struct WalkSceneView: View {
                     .walkOverTheWindow(stage)
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
+            // VoiceOver reads the step's words first: above the standing pill (3), its cloths (2) and the
+            // side posts (1), which are this container's children too.
             words
-                .accessibilitySortPriority(1)       // read before the peaks and flags
+                .accessibilitySortPriority(4)
         }
         .frame(width: art.stage.width, height: art.stage.height)
         .accessibilityElement(children: .contain)
@@ -88,11 +90,23 @@ struct WalkSceneView: View {
                     .accessibilityIdentifier("walk.eyebrow")
                     .modifier(WalkEntrance())
                     .id(eyebrow)
-                Text(set.question)
-                    .font(.custom("CrimsonPro-Regular", fixedSize: set.questionSize))
-                    .foregroundStyle(.white)
-                    .walkGlow()
-                    .accessibilityIdentifier("walk.question")
+                // The lines the layout broke the question into (F39), each as given, centred, on the
+                // line height the block's height assumes; VoiceOver reads the question whole.
+                VStack(spacing: 0) {
+                    ForEach(Array(set.questionLines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.custom("CrimsonPro-Regular", fixedSize: set.questionSize))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(height: set.questionSize * WalkLayout.questionLineRatio)
+                    }
+                }
+                .foregroundStyle(.white)
+                .walkGlow()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(set.question)
+                .accessibilityAddTraits(.isStaticText)
+                .accessibilityIdentifier("walk.question")
                 if set.showsWhy {
                     Text(why)
                         .font(.custom("DMSans-Regular", fixedSize: 15))

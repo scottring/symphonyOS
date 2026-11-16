@@ -1,27 +1,21 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - How many lines words take
+// MARK: - The lines a cloth draws
 
-/// The layout decides how tall a cloth is before anything is drawn, so it counts a title's lines
-/// itself. The core has no fonts: it carries the widths of the one face every cloth is set in
-/// (DM Sans SemiBold, read from the bundled file) and wraps the words by them, at each cloth's own
-/// size and inner width.
+/// The layout decides how tall a cloth is before anything is drawn, and it decides where each of
+/// its lines breaks (F39): `setLines` returns the strings to draw, one a line, and the view draws
+/// each as it is given, asking the text system nothing. So the count is the drawing. The core has
+/// no fonts: it carries the widths of the one face every cloth is set in (DM Sans SemiBold, read
+/// from the bundled file) and breaks the words by them, at each cloth's own size and inner width.
 ///
-/// The count must never be fewer lines than the text really takes (that would cut a title), so no
-/// stretch of text may be counted narrower than it is set. The face's kerning moves some pairs of
-/// characters closer than their two widths and some further apart. The pairs it sets further apart
-/// are counted (`widerPairs`); the pairs it sets closer are not, which only ever makes the count
-/// cautious. `WalkLayoutTests.noPairIsSetWiderThanItIsCounted` holds every pair of the characters
-/// known here to that against the bundled face, and `theLinesAreTheRealFaces` holds the line counts
-/// of real titles to it (never fewer; for ordinary titles not more either, which would be a blank band).
-/// A character the face does not have (another script, an emoji) is set by the system in another
-/// face: it is counted wider than any such face sets it, and its line may be taller than the face's.
-///
-/// A line is counted to end only where the text system surely can end one (F38): at a space (but
-/// not before a closing mark or after an opening one), after a hyphen that a letter follows, at a
-/// soft hyphen, and between two ideographs or kana letters. Fewer places to end a line can only
-/// make the count more cautious; one the system does not take could count a title a line short.
+/// What must hold is width: no line the core returns may be set wider than its cloth's inner
+/// width. The face's kerning moves some pairs of characters closer than their two widths and some
+/// further apart; the pairs it sets further apart are counted (`widerPairs`), the pairs it sets
+/// closer are not, which only ever makes a line counted wider than it is set.
+/// `WalkLayoutTests.noPairIsSetWiderThanItIsCounted` holds every pair of the characters known here
+/// to that against the bundled face. A character the face does not have (another script, an emoji)
+/// is set by the system in another face: it is counted wider than any such face sets it.
 extension WalkLayout {
     /// What a cloth's words are set in: the size, the tracking, and the cloth's two side paddings together.
     enum Face: Equatable {
@@ -108,46 +102,33 @@ extension WalkLayout {
 
     /// One character as the count takes it: its width in thousandths of an em; the scalar it kerns
     /// as (`plain`: an accented letter's plain letter) and its own (0: no kerning is counted for a
-    /// character the face does not have); whether it is Chinese, Japanese or Korean writing, a
-    /// full-width mark or an emoji (`foreign`: no hyphen is put or taken beside it); and whether a
-    /// line may end between it and another such (`ideograph`: an ideograph or a kana letter that may
-    /// both end and start a line).
-    struct Glyph { let width: CGFloat; let plain: UInt32; let own: UInt32; let foreign: Bool; let ideograph: Bool }
+    /// character the face does not have); and whether a line may end between it and another such
+    /// (`ideograph`: an ideograph or a kana letter that may both end and start a line).
+    struct Glyph { let width: CGFloat; let plain: UInt32; let own: UInt32; let ideograph: Bool }
 
     static func glyph(_ character: Character) -> Glyph {
         if let ascii = character.asciiValue, (32...126).contains(ascii) {
-            return Glyph(width: glyphWidths[Int(ascii) - 32], plain: UInt32(ascii), own: UInt32(ascii), foreign: false, ideograph: false)
+            return Glyph(width: glyphWidths[Int(ascii) - 32], plain: UInt32(ascii), own: UInt32(ascii), ideograph: false)
         }
         // A letter typed as its plain letter and a combining accent is the same letter.
         let whole = character.unicodeScalars.count > 1
             ? (String(character).precomposedStringWithCanonicalMapping.first ?? character) : character
         if whole.unicodeScalars.count == 1, let scalar = whole.unicodeScalars.first {
-            if let known = otherGlyphWidths[whole] { return Glyph(width: known, plain: scalar.value, own: scalar.value, foreign: false, ideograph: false) }
+            if let known = otherGlyphWidths[whole] { return Glyph(width: known, plain: scalar.value, own: scalar.value, ideograph: false) }
             if accentedLetters.contains(whole), let plain = String(whole).decomposedStringWithCanonicalMapping.unicodeScalars.first,
                (32...126).contains(plain.value) {
-                return Glyph(width: glyphWidths[Int(plain.value) - 32], plain: plain.value, own: scalar.value, foreign: false, ideograph: false)
+                return Glyph(width: glyphWidths[Int(plain.value) - 32], plain: plain.value, own: scalar.value, ideograph: false)
             }
         }
-        return Glyph(width: unknownWidth(whole), plain: 0, own: 0, foreign: isForeign(whole), ideograph: isIdeograph(whole))
+        return Glyph(width: unknownWidth(whole), plain: 0, own: 0, ideograph: isIdeograph(whole))
     }
 
     /// One character's width in thousandths of an em.
     static func glyphWidth(_ character: Character) -> CGFloat { glyph(character).width }
 
-    /// Chinese, Japanese and Korean writing, their full-width marks, and emoji.
-    private static func isForeign(_ character: Character) -> Bool {
-        let scalars = character.unicodeScalars
-        guard let first = scalars.first else { return false }
-        if first.properties.isIdeographic { return true }
-        switch first.value {
-        case 0x1100...0x11FF, 0x2E80...0x2FFF, 0x3000...0x31FF, 0x3400...0x4DBF, 0xAC00...0xD7AF, 0xFF00...0xFFEF,   // hangul, CJK marks, kana, full-width
-             0x1F000...0x1FAFF: return true                                                                              // emoji
-        default: return scalars.contains { $0.value > 0x7F && $0.properties.isEmoji }
-        }
-    }
-
     /// An ideograph, or a kana letter, that may both end and start a line: one scalar, not a small
     /// kana (ぁ ッ ャ …), not the prolonged sound mark, an iteration mark or a punctuation mark.
+    /// A line may end between two of these with no mark.
     private static func isIdeograph(_ character: Character) -> Bool {
         let scalars = character.unicodeScalars
         guard scalars.count == 1, let value = scalars.first?.value else { return false }
@@ -187,139 +168,150 @@ extension WalkLayout {
         return across
     }
 
-    /// The title as it is drawn on a cloth `width` wide, which is what the layout counts and what
-    /// `Banner.text` carries:
-    /// - its words one space apart, with none at its ends: a run of spaces, a tab and a line break
-    ///   each become one space (so nothing is drawn that was not counted);
-    /// - a word wider than a line holds carries soft hyphens (U+00AD) where each line of it ends,
-    ///   so it breaks there, with a hyphen, instead of spilling past its cloth (S20). A word that
-    ///   already carries one is left as it is, and none is put beside Chinese, Japanese or Korean
-    ///   writing or an emoji.
-    static func drawnTitle(_ text: String, width: CGFloat, face: Face = .flag) -> String {
-        let room = width - face.inset
-        return text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map { word -> String in
-            guard textWidth(word, face: face) > room, !word.contains(softHyphen) else { return String(word) }
-            var out = "", run: CGFloat = 0
-            var last: Character?
-            for character in word {
-                let across = textWidth(String(character), face: face, after: last)
-                if let last, run + across + textWidth("-", face: face, after: character) > room {
-                    if !glyph(last).foreign, !glyph(character).foreign { out += softHyphen }
-                    run = 0
-                    out.append(character)
-                    run += textWidth(String(character), face: face)
-                } else {
-                    out.append(character)
-                    run += across
-                }
-                last = character
-            }
-            return out
-        }.joined(separator: " ")
+    /// The title's words one space apart, none at its ends: a run of spaces, a tab and a line break
+    /// each become one space. The lines a cloth draws are this, broken (`Banner.text` carries it).
+    static func normalised(_ text: String) -> String {
+        text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).joined(separator: " ")
     }
 
-    /// How many lines a title takes on a cloth `width` wide, at most 3: its drawn form wrapped,
-    /// by the face's widths, only where the text system surely ends a line (`words`, `breaks`); a
-    /// soft hyphen's line must hold the hyphen it then shows.
+    /// The lines a cloth draws of a title in a face, each no wider than `width` (the cloth's inner
+    /// width: the cloth less `face.inset`) by `textWidth`, at most `limit` of them (F39).
+    static func setLines(_ text: String, face: Face, width: CGFloat, limit: Int) -> [String] {
+        breakLines(text, room: width, limit: limit) { textWidth($0, face: face, after: $1) }
+    }
+
+    /// How many lines a title takes on a cloth `width` wide, at most 3: the lines `setLines` gives
+    /// it (one for a title with no words).
     static func lines(for text: String, width: CGFloat, face: Face = .flag) -> Int {
-        let room = width - face.inset
-        var lines = 1
-        var used: CGFloat = 0                  // the width of the line so far
-        var last: Character?                    // and its last character
-        for word in words(drawnTitle(text, width: width, face: face)) {
-            for (i, piece) in breaks(in: word).enumerated() {
-                let tail = piece.soft ? textWidth("-", face: face, after: piece.text.last) : 0
-                if used > 0 {
-                    let across = textWidth((i == 0 ? " " : "") + piece.text, face: face, after: last)
+        max(1, setLines(text, face: face, width: width - face.inset, limit: 3).count)
+    }
+
+    /// The one breaker (F39), over any face's widths: `measure(text, previous)` is how wide `text` is
+    /// on a line after the character `previous`. Lines, greedily, no wider than `room`:
+    /// - the words one space apart (`normalised`); a word goes on the line if it fits with its
+    ///   space, else it starts the next line;
+    /// - inside a word a line may end after a hyphen that a letter follows (the hyphen ends the
+    ///   line), between two ideographs or kana (`Glyph.ideograph`), with no mark, and at a soft
+    ///   hyphen the person typed, drawn there as "-" (and nowhere else drawn);
+    /// - a piece wider than a whole line starts a fresh line and is filled a character (grapheme
+    ///   cluster) at a time, as many as fit, with "-" where the line ends between two letters or
+    ///   digits (none between ideographs, emoji or marks), the hyphen's room kept;
+    /// - where the words need more than `limit` lines, the last kept line is made again to end in
+    ///   "…": its first word and as many whole further words as fit with the "…", or, if not even
+    ///   its first word fits whole, as many of its characters as fit.
+    /// No line is empty; a title of only spaces has none.
+    static func breakLines(_ text: String, room: CGFloat, limit: Int, measure: (String, Character?) -> CGFloat) -> [String] {
+        guard limit > 0 else { return [] }
+        let words = text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map { pieces(in: $0) }.filter { !$0.isEmpty }
+        var lines: [String] = []
+        /// Where each line begins: its word, and the part of that word the line begins with.
+        var starts: [(word: Int, head: String)] = []
+        var line = "", used: CGFloat = 0
+        func begin(_ word: Int, _ head: String) { starts.append((word, head)) }
+        build: for (w, word) in words.enumerated() {
+            for (i, piece) in word.enumerated() {
+                // A typed soft hyphen's "-" must fit where its line may end.
+                let tail = i < word.count - 1 && !piece.mark.isEmpty ? measure(piece.mark, piece.text.last) : 0
+                if !line.isEmpty {
+                    let join = (i == 0 ? " " : "") + piece.text
+                    let across = measure(join, line.last)
                     if used + across + tail <= room {
+                        line += join
                         used += across
-                        last = piece.text.last
                         continue
                     }
-                    lines += 1
+                    lines.append(line + (i == 0 ? "" : word[i - 1].mark))
+                    line = ""
+                    if lines.count > limit { break build }
                 }
-                // The piece starts a line. One wider than a line (a word the person hyphenated themselves,
-                // a Korean word, emoji with no space between) runs on: the text system then ends each
-                // line between two characters, so each line holds the characters that fit.
-                used = 0
-                var before: Character?
-                for character in piece.text where character != softHyphenCharacter {
-                    let across = textWidth(String(character), face: face, after: before)
-                    if used > 0, used + across > room {
-                        lines += 1
-                        used = textWidth(String(character), face: face)
-                    } else {
-                        used += across
-                    }
-                    before = character
+                // The piece begins a line. One wider than a whole line is filled a character at a time.
+                var rest = Array(piece.text)
+                begin(w, String(rest) + word[(i + 1)...].map(\.text).joined())
+                while rest.count > 1, measure(String(rest), nil) + tail > room {
+                    let k = fill(rest, room: room, measure: measure)
+                    lines.append(String(rest[..<k]) + (hyphenates(rest[k - 1], rest[k]) ? "-" : ""))
+                    if lines.count > limit { break build }
+                    rest = Array(rest[k...])
+                    begin(w, String(rest) + word[(i + 1)...].map(\.text).joined())
                 }
-                // A line that must end at the soft hyphen and cannot hold it ends sooner: a line more.
-                if used + tail > room { lines += 1 }
-                last = piece.text.last
-            }
-            if lines > 3 { break }
-        }
-        return min(3, max(1, lines))
-    }
-
-    /// The drawn title's words: split at its spaces, but for a space the text system will not end a
-    /// line at, which stays inside its word: before a closing bracket, a stop, a comma, a colon, an
-    /// exclamation or question mark, a slash or a mark that may not start a line ("Wow !"); before
-    /// a closing quote that ends a word; after an opening bracket or quote ("( today"); and between
-    /// two dashes ("— —").
-    static func words(_ drawn: String) -> [String] {
-        var out: [String] = []
-        for word in drawn.split(separator: " ") {
-            if let previous = out.last?.last, let first = word.first,
-               opensWord.contains(previous) || closesWord.contains(first) || (previous == "—" && first == "—")
-                || (closingQuotes.contains(first) && !(word.dropFirst().first.map { $0.isLetter || $0.isNumber } ?? false)) {
-                out[out.count - 1] += " " + word
-            } else {
-                out.append(String(word))
+                line = String(rest)
+                used = measure(line, nil)
             }
         }
-        return out
-    }
-    private static let closesWord = Set(")]}!?,.:;/、。，．：；！？）］｝」』】〕〉》〙〗‼⁇⁈⁉・ー々ゝゞヽヾぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ")
-    private static let closingQuotes = Set("”’»")
-    private static let opensWord = Set("([{“‘«（［｛「『【〔〈《〘〖")
+        if !line.isEmpty, lines.count <= limit { lines.append(line) }
+        guard lines.count > limit else { return lines }
 
-    /// A word in the pieces a line may end after (F38), each where the text system surely can:
-    /// - at a soft hyphen (`soft`: a hyphen shows there if the line ends), but not beside Chinese,
-    ///   Japanese or Korean writing or an emoji;
-    /// - after a hyphen of the word's own that a letter follows, with no such writing either side;
-    /// - between two ideographs or kana letters (`Glyph.ideograph`) with nothing else touching
-    ///   the break; never between one and a mark, a bracket or a quote, never beside an emoji,
-    ///   never inside a Korean word.
-    /// Anywhere else a line of this word may end only where it must (a word wider than a line).
-    private static func breaks(in word: String) -> [(text: String, soft: Bool)] {
-        var pieces: [(text: String, soft: Bool)] = []
+        // Cut: the last kept line, made again to end in "…".
+        let ellipsis = "…"
+        let (w, head) = starts[limit - 1]
+        var last: String
+        if measure(head + ellipsis, nil) <= room {
+            last = head
+            for next in words[(w + 1)...].map({ $0.map(\.text).joined() }) {
+                guard measure(last + " " + next + ellipsis, nil) <= room else { break }
+                last += " " + next
+            }
+        } else {
+            let characters = Array(head)
+            var k = 0
+            while k < characters.count, measure(String(characters[...k]) + ellipsis, nil) <= room { k += 1 }
+            last = String(characters[..<k])
+        }
+        return Array(lines.prefix(limit - 1)) + [last + ellipsis]
+    }
+
+    /// How many of these characters begin a line, at least one: as many as fit with the "-" a break
+    /// between two letters or digits there shows.
+    private static func fill(_ characters: [Character], room: CGFloat, measure: (String, Character?) -> CGFloat) -> Int {
+        var best = 1
+        var across: CGFloat = 0
+        for k in 1..<characters.count {
+            across += measure(String(characters[k - 1]), k > 1 ? characters[k - 2] : nil)
+            if across > room { break }
+            let dash = hyphenates(characters[k - 1], characters[k]) ? measure("-", characters[k - 1]) : 0
+            if across + dash <= room { best = k }
+        }
+        return best
+    }
+
+    /// Whether a line ending between these two characters shows a "-": between two letters or
+    /// digits of an alphabet (not ideographs, kana or hangul, which part with no mark).
+    private static func hyphenates(_ a: Character, _ b: Character) -> Bool {
+        func spelled(_ c: Character) -> Bool {
+            guard c.isLetter || c.isNumber, let first = c.unicodeScalars.first else { return false }
+            if first.properties.isIdeographic { return false }
+            switch first.value {
+            case 0x1100...0x11FF, 0x3040...0x30FF, 0x3130...0x318F, 0x31F0...0x31FF, 0xAC00...0xD7AF: return false
+            default: return true
+            }
+        }
+        return spelled(a) && spelled(b)
+    }
+
+    /// A word in the pieces a line may end after (`mark`: what the line then shows at its end): after
+    /// a hyphen that a letter follows (nothing: the hyphen is there), between two ideographs or kana
+    /// (nothing), and at a typed soft hyphen ("-"; the soft hyphen itself is not kept).
+    private static func pieces<S: StringProtocol>(in word: S) -> [(text: String, mark: String)] {
+        var out: [(text: String, mark: String)] = []
         var piece = ""
         let characters = Array(word)
         for (i, character) in characters.enumerated() {
-            let before = i > 0 ? characters[i - 1] : nil
-            let after = i + 1 < characters.count ? characters[i + 1] : nil
             if character == softHyphenCharacter {
-                if !piece.isEmpty, let before, let after, !glyph(before).foreign, !glyph(after).foreign {
-                    pieces.append((piece, true))
-                    piece = ""
-                }
+                if !piece.isEmpty, i + 1 < characters.count { out.append((piece, "-")); piece = "" }
                 continue
             }
-            if !piece.isEmpty, let before, glyph(before).ideograph, glyph(character).ideograph {
-                pieces.append((piece, false))
+            if !piece.isEmpty, i > 0, glyph(characters[i - 1]).ideograph, glyph(character).ideograph {
+                out.append((piece, ""))
                 piece = ""
             }
             piece.append(character)
-            if character == "-", piece.count > 1, let before, let after, after.isLetter, !glyph(before).foreign, !glyph(after).foreign {
-                pieces.append((piece, false))
+            if character == "-", piece.count > 1, i + 1 < characters.count, characters[i + 1].isLetter {
+                out.append((piece, ""))
                 piece = ""
             }
         }
-        if !piece.isEmpty { pieces.append((piece, false)) }
-        // The last piece of a word shows no hyphen: nothing follows it.
-        if let last = pieces.indices.last { pieces[last].soft = false }
-        return pieces
+        if !piece.isEmpty { out.append((piece, "")) }
+        return out
     }
 
     /// An example's tag: the long one where the cloth holds it on its one line, else the short one.

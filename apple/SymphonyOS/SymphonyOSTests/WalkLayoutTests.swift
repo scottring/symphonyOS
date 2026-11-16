@@ -915,27 +915,36 @@ struct WalkLayoutTests {
         }
     }
 
-    /// S20: a 60-letter word is drawn with soft hyphens where it breaks, on three lines; the flag's
-    /// VoiceOver label keeps the word as written.
+    /// S20, F39: a word wider than a line is broken by characters, a "-" where two letters part, as many
+    /// as fit with it on each line; past the cloth's three lines the last is cut with "…". The flag's
+    /// VoiceOver label keeps the word as written. The quiet Month page's 60 letters keep their look.
     @Test func aLongWordIsHyphenatedWhereItBreaks() {
         let word = String(repeating: "x", count: 60)
-        let drawn = WalkLayout.drawnTitle(word, width: 150)
-        #expect(drawn.contains("\u{00AD}") && drawn.replacingOccurrences(of: "\u{00AD}", with: "") == word)
+        let whole = WalkLayout.setLines(word, face: .flag, width: 134, limit: 9)
         // Each line of it is as many letters as fit with their hyphen in the cloth's 134: 17 of these.
-        let pieces = drawn.components(separatedBy: "\u{00AD}")
-        #expect(pieces.map(\.count) == [17, 17, 17, 9])
-        #expect(pieces.dropLast().allSatisfy { WalkLayout.textWidth($0 + "-", face: .flag) <= 134 && WalkLayout.textWidth($0 + "x-", face: .flag) > 134 })
-        #expect(WalkLayout.lines(for: word, width: 150) == 3 && WalkLayout.lines(for: drawn, width: 150) == 3)
-        #expect(WalkLayout.drawnTitle("Call Mum about Sunday lunch", width: 150) == "Call Mum about Sunday lunch")
-        #expect(WalkLayout.drawnTitle(drawn, width: 150) == drawn)
+        #expect(whole == [String(repeating: "x", count: 17) + "-", String(repeating: "x", count: 17) + "-",
+                          String(repeating: "x", count: 17) + "-", String(repeating: "x", count: 9)])
+        #expect(whole.dropLast().allSatisfy { WalkLayout.textWidth($0, face: .flag) <= 134 && WalkLayout.textWidth("x" + $0, face: .flag) > 134 })
+        let three = WalkLayout.setLines(word, face: .flag, width: 134, limit: 3)
+        #expect(three.count == 3 && three.prefix(2) == whole.prefix(2) && three[2].hasSuffix("…") && !three[2].contains("-"))
+        #expect(three.allSatisfy { WalkLayout.textWidth($0, face: .flag) <= 134 })
+        #expect(WalkLayout.setLines(DemoMode.longWord, face: .flag, width: 134, limit: 3)
+                == ["Antidisestablishme-", "ntarianismfloccinau-", "cinihilipilificationism"])
+        #expect(WalkLayout.lines(for: word, width: 150) == 3)
         let item = flag(.year, "Say \(word)", in: "Home")
         let b = ruled(state(1, kept: ["Home"], items: [item], standing: "Home")).banner(for: item)!
-        #expect(b.text.contains("\u{00AD}") && b.lines == 3 && b.label == "Year: Say \(word), tap to move or remove")
+        #expect(b.lines == 3 && b.words.count == 3 && b.words[0] == "Say" && b.words[2].hasSuffix("…"))
+        #expect(b.text == "Say \(word)" && b.label == "Year: Say \(word), tap to move or remove")
+        // A typed soft hyphen is a place a line may end, drawn "-" there and nowhere else.
+        #expect(WalkLayout.setLines("Ask the electro\u{00AD}cardio\u{00AD}graphy nurse", face: .flag, width: 134, limit: 3)
+                == ["Ask the electro-", "cardiography nurse"])
+        #expect(WalkLayout.setLines("Call the elec\u{00AD}trician about the wiring", face: .flag, width: 134, limit: 3)
+                == ["Call the electrician", "about the wiring"])
     }
 
     /// Lines are counted as the words wrap, by the face's own widths at the cloth's size (F33): a
     /// title of 20 or 21 ordinary letters is one line of a flag, not two; a goal above is set
-    /// smaller, in a narrower cloth. (`theLinesAreTheRealFaces` measures the count against the font.)
+    /// smaller, in a narrower cloth. (`everyLineFitsItsCloth` sets every line for real.)
     @Test func linesCountTheWrappedWords() {
         #expect(WalkLayout.lines(for: "Gym", width: 150) == 1)
         #expect(WalkLayout.lines(for: "Feel strong again", width: 150) == 1)
@@ -968,18 +977,17 @@ struct WalkLayoutTests {
         #expect(near(WalkLayout.textWidth("/É", face: .flag), (417 + 578 + 50) * 13 / 1000, 0.0001))            // as "/E"
         #expect(near(WalkLayout.textWidth("t\u{00AD},", face: .flag), WalkLayout.textWidth("t,", face: .flag), 0.0001))
         // What is drawn and counted has its words one space apart: no run of spaces, tab or line break.
-        #expect(WalkLayout.drawnTitle("  Call  Mum\tabout\nSunday lunch ", width: 150) == "Call Mum about Sunday lunch")
+        #expect(WalkLayout.normalised("  Call  Mum\tabout\nSunday lunch ") == "Call Mum about Sunday lunch")
+        #expect(WalkLayout.setLines("  Call  Mum\tabout\nSunday lunch ", face: .flag, width: 134, limit: 3) == ["Call Mum about", "Sunday lunch"])
+        #expect(WalkLayout.setLines("   ", face: .flag, width: 134, limit: 3).isEmpty && WalkLayout.lines(for: "   ", width: 150) == 1)
         #expect(WalkLayout.lines(for: "  Call  Mum\tabout\nSunday lunch ", width: 150) == WalkLayout.lines(for: "Call Mum about Sunday lunch", width: 150))
         let odd = flag(.year, "  Call  Mum\tabout\nSunday lunch ", in: "Home")
         let cloth = ruled(state(1, kept: ["Home"], items: [odd], standing: "Home")).banner(for: odd)!
-        #expect(cloth.text == "Call Mum about Sunday lunch" && cloth.lines == 2 && cloth.label.contains(odd.title))
-        // F38: a space is a place a line ends, but not before a closing mark or after an opening one, nor
-        // between two dashes; a quote that opens a word ("’n’") does not hold to the word before.
-        #expect(WalkLayout.words("Wow ! ( today ) — — ok") == ["Wow !", "( today )", "— —", "ok"])
-        #expect(WalkLayout.words("Rock ’n’ roll, the kids’ room") == ["Rock", "’n’", "roll,", "the", "kids’", "room"])
-        // Chinese: a line may end between two ideographs; no soft hyphen is put among them.
-        #expect(!WalkLayout.drawnTitle("每天早上散步三十分钟然后做拉伸运动", width: 150).contains("\u{00AD}"))
-        #expect(WalkLayout.lines(for: "每天早上散步三十分钟然后做拉伸运动", width: 150) == 3)                    // 17 at 18.2 a character: 7 a line
+        #expect(cloth.text == "Call Mum about Sunday lunch" && cloth.lines == 2 && cloth.words == ["Call Mum about", "Sunday lunch"])
+        #expect(cloth.label.contains(odd.title))
+        // Chinese: a line may end between two ideographs, with no mark.
+        let chinese = WalkLayout.setLines("每天早上散步三十分钟然后做拉伸运动", face: .flag, width: 134, limit: 3)
+        #expect(chinese == ["每天早上散步三", "十分钟然后做拉", "伸运动"])                     // 17 at 18.2 a character: 7 a line
         for title in Generated.titles {
             #expect(WalkLayout.lines(for: title, width: 226.5) <= WalkLayout.lines(for: title, width: 150))
         }
@@ -988,20 +996,7 @@ struct WalkLayoutTests {
     }
 
     #if canImport(UIKit)
-    /// How many lines a string really takes in a face at a width: TextKit's own line fragments.
-    @MainActor private static func realLines(_ text: String, font: UIFont, width: CGFloat) -> Int {
-        let storage = NSTextStorage(string: text, attributes: [.font: font])
-        let manager = NSLayoutManager()
-        let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
-        container.lineFragmentPadding = 0
-        manager.addTextContainer(container)
-        storage.addLayoutManager(manager)
-        var lines = 0
-        manager.enumerateLineFragments(forGlyphRange: manager.glyphRange(for: container)) { _, _, _, _, _ in lines += 1 }
-        return lines
-    }
-
-    /// The titles the count is held to: every title of the two stress plans and of the demo's preview
+    /// The titles every breaking is held to: every title of the two stress plans and of the demo's preview
     /// plan as the walk plants them, every example, and the generator's titles (a 200-character title
     /// and a 60-letter word among them).
     static var corpus: [String] {
@@ -1100,56 +1095,9 @@ struct WalkLayoutTests {
         print("The pairs: \(characters.count) characters, \(pairs) ordered pairs over four faces; set wider than counted: \(wider.count)")
     }
 
-    /// The titles the count gives a line more than the face sets them on, by cloth: a blank band, never
-    /// a cut. Listed so that a change which adds one is seen. One: on the outside screen's 183-wide flag
-    /// the face's kerning draws this example a hair inside the line that its letters' widths just pass.
-    static let blankBands: Set<String> = ["flag at 183: Book the first camping trip"]
-
-    /// F33: the lines the layout counts are the lines the bundled face really sets, on every cloth
-    /// (a flag at 13 pt, the goal above at 11, a Look back up cloth at 12; a phone, the outside screen
-    /// and the half window). Never fewer (that would cut a title), for the plans' titles and for the
-    /// odd ones (`oddTitles`: other scripts and emoji are counted wide, so they may get a line more);
-    /// and for the plans' titles never more (a blank band in the cloth), but for `blankBands`. No
-    /// string is counted narrower than it is set, and what is drawn has no odd spaces left in it.
-    @Test @MainActor func theLinesAreTheRealFaces() throws {
-        let corpus = Self.corpus
-        #expect(corpus.count > 130 && corpus.contains { $0.count == 200 } && Self.oddTitles.allSatisfy(corpus.contains))
-        var cloths: [(face: WalkLayout.Face, width: CGFloat)] = [(.lookBack, 150)]
-        for wing: CGFloat in [0, 42.3, 110.3] {
-            cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.parent, WalkLayout.parentWidth(wing: wing))]
-        }
-        var short: [String] = [], narrow: [String] = [], bands = Set<String>()
-        var checked = 0, twoOrMore = 0, cautious: [String] = []
-        for (face, width) in cloths {
-            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size), "the bundled face is not there")
-            for title in corpus {
-                let drawn = WalkLayout.drawnTitle(title, width: width, face: face)
-                let real = min(3, Self.realLines(drawn, font: font, width: width - face.inset))
-                let counted = WalkLayout.lines(for: title, width: width, face: face)
-                if counted < real { short.append("\(face) \(width): “\(title.prefix(50))” counted \(counted), set on \(real)") }
-                if counted > real {
-                    if Self.oddTitles.contains(title) { cautious.append("\(face) at \(Int(width)): \(title)") } else { bands.insert("\(face) at \(Int(width)): \(title)") }
-                }
-                // What the cloth draws, on one line: never set wider than counted, whatever face the
-                // system sets it in (another script and an emoji are not the bundled face's).
-                let plain = drawn.replacingOccurrences(of: "\u{00AD}", with: "")
-                let across = Self.setWidth(plain, font: font, tracking: face.tracking)
-                if WalkLayout.textWidth(plain, face: face) < across - 0.01 {
-                    narrow.append("\(face): “\(plain.prefix(50))” counted \(WalkLayout.textWidth(plain, face: face)), set \(across)")
-                }
-                if drawn.contains("  ") || drawn.hasPrefix(" ") || drawn.hasSuffix(" ") || drawn.contains("\t") || drawn.contains("\n") {
-                    narrow.append("\(face): “\(title.prefix(50))” is drawn with its odd spaces")
-                }
-                checked += 1
-                if real > 1 { twoOrMore += 1 }
-            }
-        }
-        #expect(short.isEmpty, "counted on fewer lines than the face sets them: \(short)")
-        #expect(narrow.isEmpty, "counted narrower than the face sets them: \(narrow.prefix(5))")
-        #expect(bands == Self.blankBands, "a line more than the face needs: \(bands.sorted())")
-        #expect(checked > 800 && twoOrMore > 200)
-        print("The faces: \(corpus.count) titles on \(cloths.count) cloths, \(checked) counts, \(twoOrMore) of them on two lines or more; a line more on \(bands.count), and on \(cautious.count) of the odd titles' \(Self.oddTitles.count * cloths.count)")
-        print("A line more on the odd titles: \(cautious)")
+    /// Every tag (the example's two, FIRST THING, nine day tags) is no wider than counted and fits the line
+    /// of the cloth it is given; the face's own line is under the 17 a flag gives it (F37).
+    @Test @MainActor func theTagsFitTheirLine() throws {
         // The tag line: no tag is wider than counted, and each fits the line of the cloth it is given.
         let tagFont = try #require(UIFont(name: "DMSans-SemiBold", size: WalkLayout.Face.tag.size))
         let days = (0..<9).map { WalkWords.tag(for: PlanCalendar.calendar.date(byAdding: .day, value: $0, to: today)!, today: today) }
@@ -1164,14 +1112,319 @@ struct WalkLayoutTests {
             #expect(across <= width - WalkLayout.Face.tag.inset, "\(tag) at \(width): \(across)")
         }
         // How tall a line really is. The face's own line is under the 17 a flag gives it. A line that
-        // holds Chinese or an emoji is set in the system's face and comes out taller than 17: the
-        // cloth's height does not allow for that (reported; not patched here).
+        // holds Chinese or an emoji is set in the system's face and is taller; each line is drawn in its
+        // fixed line height (F37), so the cloth never grows.
         let flagFont = try #require(UIFont(name: "DMSans-SemiBold", size: 13))
         let own = Self.lineHeights("Call Mum about Sunday lunch", font: flagFont, width: 134)
         let chinese = Self.lineHeights("每天早上散步三十分钟", font: flagFont, width: 134)
         let emoji = Self.lineHeights("Run a 5K 🏃 then coffee", font: flagFont, width: 134)
         #expect(own.count == 2 && own.allSatisfy { $0 <= WalkLayout.flagLine })
         print("Line heights at 13 pt: the face \(own), Chinese \(chinese), with an emoji \(emoji); widths: 好 \(Self.setWidth("好", font: flagFont)), 😀 \(Self.setWidth("😀", font: flagFont)), at 11 pt 😀 \(Self.setWidth("😀", font: tagFont))")
+    }
+
+    // MARK: F39: the layout breaks the lines, the view draws them
+
+    /// The lines a cloth draws of a title: what the checks below hold to width.
+    @MainActor private static func drawn(_ title: String, _ face: WalkLayout.Face, inner: CGFloat, limit: Int) -> [String] {
+        WalkLayout.setLines(title, face: face, width: inner, limit: limit)
+    }
+    /// The question's lines as drawn, and how many lines the block's height counts for it.
+    @MainActor private static func questionDrawn(_ q: String, size: CGFloat, wing: CGFloat) -> (lines: [String], counted: Int) {
+        let set = WalkLayout.words(question: q, why: "", wing: wing)
+        let lines = WalkLayout.questionLines(q, size: size, wing: wing)
+        // The block's height counts the lines it draws (at the size it picked).
+        return (lines, set.questionSize == size ? set.questionLines.count : lines.count)
+    }
+
+    /// What TextKit makes of a string at a width: each line fragment's characters, its end's spaces trimmed.
+    @MainActor private static func realLineStrings(_ text: String, font: UIFont, width: CGFloat) -> [String] {
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+        var out: [String] = []
+        let whole = text as NSString
+        manager.enumerateLineFragments(forGlyphRange: manager.glyphRange(for: container)) { _, _, _, glyphs, _ in
+            var line = whole.substring(with: manager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil))
+            while let last = line.last, last.isWhitespace { line.removeLast() }
+            out.append(line)
+        }
+        return out
+    }
+
+    /// Every way these lines can be put back together: a space at a break, nothing (a break inside a
+    /// word), or a "-" taken off (one the breaking added).
+    private static func rejoined(_ lines: [String]) -> Set<String> {
+        guard var out = lines.first.map({ Set([$0]) }) else { return [""] }
+        for next in lines.dropFirst() {
+            var more = Set<String>()
+            for so in out {
+                more.insert(so + " " + next)
+                more.insert(so + next)
+                if so.hasSuffix("-") { more.insert(String(so.dropLast()) + next) }
+            }
+            out = more
+        }
+        return out
+    }
+
+    /// What is wrong with a cloth's lines, set for real: a line wider than the cloth's inner width (CoreText,
+    /// the face's own kerning, its tracking), more lines than the cloth holds, an empty line; an uncut
+    /// title that does not put back together as itself; a cut one whose last line does not end "…"
+    /// after the title's own beginning.
+    private static func faults(_ title: String, lines: [String], uncut: Bool, limit: Int, inner: CGFloat, font: UIFont,
+                               tracking: CGFloat = 0, name: String) -> [String] {
+        var out: [String] = []
+        // The title's words one space apart, soft hyphens dropped (a word of only a soft hyphen draws nothing).
+        let words = title.replacingOccurrences(of: "\u{00AD}", with: "")
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline }).joined(separator: " ")
+        if lines.count > limit { out.append("\(name): \(lines.count) lines of \(limit)") }
+        if lines.contains(where: \.isEmpty) { out.append("\(name): an empty line in \(lines)") }
+        if lines.isEmpty != words.isEmpty { out.append("\(name): \(lines.count) lines for “\(title)”") }
+        for line in lines where setWidth(line, font: font, tracking: tracking) > inner + 0.01 {
+            out.append("\(name): “\(line)” set \(setWidth(line, font: font, tracking: tracking)) in \(inner)")
+        }
+        if uncut {
+            if !rejoined(lines).contains(words) { out.append("\(name): \(lines) is not “\(words)”") }
+        } else if let last = lines.last {
+            let kept = Array(lines.dropLast()) + [String(last.dropLast())]
+            if !last.hasSuffix("…") || !rejoined(kept).contains(where: { words.hasPrefix($0) }) {
+                out.append("\(name): cut \(lines) does not begin “\(words.prefix(40))” and end “…”")
+            }
+        }
+        return out
+    }
+
+    /// The cloths every title is checked on: a flag, the goal above and a Look back up cloth, at the
+    /// inner width each has on every window the stage produces.
+    private static var clothFaces: [(face: WalkLayout.Face, inner: CGFloat)] {
+        var out: [(WalkLayout.Face, CGFloat)] = []
+        for wing in wings {
+            let flag = WalkLayout.standingWidth(wing: wing), parent = WalkLayout.parentWidth(wing: wing)
+            out += [(.flag, flag - WalkLayout.Face.flag.inset), (.parent, parent - WalkLayout.Face.parent.inset),
+                    (.lookBack, flag - WalkLayout.Face.lookBack.inset)]
+        }
+        return out
+    }
+
+    /// The reviewers' titles, the quiet Month page's two, and long tokens.
+    static let hardTitles = [
+        "Buy ,apples/eggs/trousers before Friday", "https://www.us.city.springfield/holds", "Call the bank ( today ) before Friday",
+        "☕️PDFJavaScriptAmazon。周划库", "Email jonathan.richardson-whitfield@example.com",
+        "Sort #photos2025/holidays/summer-in-the-mountains", String(repeating: "m", count: 20),
+        DemoMode.longTitle, DemoMode.longWord, "soft\u{00AD}hyphen\u{00AD}ated words, typed", "   ",
+    ]
+
+    /// F39 (a): every line the layout gives a cloth fits it. Every title of the corpus (the demo plans,
+    /// the examples, the generator's, the odd ones) and the hard ones, on every cloth face at every inner
+    /// width, with room for 3, 2 and 1 lines.
+    @Test @MainActor func everyLineFitsItsCloth() throws {
+        var faults: [String] = []
+        var checked = 0
+        for (face, inner) in Self.clothFaces {
+            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size))
+            for title in Self.corpus + Self.hardTitles {
+                let whole = Self.drawn(title, face, inner: inner, limit: 99)
+                for limit in [3, 2, 1] {
+                    let lines = Self.drawn(title, face, inner: inner, limit: limit)
+                    faults += Self.faults(title, lines: lines, uncut: whole.count <= limit, limit: limit, inner: inner, font: font,
+                                          name: "\(face) \(Int(inner)) ≤\(limit)")
+                    checked += 1
+                }
+            }
+        }
+        #expect(faults.isEmpty, "\(faults.count) of \(checked): \(faults.prefix(12))")
+        print("Every line fits: \(checked) breakings; faults \(faults.count)")
+    }
+
+    /// A title made by chance, the same every run: words, marks with stray spaces before them, slashes,
+    /// web addresses, emoji runs, Chinese, Japanese and Korean, soft hyphens, tabs.
+    static func fuzzedTitles(_ count: Int) -> [String] {
+        struct Seeded: RandomNumberGenerator {
+            var state: UInt64
+            mutating func next() -> UInt64 {
+                state &+= 0x9E37_79B9_7F4A_7C15
+                var z = state
+                z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+                z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+                return z ^ (z >> 31)
+            }
+        }
+        var g = Seeded(state: 20_261_116)
+        let words = ["Call", "Mum", "about", "Sunday", "lunch", "Buy", "apples", "eggs", "trousers", "before", "Friday", "the",
+                     "bank", "mid-afternoon", "check-up", "x", "a", "10-minute", "re:", "a/b", "don’t", "WWWWWWWW", "Ödland",
+                     "jonathan.richardson-whitfield@example.com", "https://www.us.city.springfield/holds",
+                     "#photos2025/holidays/summer", "Antidisestablishmentarianism", String(repeating: "m", count: 20)]
+        let others = ["🏊", "😀🎉🎂🎈", "👨‍👩‍👧", "☕️", "🇬🇧", "整理车库", "然后把旧自行车卖掉", "キッチンのリフォーム", "주말에가족과함께",
+                      "把「车库」", "(today)", "«oui»", "Διαβάζω", "e\u{00AD}mail", "soft\u{00AD}hyphen\u{00AD}ated"]
+        let marks = ["!", "?", ",", ".", ":", ")", "/", "…", "—", "–", "’", "”", "„", "‚", "‹", "¿", "¡", "›", "\u{00AD}", "。", "、"]
+        let gaps = [" ", " ", " ", " ", " ", "  ", "", "\t", " \u{00AD}"]
+        var out: [String] = []
+        for _ in 0..<count {
+            var title = ""
+            for i in 0..<Int.random(in: 1...14, using: &g) {
+                if i > 0 { title += gaps.randomElement(using: &g)! }
+                if Int.random(in: 0..<10, using: &g) < 7 { title += words.randomElement(using: &g)! } else { title += others.randomElement(using: &g)! }
+                if Int.random(in: 0..<4, using: &g) == 0 {
+                    if Bool.random(using: &g) { title += " " }
+                    title += marks.randomElement(using: &g)!
+                }
+            }
+            out.append(title)
+        }
+        return out
+    }
+
+    /// F39 (b): the same checks over 2,000 titles made by chance (a fixed seed).
+    @Test @MainActor func fuzzedTitlesFitTheirCloths() throws {
+        var faults: [String] = []
+        var checked = 0
+        let titles = Self.fuzzedTitles(2000)
+        for (face, inner) in Self.clothFaces.prefix(6) {                   // a phone's and the outside screen's cloths
+            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size))
+            for title in titles {
+                let whole = Self.drawn(title, face, inner: inner, limit: 99)
+                for limit in [3, 1] {
+                    let lines = Self.drawn(title, face, inner: inner, limit: limit)
+                    faults += Self.faults(title, lines: lines, uncut: whole.count <= limit, limit: limit, inner: inner, font: font,
+                                          name: "\(face) \(Int(inner)) ≤\(limit) “\(title)”")
+                    checked += 1
+                }
+            }
+        }
+        #expect(faults.isEmpty, "\(faults.count) of \(checked): \(faults.prefix(8))")
+        print("Fuzzed: \(titles.count) titles, \(checked) breakings; faults \(faults.count)")
+    }
+
+    /// The demo plans' titles and the examples (the titles a person sees first).
+    static var ordinaryTitles: [String] {
+        var out: [String] = []
+        for plan in [DemoStress.full, DemoStress.long] {
+            out += plan.script.map { WalkWords.said($0.1, level: $0.0, today: today)?.title ?? $0.1 }
+        }
+        for level in [WalkLevel.year, .season, .month, .week] {
+            for name in ["Health", "Home", "People", "Work", "Money", "Fun"] { out += WalkCopy.examples(level, area: name) }
+        }
+        out += ["Feel strong again", "Finish the bathroom", "More slow weekends together", "Bathroom done by February",
+                "Lift twice a week", "Pick the tile and pay the deposit", "Send the contractor the deposit", "Choose the tile"]
+        var seen = Set<String>()
+        return out.filter { seen.insert($0).inserted }
+    }
+
+    /// Where the layout breaks an ordinary title otherwise than the text system would, by cloth. Each is
+    /// the face's kerning setting a line a hair inside the width its letters' widths pass (pairs it sets
+    /// closer are never counted). "Book the first camping trip" on the outside screen's 183-wide flag
+    /// gets two lines (before F39: one line and a blank band); the rest keep their two lines and move
+    /// one word down ("Invite friends over / for dinner", the system "Invite friends over for / dinner").
+    static let breaksOtherwise: Set<String> = [
+        "flag at 183: Book the first camping trip",
+        "flag at 150: Invite friends over for dinner", "flag at 150: Borrow the next book on Saturday",
+        "parent at 126: Tour the gym on Main Street", "parent at 159: Protect two focus mornings a week",
+        "flag at 226: Photograph the first five pieces in daylight", "parent at 202: Finish the upstairs bathroom before spring",
+        "parent at 202: Put the free Sunday on the calendar today",
+    ]
+
+    /// F39 (c): ordinary titles look as the system sets them: the layout's lines are the lines TextKit
+    /// breaks them into, on every cloth, but for `breaksOtherwise`.
+    @Test @MainActor func ordinaryTitlesBreakAsTheSystemDoes() throws {
+        var cloths: [(face: WalkLayout.Face, width: CGFloat)] = [(.lookBack, 150)]
+        for wing: CGFloat in [0, 42.3, 110.3] {
+            cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.parent, WalkLayout.parentWidth(wing: wing))]
+        }
+        var otherwise = Set<String>(), seen: [String] = []
+        var checked = 0
+        for (face, width) in cloths {
+            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size))
+            for title in Self.ordinaryTitles {
+                let ours = Self.drawn(title, face, inner: width - face.inset, limit: 99)
+                let system = Self.realLineStrings(title, font: font, width: width - face.inset)
+                if ours != system {
+                    otherwise.insert("\(face) at \(Int(width)): \(title)")
+                    seen.append("\(face) at \(Int(width)): \(ours) / the system \(system)")
+                }
+                checked += 1
+            }
+        }
+        #expect(otherwise == Self.breaksOtherwise, "\(seen)")
+        #expect(checked > 600)
+        print("Ordinary titles: \(Self.ordinaryTitles.count) on \(cloths.count) cloths, \(checked) breakings; otherwise: \(seen)")
+    }
+
+    /// The questions every step asks, quoting each goal of the demo's plans, and the three long-token goals.
+    private func questions() -> (ordinary: [String], long: [String]) {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        var goals: [(WalkLevel, String)] = []
+        for plan in [DemoStress.full, DemoStress.long] {
+            goals += plan.script.map { ($0.0, WalkWords.said($0.1, level: $0.0, today: today)?.title ?? $0.1) }
+        }
+        goals += [(.year, "Feel strong again"), (.year, "Finish the bathroom"), (.year, "More slow weekends together"),
+                  (.season, "Bathroom done by February"), (.season, "Lift twice a week"),
+                  (.month, "Pick the tile and pay the deposit"), (.week, "Send the contractor the deposit")]
+        var ordinary: [String] = []
+        for (level, title) in goals where level != .today {
+            let step = level.rawValue + 1
+            ordinary.append(WalkCopy.question(quoting(title, step: step), p))
+            if step == 5 { ordinary.append(WalkCopy.question(quoting(title, step: step, first: true), p)) }
+        }
+        ordinary += [1, 2, 3, 4, 5].map { WalkCopy.question(state($0, kept: ["Health"], standing: "Health"), p) }
+        var long: [String] = []
+        for title in ["Email jonathan.richardson-whitfield@example.com", "Sort #photos2025/holidays/summer-in-the-mountains",
+                      String(repeating: "m", count: 20)] {
+            for step in 2...5 { long.append(WalkCopy.question(quoting(title, step: step), p)) }
+            long.append(WalkCopy.question(quoting(title, step: 5, first: true), p))
+        }
+        return (Array(Set(ordinary)).sorted(), Array(Set(long)).sorted())
+    }
+
+    /// Where the layout gives an ordinary question a different number of lines than the system would: each
+    /// one line more, Crimson Pro's kerning setting it a hair inside the width its letters' widths pass.
+    /// (The block counted these lines before F39 too; the text system then drew one line fewer.)
+    static let questionsOtherwise: Set<String> = [
+        "28.0 at 334.0: For “Clear out the old vanity”, what happens this week? (3, the system 2)",
+        "28.0 at 334.0: What part of “In bed by eleven” belongs to December? (3, the system 2)",
+        "28.0 at 334.0: You’ll start the day with “Text the Okafors about Friday”. (3, the system 2)",
+        "28.0 at 418.6: What’s the first thing you’ll do today? (2, the system 1)",
+        "28.0 at 419.6: What’s the first thing you’ll do today? (2, the system 1)",
+        "28.0 at 500.0: Start the day with “Cancel the film channel”? (2, the system 1)",
+        "32.0 at 334.0: For “No screens after ten”, what happens this week? (3, the system 2)",
+        "32.0 at 334.0: Start the day with “Cancel the film channel”? (3, the system 2)",
+        "32.0 at 334.0: You’ll start the day with “Call the first three leads”. (3, the system 2)",
+        "32.0 at 334.0: You’ll start the day with “Cancel the film channel”. (3, the system 2)",
+        "32.0 at 418.6: For “Ring Dad about December”, what happens this week? (3, the system 2)",
+        "32.0 at 418.6: What part of “Bathroom done by February” belongs to December? (3, the system 2)",
+        "32.0 at 419.6: You’ll start the day with “Choose between the two grey floor tiles”. (3, the system 2)",
+    ]
+
+    /// F39 (d): the question's lines fit the block (Crimson Pro at 32 and 28, the block's widths on a
+    /// phone, the outside screen, just past it and the widest window), put back together as the
+    /// question, and are as many as the block's height counts; for the ordinary questions as many as the
+    /// text system would set.
+    @Test @MainActor func theQuestionsLinesFitTheBlock() throws {
+        let (ordinary, long) = questions()
+        #expect(ordinary.count > 90 && long.count == 15)
+        var faults: [String] = [], otherwise = Set<String>()
+        var checked = 0
+        for size in [WalkLayout.questionSize, WalkLayout.questionSmallSize] {
+            let font = try #require(UIFont(name: "CrimsonPro-Regular", size: size))
+            for wing: CGFloat in [0, 42.3, 42.8, 110.3] {
+                let width = WalkLayout.wordsWidth(wing: wing)
+                for q in ordinary + long {
+                    let set = Self.questionDrawn(q, size: size, wing: wing)
+                    faults += Self.faults(q, lines: set.lines, uncut: true, limit: .max, inner: width, font: font, name: "\(size) at \(width)")
+                    if set.lines.count != set.counted { faults.append("\(size) at \(width): “\(q)” drawn on \(set.lines.count), counted \(set.counted)") }
+                    let system = Self.realLineStrings(q, font: font, width: width).count
+                    if ordinary.contains(q), set.lines.count != system {
+                        otherwise.insert("\(size) at \(width): \(q) (\(set.lines.count), the system \(system))")
+                    }
+                    checked += 1
+                }
+            }
+        }
+        #expect(faults.isEmpty, "\(faults.count) of \(checked): \(faults.prefix(8))")
+        #expect(otherwise == Self.questionsOtherwise, "\(otherwise.sorted())")
+        print("The questions: \(ordinary.count) ordinary and \(long.count) long at 2 sizes on 4 widths, \(checked) breakings; faults \(faults.count); otherwise \(otherwise.sorted())")
     }
     #endif
 
@@ -1626,7 +1879,7 @@ struct WalkLayoutTests {
         for step in 2...5 {
             let words = WalkLayout.words(quoting("Pay off the car", step: step), p, wing: 0)
             #expect(words.questionSize == WalkLayout.questionSize, "step \(step)")
-            #expect(words.showsWhy && words.questionLines <= WalkLayout.questionMaxLines, "step \(step): \(words)")
+            #expect(words.showsWhy && words.questionLines.count <= WalkLayout.questionMaxLines, "step \(step): \(words)")
         }
         let year = state(1, kept: ["Health"], standing: "Health")
         let words = WalkLayout.words(year, p, wing: 0)
@@ -1648,7 +1901,7 @@ struct WalkLayoutTests {
                 for wing in [CGFloat(0), 42.3, 110.3] {
                     let words = WalkLayout.words(s, p, wing: wing)
                     guard !words.showsWhy else { continue }
-                    let withWhy = WalkLayout.wordsFoot(questionSize: words.questionSize, questionLines: words.questionLines,
+                    let withWhy = WalkLayout.wordsFoot(questionSize: words.questionSize, questionLines: words.questionLines.count,
                                                        whyLines: WalkLayout.whyLines(WalkCopy.why(s, p), wing: wing))
                     #expect(withWhy > WalkLayout.wordsFootLimit, "step \(step), wing \(wing): the why line went with room for it")
                 }
@@ -1725,48 +1978,6 @@ struct WalkLayoutTests {
         print("The question's pairs: \(characters.count) characters, \(pairs) ordered pairs at two sizes; set wider than counted: \(wider.count)")
     }
 
-    /// The question's line estimate is never fewer lines than the text system sets it on: every step's
-    /// question quoting each goal of the demo's plans (the preview plan and both stress plans), at 32
-    /// and at 28 points, on a phone, the outside screen and the half window (`realLines` with Crimson
-    /// Pro, the block's width). For ordinary questions it is not more than one line over either.
-    @Test @MainActor func theQuestionsLinesAreTheRealFaces() throws {
-        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
-        var goals: [(WalkLevel, String)] = []
-        for plan in [DemoStress.full, DemoStress.long] {
-            goals += plan.script.map { ($0.0, WalkWords.said($0.1, level: $0.0, today: today)?.title ?? $0.1) }
-        }
-        goals += [(.year, "Feel strong again"), (.year, "Finish the bathroom"), (.year, "More slow weekends together"),
-                  (.season, "Bathroom done by February"), (.season, "Lift twice a week"),
-                  (.month, "Pick the tile and pay the deposit"), (.week, "Send the contractor the deposit")]
-        var questions: [String] = []
-        for (level, title) in goals where level != .today {
-            let step = level.rawValue + 1
-            questions.append(WalkCopy.question(quoting(title, step: step), p))
-            if step == 5 { questions.append(WalkCopy.question(quoting(title, step: step, first: true), p)) }
-        }
-        questions += [1, 2, 3, 4, 5].map { WalkCopy.question(state($0, kept: ["Health"], standing: "Health"), p) }
-        questions = Array(Set(questions)).sorted()
-        var short: [String] = [], over: [String] = []
-        var checked = 0, more = 0
-        for size in [WalkLayout.questionSize, WalkLayout.questionSmallSize] {
-            let font = try #require(UIFont(name: "CrimsonPro-Regular", size: size), "the bundled face is not there")
-            for wing: CGFloat in [0, 42.3, 110.3] {
-                let width = WalkLayout.wordsWidth(wing: wing)
-                for q in questions {
-                    let real = Self.realLines(q, font: font, width: width)
-                    let counted = WalkLayout.questionLines(q, size: size, wing: wing)
-                    if counted < real { short.append("\(size) at \(width): “\(q)” counted \(counted), set on \(real)") }
-                    if counted > real + 1 { over.append("\(size) at \(width): “\(q)” counted \(counted), set on \(real)") }
-                    if counted > real { more += 1 }
-                    checked += 1
-                }
-            }
-        }
-        #expect(short.isEmpty, "counted on fewer lines than set: \(short.prefix(5))")
-        #expect(over.isEmpty, "counted two lines or more over: \(over.prefix(5))")
-        #expect(checked > 400)
-        print("The questions: \(questions.count) questions at 2 sizes on 3 widths, \(checked) counts; a line more than set on \(more)")
-    }
     #endif
 
     /// Back, More and Leave for now on every step after Welcome (the ground too), each a full touch,
