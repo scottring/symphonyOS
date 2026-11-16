@@ -221,7 +221,8 @@ enum WalkCopy {
     /// The choices on the light. Welcome's two sit upper-left and upper-right, with room under each
     /// for its second line (the light itself is the quick start). On steps 1 to 5 at most three, in
     /// this order: Type it on the left ("Type your own" on the ground), the examples (steps 1 to 4 off
-    /// the ground) or, on Today while it is offered, the calendar on the right, and Undo at the top
+    /// the ground, while the area stood in has some for the step, F27) or, on Today while it is
+    /// offered, the calendar on the right, and Undo at the top
     /// once there is something to undo. Back, Next and Leave for now have their own controls.
     static func points(_ s: WalkState, _ p: WalkPeriods) -> [Point] {
         if s.step == 0 {
@@ -240,7 +241,7 @@ enum WalkCopy {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
-            } else {
+            } else if !s.examplesHere.isEmpty {
                 out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
                                  action: .examples, symbol: "lightbulb"))
             }
@@ -267,15 +268,55 @@ enum WalkCopy {
         }
     }
 
-    static func examples(_ level: WalkLevel) -> [String] {
-        switch level {
-        case .year: return ["Run a 5K", "Read a book a month", "Pay off the car"]
-        case .season: return ["Clear out the garage", "Get outside every weekend"]
-        case .month: return ["Book the plumber", "Two early nights a week"]
-        case .week: return ["Call the tile shop", "Gym on Tuesday"]
-        case .today: return []
-        }
+    /// The examples for an area on a level (F27): they answer the question asked, so only the six
+    /// built-in areas have them, keyed by the name lowercased as `phrase(for:)` reads it. An area of
+    /// the person's own, the nameless post (nil) and Today have none: nothing generic stands in.
+    static func examples(_ level: WalkLevel, area: String?) -> [String] {
+        guard let area else { return [] }
+        return exampleLists[area.lowercased()]?[level] ?? []
     }
+
+    /// One line per area and level. Each area's first example on a level follows from its first one
+    /// level up, so tapping the first at every step makes a plan that holds together. Week's carry a
+    /// day, as `WalkWords.said` reads one (the title is planted without it).
+    private static let exampleLists: [String: [WalkLevel: [String]]] = [
+        "health": [
+            .year: ["Feel strong again", "Sleep seven hours most nights", "Run a 5K"],
+            .season: ["Lift twice a week", "Walk every morning before work"],
+            .month: ["Find a gym that fits", "Book a check-up"],
+            .week: ["Tour the gym on Tuesday", "Buy proper running shoes on Saturday"],
+        ],
+        "home": [
+            .year: ["Finish the bathroom", "Clear out the garage", "Grow a kitchen garden"],
+            .season: ["Bathroom tiled and plumbed", "Garage empty enough for the car"],
+            .month: ["Pick the tile and pay the deposit", "Book the plumber"],
+            .week: ["Call the tile shop on Monday", "Measure the bathroom window today"],
+        ],
+        "people": [
+            .year: ["More slow weekends together", "See old friends each season", "Call Mum every Sunday"],
+            .season: ["One slow Sunday a month", "Dinner with old friends"],
+            .month: ["Keep one Sunday free", "Invite friends round for dinner"],
+            .week: ["Put the free Sunday on the calendar today", "Text friends about Friday, today"],
+        ],
+        "work": [
+            .year: ["Sign one more client", "Ask for a raise", "Protect two focus mornings a week"],
+            .season: ["Pitch three new clients", "Ship the spring proposal"],
+            .month: ["Send two proposals", "Ask for a testimonial"],
+            .week: ["Draft the first proposal on Wednesday", "Email the client on Thursday"],
+        ],
+        "money": [
+            .year: ["Pay off the car", "Save an emergency fund", "Sort the pension"],
+            .season: ["Clear a third of the car loan", "Spend less on takeaways"],
+            .month: ["Set up a bigger monthly payment", "Call the pension line"],
+            .week: ["Call the bank about the payment on Monday", "Cancel unused subscriptions today"],
+        ],
+        "fun": [
+            .year: ["Read a book a month", "Learn to play the guitar", "Go camping twice"],
+            .season: ["Finish two novels", "Book the first camping trip"],
+            .month: ["Join the library", "Pick the campsite"],
+            .week: ["Borrow the next book on Saturday", "Pack the tent on Friday"],
+        ],
+    ]
 
     /// A title as the question quotes it (S33): whole up to `shortLength` characters; longer, cut at the
     /// last space at or before the 55th character (trailing spaces trimmed), then "…"; a word of 56

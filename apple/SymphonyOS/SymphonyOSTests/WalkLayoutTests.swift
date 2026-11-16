@@ -190,6 +190,7 @@ struct WalkLayoutTests {
         let month = flag(.month, "Get back to the gym", in: "Health")
         let gym = flag(.week, "Gym", in: "Health", parent: month.id, day: day(2026, 11, 17))
         var s = state(4, kept: ["Health", "Home"], items: [month, gym])
+        s.focusArea = area("Health").id
         s.focus[.week] = month.id
         s.examplesOn = [4]
         let layout = WalkLayout.make(s, today: today, footing: .level)
@@ -266,6 +267,7 @@ struct WalkLayoutTests {
         let parent = flag(above, "Feel strong again", in: "Health")
         let mine = own.map { flag(level, $0, in: "Health", parent: parent.id, day: level == .week ? today : nil) }
         var s = state(step, kept: ["Health", "Home"], items: [parent] + mine)
+        s.focusArea = area("Health").id
         s.focus[level] = parent.id
         if examples { s.examplesOn = [step] }
         return (s, parent, mine)
@@ -285,7 +287,7 @@ struct WalkLayoutTests {
                 #expect(!ghosts.isEmpty, "step \(step) own \(own.count)")
                 for g in ghosts {
                     #expect(g.frame.minY >= risen.maxY + 4 - 0.01 && g.frame.maxY <= post.base.y + 0.01, "\(g.frame)")
-                    #expect(g.text == WalkCopy.examples(level).first { $0 == g.text })
+                    #expect(WalkCopy.examples(level, area: "Health").contains(g.text))
                 }
                 let frames = post.banners.map(\.frame)
                 for i in frames.indices { for j in frames.indices where j > i {
@@ -372,8 +374,9 @@ struct WalkLayoutTests {
         }
     }
 
-    @Test func aQuickStartFindsRoomForAnExample() {
-        // No areas, a focused Year flag with no area (no zoom), one Season flag, examples on.
+    @Test func aQuickStartOnTheNamelessPostShowsNoExamples() {
+        // No areas, a focused Year flag with no area (no zoom), one Season flag, examples on: the nameless
+        // post has no examples to show (F27), and the flags stand as they would with examples off.
         let year = flag(.year, "Feel strong again")
         let season = flag(.season, "Lift twice a week", parent: year.id)
         var s = state(2, items: [year, season])
@@ -381,18 +384,16 @@ struct WalkLayoutTests {
         s.examplesOn = [2]
         let layout = WalkLayout.make(s, today: today, footing: .level)
         #expect(layout.camera == art.stops[2])
-        let risen = layout.banner(for: year)!.frame
-        let post = layout.post(.season, nil)!
-        let ghosts = post.banners.filter { $0.kind == .ghost }
-        #expect(ghosts.first?.text == "Clear out the garage")
-        #expect(post.banners.allSatisfy { !$0.frame.intersects(risen) || $0.frame.minY >= risen.maxY })
-        #expect(layout.banner(for: season)?.kind == .compact)
-        #expect(ghosts.first?.lines == 1 || ghosts.first?.lines == 2)
+        #expect(layout.posts.flatMap(\.banners).allSatisfy { $0.kind != .ghost })
+        var off = s
+        off.examplesOn = []
+        #expect(layout.posts.flatMap(\.banners).map(\.frame) == WalkLayout.make(off, today: today, footing: .level).posts.flatMap(\.banners).map(\.frame))
     }
 
     @Test func labelsKeepOffTheLight() {
-        // Year, three kept areas and examples (the unlabeled post makes four columns).
+        // Year, three kept areas, standing in Health with its examples on.
         var s = state(1, kept: ["Health", "Home", "People"])
+        s.focusArea = area("Health").id
         s.examplesOn = [1]
         let layout = WalkLayout.make(s, today: today, footing: .level)
         #expect(layout.labels.count == 3)
@@ -463,10 +464,11 @@ struct WalkLayoutTests {
     }
 
     @Test func anExampleKeepsItsIdWhenAnotherIsPlanted() {
-        var s = state(1)
+        var s = state(1, kept: ["Health"])
+        s.focusArea = area("Health").id
         s.examplesOn = [1]
         let before = WalkLayout.make(s, today: today, footing: .level).posts.flatMap(\.banners).filter { $0.kind == .ghost }
-        s.items = [flag(.year, "Run a 5K")]
+        s.items = [flag(.year, "Run a 5K", in: "Health")]
         let after = WalkLayout.make(s, today: today, footing: .level).posts.flatMap(\.banners).filter { $0.kind == .ghost }
         #expect(after.count == 2)
         for ghost in after { #expect(before.first { $0.text == ghost.text }?.id.hasSuffix(ghost.text) == true) }
@@ -605,16 +607,17 @@ struct WalkLayoutTests {
     // MARK: Examples
 
     @Test func examplesHangOnAPostNotInTheSky() {
-        var s = state(1)
+        // Standing in Health on Year with nothing planted: its examples hang on Health's post.
+        var s = state(1, kept: ["Health"])
+        s.focusArea = area("Health").id
         s.examplesOn = [1]
         var layout = WalkLayout.make(s, today: today, footing: .level)
         #expect(layout.posts.count == 1)
         let post = layout.posts[0]
-        #expect(post.pale && post.key == WalkPostKey(level: .year, column: nil))
-        #expect(near(post.base.y, 535.5))
-        #expect(post.banners.filter { $0.kind == .ghost }.map(\.text) == WalkCopy.examples(.year))
+        #expect(post.pale && post.key == WalkPostKey(level: .year, column: area("Health").id))
+        #expect(post.banners.filter { $0.kind == .ghost }.map(\.text) == WalkCopy.examples(.year, area: "Health"))
 
-        s.items = [flag(.year, "Run a 5K")]
+        s.items = [flag(.year, "Run a 5K", in: "Health")]
         layout = WalkLayout.make(s, today: today, footing: .level)
         #expect(layout.posts.flatMap(\.banners).filter { $0.kind == .ghost }.count == 2)
         #expect(layout.posts.allSatisfy { !$0.pale })
@@ -623,13 +626,15 @@ struct WalkLayoutTests {
     @Test func aPlantedExampleDoesNotComeBack() {
         let gym = flag(.week, "Gym", in: "Home")
         var s = state(4, kept: ["Home"], items: [gym])
+        s.focusArea = area("Home").id
         s.examplesOn = [4]
         var ghosts = WalkLayout.make(s, today: today, footing: .level).posts.flatMap(\.banners).filter { $0.kind == .ghost }
-        #expect(ghosts.map(\.text) == ["Call the tile shop"])
+        #expect(ghosts.map(\.text) == WalkCopy.examples(.week, area: "Home"))
 
-        s.items.append(flag(.week, "call the tile shop", in: "Home"))
+        // "Call the tile shop on Monday", planted: Monday the 16th.
+        s.items.append(flag(.week, "call the tile shop", in: "Home", day: day(2026, 11, 16)))
         ghosts = WalkLayout.make(s, today: today, footing: .level).posts.flatMap(\.banners).filter { $0.kind == .ghost }
-        #expect(ghosts.isEmpty)
+        #expect(ghosts.map(\.text) == ["Measure the bathroom window today"])
     }
 
     // MARK: VoiceOver
@@ -649,10 +654,11 @@ struct WalkLayoutTests {
         layout = WalkLayout.make(s, today: today, footing: .level)
         #expect(layout.banner(for: mine)?.label == "Year: Run a 5K, focused, tap to let go")
 
-        var ex = state(1)
+        var ex = state(1, kept: ["Health"])
+        ex.focusArea = area("Health").id
         ex.examplesOn = [1]
         let ghost = WalkLayout.make(ex, today: today, footing: .level).posts.flatMap(\.banners).first { $0.kind == .ghost }
-        #expect(ghost?.label == "Example: Run a 5K, tap to make it yours")
+        #expect(ghost?.label == "Example: Feel strong again, tap to make it yours")
 
         let crowd = (1...8).map { flag(.year, "Goal \($0)", in: "Home") }
         let stub = WalkLayout.make(state(1, kept: ["Health", "Home", "People"], items: crowd), today: today, footing: .level)
@@ -691,7 +697,8 @@ struct WalkLayoutTests {
         let peaks = WalkLayout.make(ground, today: today, footing: .level).labels
         #expect(peaks.filter(\.selected).map(\.name) == ["Home"])
 
-        var ex = state(1)
+        var ex = state(1, kept: ["Health"])
+        ex.focusArea = area("Health").id
         ex.examplesOn = [1]
         #expect(WalkLayout.make(ex, today: today, footing: .level).posts.flatMap(\.banners).first { $0.kind == .ghost }?.taps == true)
 
@@ -948,6 +955,7 @@ struct WalkLayoutTests {
         var g = WalkState(); g.step = 1; g.ground = true; g.undo = [.plant(uid(1))]; g.orb = .open; states.append(g)
         for step in 1...5 {
             var s = WalkState(); s.step = step; s.undo = [.plant(uid(1))]; s.calendarOffer = true; s.orb = .open
+            s.areas = [area("Health")]; s.kept = [area("Health").id]; s.focusArea = area("Health").id   // examples offered
             states.append(s)
             s.items = [WalkItem(id: uid(2), level: step == 5 ? .week : WalkLevel(rawValue: step)!, title: "x")]
             if step == 5 { s.firstThing = uid(2) }
@@ -1569,13 +1577,9 @@ enum Invariants {
         if s.step <= 5 {
             for l in layout.labels where orbDistance(l.frame) < 74 { problems.append("label \(l.name) \(l.frame) on the light") }
         }
-        // Examples on for a step that has some not yet planted: at least one shows.
-        if let level = s.level, !s.ground, (1...4).contains(s.step), s.examplesOn.contains(s.step) {
-            let titles = s.items(on: level).map { $0.title.lowercased() }
-            let left = WalkCopy.examples(level).filter { e in
-                !titles.contains((WalkWords.said(e, level: level, today: today, detect: { _ in nil })?.title ?? e).lowercased())
-            }
-            if !left.isEmpty, !banners.contains(where: { $0.kind == .ghost }) { problems.append("examples on, none shows") }
+        // Examples on for a step where the area stood in has some not yet planted: at least one shows.
+        if !s.examplesShown(today: today).isEmpty, !banners.contains(where: { $0.kind == .ghost }) {
+            problems.append("examples on, none shows")
         }
         // No label sits in the question; looking back up, where a label may head its column, none above the header line.
         let labelTop = s.step >= 6 ? WalkLayout.lookBackHeader : 250
@@ -1611,7 +1615,7 @@ enum Invariants {
         for level in drawn {
             let has = level == .today ? s.item(s.firstThing) != nil : s.items(on: level).contains { item in
                 !s.ground || item.areaId.map { id in s.areas.contains { $0.id == id } } ?? false
-            } || (level == s.level && s.examplesOn.contains(s.step) && !s.ground && s.step <= 4)
+            } || (level == s.level && !s.examplesShown(today: today).isEmpty)
             let base = (art.bandY(level) - cam.y) * cam.k
             let waits = zoomed && base - ceiling(level, s, cam) < 20
             let shows = layout.posts.contains { $0.key.level == level }

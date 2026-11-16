@@ -161,8 +161,11 @@ struct WalkState: Equatable {
         case .leave: return (1...5).contains(step) ? end(.paused) : []
         case .next: return walkOn(env)
         case .back: return backUp(env)
+        // Only while the area stood in has examples for the step (F27). A place opened mid-walk (the
+        // demo's preview) may not have settled yet, so it settles first, as it would after any touch.
         case .examples:
-            guard (1...4).contains(step), !ground else { return [] }
+            settleStanding()
+            guard !examplesHere.isEmpty else { return [] }
             if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
             return []
         case .undo: return undoLast(env)

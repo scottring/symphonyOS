@@ -180,21 +180,9 @@ private struct Builder {
         let labeledIds = Set(labeled.map(\.id))
         let column = { (item: WalkItem) -> UUID? in item.areaId.flatMap { labeledIds.contains($0) ? $0 : nil } }
 
-        // Examples: while on for the step, the ones not yet planted on this level.
-        var ghosts: [String] = []
-        var ghostColumn: UUID?
-        if let level, !s.ground, (1...4).contains(s.step), s.examplesOn.contains(s.step) {
-            let titles = s.items(on: level).map { $0.title.lowercased() }
-            ghosts = Array(WalkCopy.examples(level).filter { example in
-                let said = WalkWords.said(example, level: level, today: today, detect: { _ in nil })?.title ?? example
-                return !titles.contains(said.lowercased())
-            }.prefix(3))
-            if level == .year {
-                ghostColumn = s.focusArea.flatMap { labeledIds.contains($0) ? $0 : nil }
-            } else {
-                ghostColumn = s.item(s.focus[level]).flatMap(column)
-            }
-        }
+        // Examples: while on for the step, the area stood in's not yet planted (F27), on its post.
+        let ghosts = Array(s.examplesShown(today: today).prefix(3))
+        let ghostColumn = s.standing
         self.ghosts = ghosts
         self.ghostColumn = ghostColumn
 

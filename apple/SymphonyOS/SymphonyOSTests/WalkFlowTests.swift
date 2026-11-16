@@ -163,6 +163,38 @@ final class WalkFlowTests {
         #expect(weekInsert < focusInsert)
     }
 
+    /// F27: a quick walk in Home that taps the first example on Year, Season, Month and Week grows one
+    /// chain: each new flag hangs under the one before, all in Home, and Week's carries its day.
+    @Test func followingTheFirstExamplesMakesOneChain() throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        quickStart(m, keeping: ["Home"])
+        let home = area(m, "Home")
+        var chain: [WalkItem] = []
+        for level in [WalkLevel.year, .season, .month, .week] {
+            #expect(m.state.level == level)
+            m.choose(.examples)
+            let first = try #require(WalkCopy.examples(level, area: "Home").first)
+            m.send(.exampleTapped(first))
+            let planted = try #require(m.state.items.last)
+            #expect(planted.areaId == home, "\(level)")
+            #expect(planted.parentId == chain.last?.id, "\(level): \(planted.title)")
+            chain.append(planted)
+            if level != .week { m.choose(.next) }
+        }
+        #expect(chain.map(\.title) == ["Finish the bathroom", "Bathroom tiled and plumbed",
+                                       "Pick the tile and pay the deposit", "Call the tile shop"])
+        #expect(chain.last?.day == day(2026, 11, 16))              // "on Monday", said on Friday the 13th
+
+        let goal = try #require(fetch(ctx, Goal.self).first)
+        #expect(goal.name == "Finish the bathroom" && goal.areaId == home)
+        let season = try #require(task(ctx, "Bathroom tiled and plumbed"))
+        let month = try #require(task(ctx, "Pick the tile and pay the deposit"))
+        let week = try #require(task(ctx, "Call the tile shop"))
+        #expect(season.goalId == goal.id && month.sourceId == season.id && week.sourceId == month.id)
+        #expect([season, month, week].allSatisfy { $0.areaId == home })
+    }
+
     // MARK: A replay over a real plan
 
     /// Every field of a seeded row a walk could touch, to compare before and after.

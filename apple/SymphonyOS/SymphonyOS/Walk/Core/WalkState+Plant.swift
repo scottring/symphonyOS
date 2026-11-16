@@ -20,17 +20,40 @@ extension WalkState {
         return plantFlag(said, on: level, plantSoundMs: 0, env)
     }
 
-    /// An example is planted as the person's own words, only while examples are
-    /// on for this step, as anything said here is.
-    /// Once it is planted (same words, and on Week the same day) another tap does nothing.
-    mutating func plantExample(_ text: String, _ env: WalkEnv) -> [WalkEffect] {
-        guard let level, !ground, examplesOn.contains(step), WalkCopy.examples(level).contains(text),
-              let said = WalkWords.said(text, level: level, today: env.periods.today) else { return [] }
-        let planted = items(on: level).contains {
-            $0.title.caseInsensitiveCompare(said.title) == .orderedSame
-                && (level != .week || $0.day.map(PlanCalendar.day) == said.day.map(PlanCalendar.day))
+    // MARK: Examples (F27)
+
+    /// The examples the area stood in has for this step's level (steps 1 to 4 off the ground): none
+    /// on the nameless post or in an area of the person's own. Whether Show examples is offered.
+    var examplesHere: [String] {
+        guard let level, !ground, (1...4).contains(step) else { return [] }
+        return WalkCopy.examples(level, area: area(standing)?.name)
+    }
+
+    /// The examples shown while they are on for this step: the area's, less any already planted on
+    /// this level (the same title ignoring case; on Week the same day too). A used example comes down.
+    func examplesShown(today: Date) -> [String] {
+        guard let level, examplesOn.contains(step) else { return [] }
+        return examplesHere.filter { text in
+            guard let said = Self.exampleSaid(text, level, today) else { return false }
+            return !items(on: level).contains {
+                $0.title.caseInsensitiveCompare(said.title) == .orderedSame
+                    && (level != .week || $0.day.map(PlanCalendar.day) == said.day.map(PlanCalendar.day))
+            }
         }
-        guard !planted else { return [] }
+    }
+
+    /// An example read as anything said on this step is (Week's day comes off its end).
+    private static func exampleSaid(_ text: String, _ level: WalkLevel, _ today: Date) -> WalkWords.Said? {
+        WalkWords.said(text, level: level, today: today, detect: { _ in nil })
+    }
+
+    /// An example shown here is planted as the person's own words, in the area stood in, under the
+    /// goal above (`plantFlag`); never under another area's goal. Once planted it comes down, so
+    /// another tap does nothing.
+    mutating func plantExample(_ text: String, _ env: WalkEnv) -> [WalkEffect] {
+        guard let level, examplesShown(today: env.periods.today).contains(text),
+              let said = Self.exampleSaid(text, level, env.periods.today) else { return [] }
+        if level != .year, let parent = item(focus[level]), column(of: parent) != standing { return [] }
         return [.sound(.poles, afterMs: 0)] + plantFlag(said, on: level, plantSoundMs: 160, env)
     }
 

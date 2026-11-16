@@ -111,12 +111,65 @@ struct WalkCopyTests {
         #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAbove)
     }
 
+    /// F27: the examples answer the question asked, for the area stood in and the step's level.
     @Test func theExamples() {
-        #expect(WalkCopy.examples(.year) == ["Run a 5K", "Read a book a month", "Pay off the car"])
-        #expect(WalkCopy.examples(.season) == ["Clear out the garage", "Get outside every weekend"])
-        #expect(WalkCopy.examples(.month) == ["Book the plumber", "Two early nights a week"])
-        #expect(WalkCopy.examples(.week) == ["Call the tile shop", "Gym on Tuesday"])
-        #expect(WalkCopy.examples(.today).isEmpty)
+        #expect(WalkCopy.examples(.year, area: "Home") == ["Finish the bathroom", "Clear out the garage", "Grow a kitchen garden"])
+        #expect(WalkCopy.examples(.season, area: "Home") == ["Bathroom tiled and plumbed", "Garage empty enough for the car"])
+        #expect(WalkCopy.examples(.month, area: "Home") == ["Pick the tile and pay the deposit", "Book the plumber"])
+        #expect(WalkCopy.examples(.week, area: "Home") == ["Call the tile shop on Monday", "Measure the bathroom window today"])
+        #expect(WalkCopy.examples(.year, area: "Health") == ["Feel strong again", "Sleep seven hours most nights", "Run a 5K"])
+        #expect(WalkCopy.examples(.week, area: "People") == ["Put the free Sunday on the calendar today",
+                                                            "Text friends about Friday, today"])
+        // Keyed by the name as `phrase(for:)` reads it: without case.
+        #expect(WalkCopy.examples(.year, area: "home") == WalkCopy.examples(.year, area: "Home"))
+        #expect(WalkCopy.examples(.year, area: "HOME") == WalkCopy.examples(.year, area: "Home"))
+        // The nameless post has none.
+        for level in WalkLevel.allCases { #expect(WalkCopy.examples(level, area: nil).isEmpty) }
+    }
+
+    private static let builtIn = ["Health", "Home", "People", "Work", "Money", "Fun"]
+
+    @Test func everyBuiltInAreaHasExamplesOnEveryLevel() {
+        for area in Self.builtIn {
+            for level in [WalkLevel.year, .season, .month, .week] {
+                #expect(!WalkCopy.examples(level, area: area).isEmpty, "\(area) \(level)")
+            }
+            #expect(WalkCopy.examples(.today, area: area).isEmpty, "\(area) on Today")
+        }
+    }
+
+    @Test func anAreaYouNamedHasNone() {
+        for level in WalkLevel.allCases {
+            #expect(WalkCopy.examples(level, area: "Side projects and making") == [])
+        }
+    }
+
+    @Test func examplesFitAFlag() {
+        for area in Self.builtIn {
+            for level in WalkLevel.allCases {
+                for example in WalkCopy.examples(level, area: area) {
+                    #expect(example.count <= 44, "\(area) \(level): \(example) is \(example.count)")
+                }
+            }
+        }
+    }
+
+    /// Standing in an area of one's own, steps 1 to 4 offer no examples, and the action does nothing.
+    @Test func noExamplesNoExamplesPoint() {
+        let own = WalkArea(id: UUID(), name: "Side projects and making")
+        for step in 1...4 {
+            var s = state(step: step)
+            s.areas = [own]; s.kept = [own.id]; s.focusArea = own.id
+            #expect(!WalkCopy.points(s, nov13).contains { $0.at == .e || $0.action == .examples }, "step \(step)")
+            let env = WalkEnv(periods: nov13, now: day(2026, 11, 13))
+            _ = s.act(.examples, env)
+            #expect(s.examplesOn.isEmpty, "step \(step)")
+            // A built-in area on the same step does offer them.
+            let home = WalkArea(id: UUID(), name: "Home")
+            var there = state(step: step)
+            there.areas = [home]; there.kept = [home.id]; there.focusArea = home.id
+            #expect(WalkCopy.points(there, nov13).contains { $0.at == .e && $0.action == .examples }, "step \(step)")
+        }
     }
 
     /// S33: a title of up to 56 characters is quoted whole; a word of 56 letters or more is cut at 55.
@@ -239,13 +292,22 @@ struct WalkCopyTests {
     }
 
     @Test func stepPoints() {
-        let y = WalkCopy.points(state(step: 1), nov13)
+        // Standing in Health, which has examples on every step from Year to Week (F27).
+        let health = WalkArea(id: UUID(), name: "Health")
+        func inHealth(_ step: Int) -> WalkState {
+            var s = state(step: step)
+            s.areas = [health]; s.kept = [health.id]; s.focusArea = health.id
+            return s
+        }
+        // On the nameless post there are none to show.
+        #expect(labels(state(step: 1)) == ["Type it"])
+        let y = WalkCopy.points(inHealth(1), nov13)
         #expect(y.map(\.label) == ["Type it", "Show examples"])
         #expect(y.map(\.at) == [.w, .e])
         #expect(y.map(\.action) == [.type, .examples])
         #expect(y.map(\.symbol) == ["keyboard", "lightbulb"])
         #expect(y.map(\.detail) == [nil, nil])
-        var s = state(step: 3)
+        var s = inHealth(3)
         #expect(labels(s) == ["Type it", "Show examples"])
         s.items = [item(.month, "x")]; s.examplesOn = [3]
         #expect(labels(s) == ["Type it", "Hide examples"])
@@ -375,7 +437,8 @@ struct WalkCopyTests {
         }
         let areas = WalkLoad.areas([], me: UUID()).map(\.name) + ["A very long area of my own"]
         said += areas.map(WalkCopy.phrase(for:))
-        said += WalkLevel.allCases.flatMap(WalkCopy.examples) + WalkLevel.allCases.map(WalkCopy.levelName)
+        said += WalkLevel.allCases.flatMap { level in areas.flatMap { WalkCopy.examples(level, area: $0) } }
+        said += WalkLevel.allCases.map(WalkCopy.levelName)
         said += [WalkCopy.wordmark, WalkCopy.welcomeSub, WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard,
                  WalkCopy.speakNow, WalkCopy.ridgeFull, WalkCopy.undo, WalkCopy.moveTo, WalkCopy.pullUp,
                  WalkCopy.typePlaceholder, WalkCopy.typeAdd, WalkCopy.typeClose, WalkCopy.backWord, WalkCopy.firstThingTag, WalkCopy.more(2), WalkCopy.stubCount(2),

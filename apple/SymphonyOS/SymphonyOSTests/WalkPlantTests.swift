@@ -197,7 +197,7 @@ struct WalkPlantTests {
         _ = s.plant("call the tile shop", m.env)
         #expect(s.expanded == nil)
         s.expanded = WalkPostKey(level: .week, column: m.home.id)
-        _ = s.plantExample("Call the tile shop", m.env)           // examples off: nothing planted, nothing closed
+        _ = s.plantExample(WalkCopy.examples(.week, area: "Home")[0], m.env)   // examples off: nothing planted, nothing closed
         #expect(s.expanded == WalkPostKey(level: .week, column: m.home.id))
     }
 
@@ -326,12 +326,13 @@ struct WalkPlantTests {
 
     @Test func examplesPlantAsYourOwn() {
         var s = m.on(4, items: [m.tile])
+        s.focusArea = m.home.id
         s.focus[.week] = m.tile.id
         s.examplesOn = [4]
-        let effects = s.apply(.exampleTapped("Gym on Tuesday"), m.env)
+        let effects = s.apply(.exampleTapped("Call the tile shop on Monday"), m.env)
         let item = s.items[1]
-        #expect(item.title == "Gym")
-        #expect(item.day == day(2026, 11, 17))
+        #expect(item.title == "Call the tile shop")
+        #expect(item.day == day(2026, 11, 16))
         #expect(item.mine)
         #expect(item.areaId == m.home.id)
         #expect(item.parentId == m.tile.id)
@@ -342,23 +343,87 @@ struct WalkPlantTests {
         #expect(s.undo == [.plant(item.id)])
 
         var off = m.on(4, items: [m.tile])
-        #expect(off.apply(.exampleTapped("Gym on Tuesday"), m.env).isEmpty)
+        off.focusArea = m.home.id
+        off.focus[.week] = m.tile.id
+        #expect(off.apply(.exampleTapped("Call the tile shop on Monday"), m.env).isEmpty)
         #expect(off.items == [m.tile])
 
-        var notOne = m.on(4)
+        var notOne = m.on(4, items: [m.tile])
+        notOne.focusArea = m.home.id
+        notOne.focus[.week] = m.tile.id
         notOne.examplesOn = [4]
         #expect(notOne.apply(.exampleTapped("Buy a boat"), m.env).isEmpty)   // only the examples themselves
-        #expect(notOne.items.isEmpty)
+        #expect(notOne.items == [m.tile])
     }
 
     @Test func aYearExampleTakesTheFocusedPeakAndIsNotClassified() {
         var s = m.on(1)
-        s.focusArea = m.home.id
+        s.focusArea = m.health.id
         s.examplesOn = [1]
-        _ = s.apply(.exampleTapped("Run a 5K"), m.env)                 // "5k" is a Health word
+        _ = s.apply(.exampleTapped("Run a 5K"), m.env)
         #expect(s.items[0].title == "Run a 5K")
-        #expect(s.items[0].areaId == m.home.id)
+        #expect(s.items[0].areaId == m.health.id)
         #expect(s.note == nil)
+    }
+
+    /// F27: only the standing area's examples plant, and never under another area's goal.
+    @Test func anExampleIsPlantedOnlyWhereItBelongs() {
+        let health = WalkCopy.examples(.year, area: "Health")[0]
+        var s = m.on(1)
+        s.kept.append(m.work.id)
+        s.focusArea = m.work.id
+        s.examplesOn = [1]
+        #expect(s.apply(.exampleTapped(health), m.env).isEmpty)
+        #expect(s.items.isEmpty)
+        // Work's own does.
+        let work = WalkCopy.examples(.year, area: "Work")[0]
+        _ = s.apply(.exampleTapped(work), m.env)
+        #expect(s.items.map(\.title) == [work] && s.items.map(\.areaId) == [m.work.id])
+
+        // Below Year: standing in Home under Home's goal, a Health example plants nothing.
+        var season = m.on(2, items: [m.bathroom, m.strong])
+        season.focusArea = m.home.id
+        season.focus[.season] = m.bathroom.id
+        season.examplesOn = [2]
+        #expect(season.apply(.exampleTapped(WalkCopy.examples(.season, area: "Health")[0]), m.env).isEmpty)
+        #expect(season.items == [m.bathroom, m.strong])
+
+        // Never under another area's goal: a goal above that does not stand here takes no example.
+        var astray = m.on(2, items: [m.bathroom, m.strong])
+        astray.focusArea = m.home.id
+        astray.focus[.season] = m.strong.id                    // Health's goal, while standing in Home
+        astray.examplesOn = [2]
+        #expect(astray.apply(.exampleTapped(WalkCopy.examples(.season, area: "Home")[0]), m.env).isEmpty)
+        #expect(astray.items == [m.bathroom, m.strong])
+    }
+
+    /// F27: a used example comes down; the others stay.
+    @Test func aUsedExampleComesDown() {
+        let home = WalkCopy.examples(.season, area: "Home")
+        var s = m.on(2, items: [m.bathroom])
+        s.focusArea = m.home.id
+        s.focus[.season] = m.bathroom.id
+        s.examplesOn = [2]
+        #expect(s.examplesShown(today: m.today) == home)
+        _ = s.apply(.exampleTapped(home[0]), m.env)
+        #expect(s.items.last?.title == home[0] && s.items.last?.parentId == m.bathroom.id)
+        #expect(s.examplesShown(today: m.today) == [home[1]])
+        #expect(!s.examplesShown(today: m.today).contains(home[0]))
+
+        // On Week the same words on another day are another task: that example stays up.
+        var week = m.on(4, items: [m.tile, WalkItem(id: UUID(), level: .week, title: "call the tile shop",
+                                                    areaId: m.home.id, parentId: m.tile.id, day: m.today)])
+        week.focusArea = m.home.id
+        week.focus[.week] = m.tile.id
+        week.examplesOn = [4]
+        #expect(week.examplesShown(today: m.today) == WalkCopy.examples(.week, area: "Home"))
+        _ = week.apply(.exampleTapped("Call the tile shop on Monday"), m.env)
+        #expect(week.examplesShown(today: m.today) == ["Measure the bathroom window today"])
+
+        // Examples off: none shown.
+        var off = s
+        off.examplesOn = []
+        #expect(off.examplesShown(today: m.today).isEmpty)
     }
 
     // MARK: Selecting, moving, pulling up
@@ -618,20 +683,25 @@ struct WalkPlantTests {
 
     @Test func anExampleIsYoursOnce() {
         var s = m.on(4, items: [m.tile])
+        s.focusArea = m.home.id
+        s.focus[.week] = m.tile.id
         s.examplesOn = [4]
-        _ = s.apply(.exampleTapped("Gym on Tuesday"), m.env)
+        _ = s.apply(.exampleTapped("Call the tile shop on Monday"), m.env)
         let once = s
-        #expect(s.apply(.exampleTapped("Gym on Tuesday"), m.env).isEmpty)
+        #expect(s.apply(.exampleTapped("Call the tile shop on Monday"), m.env).isEmpty)
         #expect(s == once)
 
         // The same words on another day are another task.
-        var otherDay = m.on(4, items: [WalkItem(id: UUID(), level: .week, title: "gym", day: m.today)])
+        var otherDay = m.on(4, items: [m.tile, WalkItem(id: UUID(), level: .week, title: "call the tile shop", day: m.today)])
+        otherDay.focusArea = m.home.id
+        otherDay.focus[.week] = m.tile.id
         otherDay.examplesOn = [4]
-        _ = otherDay.apply(.exampleTapped("Gym on Tuesday"), m.env)
-        #expect(otherDay.items.count == 2)
+        _ = otherDay.apply(.exampleTapped("Call the tile shop on Monday"), m.env)
+        #expect(otherDay.items.count == 3)
 
         // Without case, and on Year too.
         var year = m.on(1, items: [WalkItem(id: UUID(), level: .year, title: "run a 5k")])
+        year.focusArea = m.health.id
         year.examplesOn = [1]
         #expect(year.apply(.exampleTapped("Run a 5K"), m.env).isEmpty)
         #expect(year.items.count == 1)
