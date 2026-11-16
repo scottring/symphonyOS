@@ -83,6 +83,7 @@ struct LightTodayView: View {
                 }
                 .offset(y: sheetDrop)
                 .allowsHitTesting(paper == nil)
+                .modifier(DailySheetEndsTyping())        // a tap on the sheet, or a scroll, puts the keyboard away (S41)
                 .accessibilityHidden(paper != nil)
                 if low != nil {
                     DailyWholePlanPaper(lookBack: $lookBack, paper: paper, size: size, navTop: m.navTop)

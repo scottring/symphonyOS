@@ -257,7 +257,7 @@ struct LightSpreadView: View {
         if states.contains("select"), let pick = DemoMode.weekChoice(rest) {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(600))
-                chosen = DailyWeekChoice(id: pick.row.id, day: pick.day)
+                chosen = DailyWeekChoice(id: pick.row.id, title: pick.row.title, day: pick.day)
             }
         }
     }

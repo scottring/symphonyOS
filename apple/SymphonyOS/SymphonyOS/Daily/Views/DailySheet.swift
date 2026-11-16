@@ -104,6 +104,24 @@ struct DailyPaperFade: View {
     }
 }
 
+/// The top edge of a light page's list (S58): paper fading to clear over 14 points, `DailyPaperFade`
+/// reversed, shown once the list has scrolled from rest (at rest it would veil the first row's top),
+/// so a row going under the header reads as scrolled rather than cut. It takes no touches.
+struct DailyListTopFade: View {
+    static let height: CGFloat = 14
+    static let space = "daily.list"
+    let shown: Bool
+
+    var body: some View {
+        LinearGradient(colors: [DailyPalette.paper, DailyPalette.paper.opacity(0)], startPoint: .top, endPoint: .bottom)
+            .frame(height: Self.height)
+            .opacity(shown ? 1 : 0)
+            .animation(.easeOut(duration: 0.15), value: shown)       // a fade, so the same with Reduce Motion
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Behind Today's or Week's lowered sheet (`DailyLookBack`), in place of the band: the walk's own
 /// Look back up over the whole window: one area read top to bottom, the others as side posts (F6). A
 /// side post stands in its area; a cloth opens its level's paper (F21); every other flag is read.
@@ -212,6 +230,20 @@ extension View {
     /// Reports the list's scroll view frame in the page's space to `frames`.
     func dailyListFrame(_ frames: DailyRowFrames) -> some View {
         onGeometryChange(for: CGRect.self) { $0.frame(in: .named(DailyRowFrames.space)) } action: { frames.setList($0) }
+    }
+
+    /// On a list's content: whether it has scrolled up from rest, read in its scroll view's own space
+    /// (named by `dailyListTopFade`).
+    func dailyListScrolled(_ scrolled: Binding<Bool>) -> some View {
+        onGeometryChange(for: Bool.self) { $0.frame(in: .named(DailyListTopFade.space)).minY < -0.5 } action: {
+            scrolled.wrappedValue = $0
+        }
+    }
+
+    /// On a list's scroll view: the paper fade at its top edge while it has scrolled (`DailyListTopFade`).
+    func dailyListTopFade(_ scrolled: Bool) -> some View {
+        coordinateSpace(.named(DailyListTopFade.space))
+            .overlay(alignment: .top) { DailyListTopFade(shown: scrolled) }
     }
 }
 #endif

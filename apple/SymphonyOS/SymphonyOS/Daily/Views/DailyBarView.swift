@@ -208,7 +208,8 @@ struct DailyBarView: View {
     // MARK: The line above the bar
 
     /// The one line slot: the listening line, or the note with Undo beside it. 44 high, centred
-    /// on the board's line, ending above More and Inbox.
+    /// on the board's line, ending above More and Inbox. On paper (not the night look) the line stands
+    /// on its own paper capsule (S57), so it never lies on a row's words scrolled under it.
     private func slot(_ slot: DailyBar.Slot) -> some View {
         HStack(spacing: 10) {
             switch slot {
@@ -236,6 +237,9 @@ struct DailyBarView: View {
             .shadow(color: lineIsNight && !night ? DailyPalette.navy.opacity(0.9) : .clear, radius: 3, x: 0, y: 1)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
+            .padding(.horizontal, lineIsNight ? 0 : 10)
+            .padding(.vertical, lineIsNight ? 0 : 4)
+            .background { if !lineIsNight { Capsule().fill(DailyPalette.paper.opacity(0.96)) } }
     }
 
     private var lineIsNight: Bool { lineNight ?? night }

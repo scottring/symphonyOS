@@ -119,11 +119,14 @@ struct DailyMetrics: Equatable {
     /// The handle's touch shape's width: the walk's capsule round "See my whole plan", its chevron and 20
     /// either side (`DailyMetricsTests.theHandlesWordsFitItsCapsule`).
     static let handleWidth: CGFloat = 188
-    /// How many lines a row's title may take: one, as the boards draw it, and three at the
-    /// accessibility text sizes, where the row grows in height to hold them.
-    static func titleLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 1 }
-    /// How many lines a quieter line may take (Week's fold, an event, a row's "for" line): one, and
-    /// two at the accessibility text sizes, so it wraps rather than cuts short.
+    /// How many lines a task's title may take (F28): two rather than cut at one, and three at the
+    /// accessibility text sizes. The row keeps the board's height as its least and grows to hold them.
+    static func titleLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 2 }
+    /// How many lines a task's "for …" line may take (F28: Today's rows, Week's tasks, the walk's
+    /// ending): two, and three at the accessibility text sizes.
+    static func forLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 2 }
+    /// How many lines a quieter line may take (Week's fold, an event): one, and two at the
+    /// accessibility text sizes, so it wraps rather than cuts short.
     static func quietLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 2 : 1 }
     /// A window under this height takes the short shape.
     static let shortHeight: CGFloat = 760
@@ -361,10 +364,20 @@ struct DailyMetrics: Equatable {
         let tilt: Double
     }
 
+    /// A band flag's cloth: `18 + 6` points a letter wide, at most this.
+    static let bandClothWidth: CGFloat = 156
+
+    /// How many lines a band flag's title takes (F28, S49): one where the cloth's estimate
+    /// (`18 + 6` a letter) is at most `bandClothWidth`, else two.
+    static func bandLines(_ title: String) -> Int {
+        18 + 6 * CGFloat(title.count) <= bandClothWidth ? 1 : 2
+    }
+
     /// Up to two month goals, planted by hand: poles at 0.244 and 0.741 of the width, feet
     /// near `navTop + 146` and `navTop + 136`, each moved up to ±6 by its goal's hand (two feet
     /// always at least `flagsApart` apart); each pole leans up to ±1.8° and its cloth tilts
-    /// 0.9…1.3° the other way. The same goals give the same frames on every call.
+    /// 0.9…1.3° the other way. A cloth is 32 high on one line and 48 on two (`bandLines`), its top
+    /// 10 above the pole's either way. The same goals give the same frames on every call.
     /// (`slots`: the spread's, over its left page, `spreadFlagSlots`.)
     static func bandFlags(_ goals: [Signpost.Named], width: CGFloat, navTop: CGFloat,
                           slots: [FlagSlot] = [FlagSlot(x: 0.244, foot: 146, length: 62),
@@ -384,8 +397,9 @@ struct DailyMetrics: Equatable {
         return picked.enumerated().map { i, goal in
             let slot = slots[i]
             let pole = CGRect(x: slot.x * width, y: feet[i] - slot.length, width: 3, height: slot.length)
-            let clothWidth = min(156, 18 + 6 * CGFloat(goal.title.count))
-            let cloth = CGRect(x: pole.midX - clothWidth / 2, y: pole.minY - 10, width: clothWidth, height: 32)
+            let clothWidth = min(bandClothWidth, 18 + 6 * CGFloat(goal.title.count))
+            let clothHeight: CGFloat = bandLines(goal.title) == 1 ? 32 : 48
+            let cloth = CGRect(x: pole.midX - clothWidth / 2, y: pole.minY - 10, width: clothWidth, height: clothHeight)
             let h = WalkFooting.hand(key(goal.id), "band.lean")
             let side: Double = h < 0 ? -1 : 1
             let lean = side * (0.4 + 1.4 * abs(h))

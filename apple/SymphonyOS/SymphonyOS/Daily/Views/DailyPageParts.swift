@@ -154,6 +154,8 @@ struct DailyTodayList: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Where the rows stand, so the row an Undo would change is kept clear of it.
     @State private var frames = DailyRowFrames()
+    /// The rows have scrolled from rest: the paper fades in at the list's top edge (S58).
+    @State private var scrolled = false
 
     private static let halo: CGFloat = 4
 
@@ -191,7 +193,9 @@ struct DailyTodayList: View {
                 .padding(.horizontal, inset)
                 .padding(.top, halo)
                 .padding(.bottom, frame.maxY - clearOf + halo)
+                .dailyListScrolled($scrolled)
             }
+            .dailyListTopFade(scrolled)
             .dailyListFrame(frames)
             .onChange(of: model.reveal) { _, reveal in
                 guard let reveal else { return }
@@ -211,7 +215,9 @@ struct DailyTodayList: View {
 
 /// The one quiet line at the top of light Today (`DailyGate.walkLine`): a walk left with Leave for
 /// now picks back up (Settings' "Pick the walk back up"); a walk declined at Welcome starts from the
-/// top. Drawn in `frame` (page points), 44 high.
+/// top. Drawn in `frame` (page points), 44 high, the whole frame its touch; its words stand on a
+/// capsule (S39), the sheet handle's own drawing (`SheetHandleCapsule`) with a chip's outline and an
+/// arrow, so it reads as a button: 36 high, its words plus 40 wide, centred.
 struct DailyWalkLine: View {
     let line: DailyGate.WalkLine
     let frame: CGRect
@@ -226,18 +232,44 @@ struct DailyWalkLine: View {
             case .whenReady: appState.walkReplayRequested = true    // from the top
             }
         } label: {
-            Text(words)
-                .font(DailyPalette.sansMedium(13, relativeTo: .subheadline))
-                .foregroundStyle(DailyPalette.deepGreen)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            SheetHandleCapsule(label: words, symbol: "arrow.right", outline: DailyPalette.chipLine)
                 .frame(width: frame.width, height: frame.height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .offset(x: frame.minX, y: frame.minY)
         .dynamicTypeSize(...DailyPalette.largestChrome)        // one line in a fixed frame
+        .accessibilityLabel(words)
         .accessibilityIdentifier("daily.walkWaiting")
+    }
+}
+
+/// A chosen thing's panel names it first (S45): its words in DM Sans SemiBold 15, ink, whole or up
+/// to `lines`. Week's Move to panel and the mountain pages' panel draw the same title.
+struct DailyPanelTitle: View {
+    let title: String
+    var lines: Int?
+
+    var body: some View {
+        Text(title)
+            .font(DailyPalette.sansSemiBold(15))
+            .foregroundStyle(DailyPalette.ink)
+            .lineLimit(lines)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// S41: on Today and Week a tap on the sheet outside the bar puts the keyboard away, and so does
+/// scrolling the list; the bar's draft stays (ruling D22 keeps typed words). The bar stands beside
+/// the sheet, never on it, so a tap there is the field's own.
+struct DailySheetEndsTyping: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .simultaneousGesture(TapGesture().onEnded {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            })
+            .scrollDismissesKeyboard(.immediately)
     }
 }
 

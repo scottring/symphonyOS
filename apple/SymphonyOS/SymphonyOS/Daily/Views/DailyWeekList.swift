@@ -1,9 +1,11 @@
 #if os(iOS)
 import SwiftUI
 
-/// The task chosen by a tap on its words, and the day it stands on (nil: Any day, or none).
+/// The task chosen by a tap on its words, its words (the Move to panel names it, S45), and the day
+/// it stands on (nil: Any day, or none).
 struct DailyWeekChoice: Equatable {
     let id: UUID
+    let title: String
     let day: Date?
 }
 
@@ -20,7 +22,8 @@ struct DailyWeekChoice: Equatable {
 
     func choose(_ row: DailyDay.Row, day: Date?) {
         withAnimation(fade) {
-            chosen.wrappedValue = chosen.wrappedValue?.id == row.id ? nil : DailyWeekChoice(id: row.id, day: day)
+            chosen.wrappedValue = chosen.wrappedValue?.id == row.id ? nil
+                : DailyWeekChoice(id: row.id, title: row.title, day: day)
         }
     }
 
@@ -88,6 +91,8 @@ struct DailyWeekList: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var frames = DailyRowFrames()
+    /// The list has scrolled from rest: the paper fades in at its top edge (S58).
+    @State private var scrolled = false
 
     /// The 4 points above the list leave room for a chosen card's halo.
     static let halo: CGFloat = 4
@@ -108,7 +113,9 @@ struct DailyWeekList: View {
                 .padding(.horizontal, inset)
                 .padding(.top, halo)
                 .padding(.bottom, frame.maxY - covered + halo)
+                .dailyListScrolled($scrolled)
             }
+            .dailyListTopFade(scrolled)
             .dailyListFrame(frames)
             .onChange(of: model.reveal) { _, reveal in
                 guard let reveal else { return }
@@ -299,6 +306,8 @@ struct DailyWeekList: View {
                         .frame(minHeight: 19)
                     if let goal = row.forGoal { lineage(goal) }
                 }
+                // A card of two-line words grows past the board's height and keeps this much above and below.
+                .padding(.vertical, 4)
                 .frame(maxWidth: .infinity, minHeight: DailyMetrics.minTouch, alignment: .leading)
                 .contentShape(Rectangle())
             }
@@ -342,7 +351,8 @@ struct DailyWeekList: View {
         .frame(width: 22, height: 22)
     }
 
-    /// "for" in the lineage ink, the goal's name in Crimson Pro green, after a small flag.
+    /// "for" in the lineage ink, the goal's name in Crimson Pro green, after a small flag beside its
+    /// first line; up to two lines (F28).
     private func lineage(_ goal: String) -> some View {
         var text = AttributedString(WalkCopy.forGoal(goal))
         text.font = DailyPalette.sans(12, relativeTo: .footnote)
@@ -351,19 +361,22 @@ struct DailyWeekList: View {
             text[range].font = DailyPalette.crimson(14, relativeTo: .footnote)
             text[range].foregroundColor = DailyPalette.green
         }
-        return HStack(spacing: 5) {
+        return HStack(alignment: .top, spacing: 5) {
             DailyFlag(colour: DailyPalette.lineageFlag, poleWidth: 1.4)
                 .frame(width: 9, height: 11)
+                .padding(.top, 3)
             Text(text)
-                .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
+                .lineLimit(DailyMetrics.forLines(accessibilitySize: typeSize.isAccessibilitySize))
                 .truncationMode(.tail)
         }
         .frame(minHeight: 15)
     }
 }
 
-/// The Move to panel over a week's list: "MOVE TO", a chip for each other day this week from today
-/// (`DailyWeek.chips`), then the walk's pull-up in rust. It stands in `frame` (page points), its foot
+/// The Move to panel over a week's list: the chosen task's words first (S45, as the mountain pages'
+/// panel names its goal), "MOVE TO", a chip for each other day this week from today
+/// (`DailyWeek.chips`), then the walk's pull-up in rust, read as removing that task. VoiceOver reads
+/// the panel by the task's words. It stands in `frame` (page points), its foot
 /// on the frame's foot (the top of the bar's line slot, so an Undo there stays in sight), growing up;
 /// its top is reported in `top` so the list keeps the chosen row clear of it.
 struct DailyMovePanel: View {
@@ -381,6 +394,8 @@ struct DailyMovePanel: View {
         let touches = DailyWeekTouches(model: model, chosen: $picked, reduceMotion: reduceMotion)
         return ZStack(alignment: .bottomLeading) {
             VStack(alignment: .leading, spacing: 8) {
+                DailyPanelTitle(title: chosen.title, lines: 2)
+                    .accessibilityHidden(true)                   // the panel's own label
                 Text(DailyCopy.moveTo.uppercased())
                     .font(DailyPalette.sansSemiBold(11))
                     .tracking(1.3)
@@ -395,7 +410,7 @@ struct DailyMovePanel: View {
                         }
                     }
                     chipButton(WalkCopy.pullUp, fill: DailyPalette.nextFill, line: DailyPalette.nextLine,
-                               ink: DailyPalette.rust, spoken: WalkCopy.pullUp) {
+                               ink: DailyPalette.rust, spoken: WalkCopy.removeLabel(chosen.title)) {
                         touches.pullUp(chosen.id)
                     }
                 }
@@ -410,6 +425,7 @@ struct DailyMovePanel: View {
             }
             .onDisappear { top = nil }
             .accessibilityElement(children: .contain)
+            .accessibilityLabel(chosen.title)
             .accessibilityIdentifier("daily.moveTo")
             .offset(x: frame.minX)
         }

@@ -269,18 +269,32 @@ struct WalkEndingSheet: View {
 
 /// The sheet's handle (S37), the walk's and the pages' alike: a capsule 36 high, its words in DM Sans
 /// SemiBold 14 and a chevron (up where a tap raises the sheet, down where it lowers it), 20 in from
-/// either end, on the walk's pale green. Only drawn: whoever shows it gives it its touch shape.
+/// either end, on the walk's pale green. Light Today's waiting walk line (S39) is the same capsule with
+/// an arrow and a 1-point outline. Only drawn: whoever shows it gives it its touch shape.
 struct SheetHandleCapsule: View {
     let label: String
-    /// A tap raises the sheet (chevron up); false: it lowers it (chevron down).
-    let raises: Bool
+    let symbol: String
+    /// A 1-point line round the capsule, or none (the handle).
+    var outline: Color?
+
+    /// The handle: a tap raises the sheet (chevron up); false: it lowers it (chevron down).
+    init(label: String, raises: Bool) {
+        self.init(label: label, symbol: raises ? "chevron.up" : "chevron.down", outline: nil)
+    }
+
+    init(label: String, symbol: String, outline: Color?) {
+        self.label = label
+        self.symbol = symbol
+        self.outline = outline
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             Text(label)
                 .font(.custom("DMSans-SemiBold", size: 14))
                 .lineLimit(1)
-            Image(systemName: raises ? "chevron.up" : "chevron.down")
+                .minimumScaleFactor(0.8)
+            Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
                 .accessibilityHidden(true)
         }
@@ -288,6 +302,7 @@ struct SheetHandleCapsule: View {
         .padding(.horizontal, 20)
         .frame(height: 36)
         .background(Capsule().fill(EndingPaper.walkFill))
+        .overlay { if let outline { Capsule().strokeBorder(outline, lineWidth: 1) } }
     }
 }
 
@@ -295,6 +310,8 @@ struct SheetHandleCapsule: View {
 struct WalkEndingRow: View {
     let row: WalkEnding.Row
     let toggle: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         HStack(spacing: 14) {
@@ -317,7 +334,7 @@ struct WalkEndingRow: View {
                     .lineLimit(2)
                 if let goal = row.forGoal {
                     Text(EndingPaper.named(WalkCopy.forGoal(goal), goal, base: EndingPaper.forInk, nameColour: EndingPaper.green))
-                        .lineLimit(1)
+                        .lineLimit(DailyMetrics.forLines(accessibilitySize: typeSize.isAccessibilitySize))
                 }
             }
             Spacer(minLength: 0)

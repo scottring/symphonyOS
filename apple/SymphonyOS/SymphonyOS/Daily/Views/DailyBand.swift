@@ -49,7 +49,8 @@ struct DailyBand: View {
 /// Week's band flags: up to two of this month's goals, each the person's own title on a small
 /// cloth on the walk's pole, standing as `DailyMetrics.bandFlags` plants them (never ruled: each
 /// pole leans about its foot, its cloth tilts the other way and rides on the pole's top). The cloth
-/// is 32 high; its touch shape is at least 44 × 44. A tap on one opens Month (`open`).
+/// is 32 high on one line and 48 on two (F28, S49: `DailyMetrics.bandLines`); its touch shape is at
+/// least 44 × 44. A tap on one opens Month (`open`).
 struct DailyBandFlags: View {
     let flags: [DailyMetrics.BandFlag]
     let open: () -> Void
@@ -76,7 +77,7 @@ struct DailyBandFlags: View {
             Text(flag.title)
                 .font(DailyPalette.sansMedium(12.5))
                 .foregroundStyle(.white)
-                .lineLimit(1)
+                .lineLimit(2)
                 .truncationMode(.tail)
                 .padding(.horizontal, 9)
                 .frame(width: flag.cloth.width, height: flag.cloth.height - 6)

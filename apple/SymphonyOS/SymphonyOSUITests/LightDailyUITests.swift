@@ -242,5 +242,45 @@ final class LightDailyUITests: XCTestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertGreaterThan(window.width, window.height, "the sign-in screen is still held upright: \(window.size)")
     }
+
+    // MARK: The cold read's small fixes (Task 13)
+
+    /// S41: with the field's keyboard up, a tap on the sheet clear of every row (the page's header)
+    /// puts the keyboard away, on Today and on Week. Nothing is typed: the field is only tapped.
+    @MainActor func testATapOnTheSheetPutsTheKeyboardAway() throws {
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10"])
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 60), "never reached Today")
+        let gone = NSPredicate(format: "count == 0")
+
+        func keyboardGoes(tapping header: XCUIElement, on page: String) {
+            let field = any["daily.bar.field"]
+            XCTAssertTrue(field.waitForExistence(timeout: 10), "\(page): no field")
+            field.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "\(page): the field took no keyboard")
+            XCTAssertTrue(header.waitForExistence(timeout: 5), "\(page): no header to tap")
+            header.tap()
+            XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: gone, evaluatedWith: app.keyboards)], timeout: 10),
+                           .completed, "\(page): the keyboard stayed up after a tap on the sheet")
+            XCTAssertEqual(app.keyboards.count, 0)
+        }
+
+        // Today: the ring, at the header's right.
+        keyboardGoes(tapping: any["daily.ring"], on: "Today")
+        any["daily.nav.week"].tap()
+        XCTAssertTrue(any["daily.week"].waitForExistence(timeout: 15), "Week did not open")
+        // Week: its header's range ("This week", 8–14 November on the pinned Tuesday).
+        keyboardGoes(tapping: app.staticTexts["8–14 November"], on: "Week")
+    }
+
+    /// S39: the waiting walk's line reads as a button and is one: hittable, at least 44 high.
+    @MainActor func testTheWaitingLineIsAButton() throws {
+        let (app, _) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailyState", "waiting"])
+        let line = app.buttons["daily.walkWaiting"]
+        XCTAssertTrue(line.waitForExistence(timeout: 60), "the waiting line is not a button")
+        XCTAssertTrue(line.isHittable, "the waiting line takes no tap")
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the waiting line is \(line.frame.height) high")
+        XCTAssertEqual(line.label, "Your walk is waiting. Pick it back up.")
+    }
 }
 #endif

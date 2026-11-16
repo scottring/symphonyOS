@@ -93,8 +93,10 @@ struct SignpostView: View {
         .contentShape(PlankShape(point: metrics.point))
     }
 
-    /// Eyebrow over title, one line each, shrinking to 0.75 before they cut. With no eyebrow
-    /// ("That’s the day." with nothing tomorrow) the title stands in the plank's middle.
+    /// The eyebrow on one line, shrinking to 0.75 before it cuts; under it the task's words on up to
+    /// two lines (F28, S48), shrinking to 0.7 so both stand inside the plank, 4 clear of its foot. With
+    /// no eyebrow ("That’s the day." with nothing tomorrow) the title stands in the plank's middle,
+    /// 4 clear of its top and its foot.
     @ViewBuilder private var words: some View {
         let width = metrics.plank.width - metrics.title.x - 6
         if let eyebrow = sign.eyebrow {
@@ -106,22 +108,22 @@ struct SignpostView: View {
                 .minimumScaleFactor(0.75)
                 .frame(width: width, alignment: .leading)
                 .offset(x: metrics.eyebrow.x, y: metrics.eyebrow.y)
-            title(width: width)
+            title(width: width, height: metrics.plank.height - metrics.title.y - 4, alignment: .topLeading)
                 .offset(x: metrics.title.x, y: metrics.title.y)
         } else {
-            title(width: width)
+            title(width: width, height: metrics.plank.height - 8, alignment: .leading)
                 .frame(height: metrics.plank.height)
                 .offset(x: metrics.title.x)
         }
     }
 
-    private func title(width: CGFloat) -> some View {
+    private func title(width: CGFloat, height: CGFloat, alignment: Alignment) -> some View {
         Text(sign.title)
             .font(DailyPalette.crimson(metrics.titleSize))
             .foregroundStyle(DailyPalette.plankInk)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(width: width, alignment: .leading)
+            .lineLimit(2)
+            .minimumScaleFactor(0.7)
+            .frame(width: width, height: height, alignment: alignment)
     }
 
     private var touch: some Gesture {

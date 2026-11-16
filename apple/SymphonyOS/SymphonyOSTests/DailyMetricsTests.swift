@@ -24,15 +24,18 @@ struct DailyMetricsTests {
     /// The handle's touch shape: 188 wide (the walk's capsule round "See my whole plan", a chevron and 20 either side).
     private let handle: CGFloat = 188
 
-    /// A row's title stands on one line, and wraps to three at the accessibility text sizes, where
-    /// the row grows to hold it (Today's rows, Week's tasks, the spread's).
-    @Test func aTitleWrapsToThreeLinesOnlyAtTheAccessibilitySizes() {
-        #expect(DailyMetrics.titleLines(accessibilitySize: false) == 1)
+    /// F28: a task's words take up to two lines rather than being cut at one (Today's rows, Week's
+    /// tasks, the spread's), and three at the accessibility text sizes; so does the "for …" line under
+    /// them (Today, Week, the walk's ending). The row keeps the board's height and grows to hold them.
+    @Test func aTaskTakesTwoLines() {
+        #expect(DailyMetrics.titleLines(accessibilitySize: false) == 2)
         #expect(DailyMetrics.titleLines(accessibilitySize: true) == 3)
+        #expect(DailyMetrics.forLines(accessibilitySize: false) == 2)
+        #expect(DailyMetrics.forLines(accessibilitySize: true) == 3)
     }
 
-    /// The quieter lines (Week's fold, an event, a row's "for" line) stand on one line, and wrap to
-    /// two at the accessibility text sizes rather than cut short.
+    /// The quieter lines (Week's fold, an event) stand on one line, and wrap to two at the
+    /// accessibility text sizes rather than cut short.
     @Test func aQuietLineWrapsToTwoOnlyAtTheAccessibilitySizes() {
         #expect(DailyMetrics.quietLines(accessibilitySize: false) == 1)
         #expect(DailyMetrics.quietLines(accessibilitySize: true) == 2)
@@ -549,6 +552,54 @@ struct DailyMetricsTests {
         let long = Signpost.Named(id: UUID(), title: String(repeating: "a", count: 40))
         #expect(DailyMetrics.bandFlags([long], width: 390, navTop: 44).first?.cloth.width == 156)
         #expect(DailyMetrics.bandFlags([], width: 390, navTop: 44).isEmpty)
+    }
+
+    /// F28 (S49): a month goal too long for one line on its cloth (18 + 6 points a letter past 156)
+    /// takes two: the cloth is 48 high instead of 32, as wide as before, its top where it was.
+    @Test func aLongBandFlagTakesTwoLines() {
+        let long = Signpost.Named(id: UUID(), title: "Pick the tile and pay the contractor")
+        let short = Signpost.Named(id: UUID(), title: "Find a good gym")       // 15 letters: 18 + 90 = 108
+        #expect(DailyMetrics.bandLines(long.title) == 2)
+        #expect(DailyMetrics.bandLines(short.title) == 1)
+        // 23 letters is 156 exactly, the widest one line; 24 is past it.
+        #expect(DailyMetrics.bandLines(String(repeating: "a", count: 23)) == 1)
+        #expect(DailyMetrics.bandLines(String(repeating: "a", count: 24)) == 2)
+        let flags = DailyMetrics.bandFlags([long, short], width: 390, navTop: 44)
+        #expect(flags[0].cloth.height == 48 && flags[0].cloth.width == 156)
+        #expect(flags[1].cloth.height == 32 && flags[1].cloth.width == 108)
+        for flag in flags { #expect(flag.cloth.minY == flag.pole.minY - 10) }
+    }
+
+    /// Two-line band flags still stand wholly above Week's sheet on the phone, the narrow phone, the
+    /// Duo's outside screen and the half window, at every top and foot inset, and above the spread's
+    /// sheet over its left page (where none is dropped for being two lines).
+    @Test func bandFlagsStayAboveTheSheet() {
+        let long = [Signpost.Named(id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
+                                   title: "Pick the tile and pay the contractor"),
+                    Signpost.Named(id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
+                                   title: "Find a gym that fits the mornings")]
+        let windows: [(CGSize, TodayLayout)] = [(CGSize(width: 393, height: 852), .oneColumn), (small, .oneColumn),
+                                                (outside, .glance), (CGSize(width: 484, height: 669), .oneColumn)]
+        var checked = 0
+        for (size, layout) in windows { for top: CGFloat in [0, 20, 22, 44, 59] { for bottom: CGFloat in [0, 21, 34] {
+            let shape = DailyMetrics.shape(for: layout, height: size.height, safeTop: top, safeBottom: bottom, waiting: false)
+            let m = DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom, shape: shape)
+            let flags = DailyMetrics.bandFlags(long, width: size.width, navTop: m.navTop)
+            #expect(flags.map(\.cloth.height) == [48, 48])
+            for flag in flags {
+                // Tilted by at most 1.3° about its middle, a corner moves down by half its width times sin(1.3°).
+                let tilt = flag.cloth.width / 2 * CGFloat(sin(1.3 * Double.pi / 180))
+                #expect(flag.cloth.maxY + tilt < m.sheetTop, "\(size) \(top)/\(bottom): \(flag.cloth) meets \(m.sheetTop)")
+                checked += 1
+            }
+        } } }
+        #expect(checked == 4 * 5 * 3 * 2)
+        for top: CGFloat in [0, 10, 24, 44] { for fold: CGFloat in [435, 445, 455] {
+            let sp = DailyMetrics.spread(size: CGSize(width: 890, height: 626), safeTop: top, safeBottom: 0, fold: fold)
+            let flags = DailyMetrics.spreadFlags(long, on: sp)
+            #expect(flags.count == 2, "spread, top \(top): a two-line flag was dropped")
+            for flag in flags { #expect(flag.cloth.height == 48 && flag.cloth.maxY <= sp.sheetTop) }
+        } }
     }
 
     // MARK: Half open ("Duo, half open": the laptop and the book boards)

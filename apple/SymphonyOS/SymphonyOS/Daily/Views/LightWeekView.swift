@@ -79,6 +79,7 @@ struct LightWeekView: View {
                 }
             }
             .allowsHitTesting(paper == nil)
+            .modifier(DailySheetEndsTyping())        // a tap on the sheet, or a scroll, puts the keyboard away (S41)
             .accessibilityHidden(paper != nil)
             if low != nil {
                 DailyWholePlanPaper(lookBack: $lookBack, paper: paper, size: size, navTop: m.navTop)
@@ -214,7 +215,7 @@ struct LightWeekView: View {
         if states.contains("select"), let pick = DemoMode.weekChoice(week) {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(600))
-                chosen = DailyWeekChoice(id: pick.row.id, day: pick.day)
+                chosen = DailyWeekChoice(id: pick.row.id, title: pick.row.title, day: pick.day)
             }
         }
     }

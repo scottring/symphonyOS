@@ -482,10 +482,7 @@ private struct MountainPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(panel.title)
-                .font(DailyPalette.sansSemiBold(15))
-                .foregroundStyle(DailyPalette.ink)
-                .fixedSize(horizontal: false, vertical: true)
+            DailyPanelTitle(title: panel.title)
                 .accessibilityHidden(true)                   // the panel's own label
             if showsLine, let line = panel.line {
                 Text(line)

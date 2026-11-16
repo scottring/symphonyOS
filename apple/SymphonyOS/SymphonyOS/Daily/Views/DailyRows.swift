@@ -32,6 +32,8 @@ struct DailyRow: View {
                         .frame(minHeight: 20)
                     if let goal = row.forGoal { lineage(goal) }
                 }
+                // A row of two-line words grows past the board's height and keeps this much above and below.
+                .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if row.first {
                     DailyFlag(colour: DailyPalette.firstFlag, poleWidth: 1.5)
@@ -80,13 +82,15 @@ struct DailyRow: View {
         .frame(width: 26, height: 26)
     }
 
-    /// "for" in the lineage ink, the goal's name in Crimson Pro green, after a small flag.
+    /// "for" in the lineage ink, the goal's name in Crimson Pro green, after a small flag beside its
+    /// first line; up to two lines (F28).
     private func lineage(_ goal: String) -> some View {
-        HStack(spacing: 5) {
+        HStack(alignment: .top, spacing: 5) {
             DailyFlag(colour: DailyPalette.lineageFlag, poleWidth: 1.4)
                 .frame(width: 10, height: 12)
+                .padding(.top, 3)
             Text(Self.forLine(goal))
-                .lineLimit(DailyMetrics.quietLines(accessibilitySize: typeSize.isAccessibilitySize))
+                .lineLimit(DailyMetrics.forLines(accessibilitySize: typeSize.isAccessibilitySize))
                 .truncationMode(.tail)
         }
         .frame(minHeight: 16)
