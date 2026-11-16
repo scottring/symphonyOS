@@ -3,6 +3,7 @@ import Foundation
 import CoreGraphics
 #if canImport(UIKit)
 import UIKit
+import CoreText
 #endif
 @testable import Symphony
 
@@ -912,8 +913,24 @@ struct WalkLayoutTests {
         #expect(near(WalkLayout.textWidth("No screens after ten", face: .flag), 127.985, 0.01))
         #expect(near(WalkLayout.textWidth("No screens after ten", face: .parent), 108.295, 0.01))
         #expect(near(WalkLayout.textWidth(WalkCopy.exampleTag, face: .tag), 131.306, 0.01))
-        #expect(WalkLayout.glyphWidth("é") == WalkLayout.glyphWidth("e") && WalkLayout.glyphWidth("好") == 1000)
-        #expect(WalkLayout.glyphWidths.count == 95)
+        #expect(WalkLayout.glyphWidth("é") == WalkLayout.glyphWidth("e") && WalkLayout.glyphWidth("e\u{0301}") == WalkLayout.glyphWidth("e"))
+        #expect(WalkLayout.glyphWidth("好") == 1400 && WalkLayout.glyphWidth("😀") == 1400 && WalkLayout.glyphWidth("Ĝ") == 1400)
+        #expect(WalkLayout.glyphWidth("ď") == 745 && WalkLayout.glyphWidth("ß") == 696)
+        #expect(WalkLayout.glyphWidths.count == 95 && WalkLayout.widerPairs.count == 55)
+        // The pairs the face sets further apart are counted: "t," is 421 + 227 and 30 between them.
+        #expect(near(WalkLayout.textWidth("t,", face: .flag), (421 + 227 + 30) * 13 / 1000, 0.0001))
+        #expect(near(WalkLayout.textWidth(",", face: .flag, after: "t"), (227 + 30) * 13 / 1000, 0.0001))
+        #expect(near(WalkLayout.textWidth("/É", face: .flag), (417 + 578 + 50) * 13 / 1000, 0.0001))            // as "/E"
+        #expect(near(WalkLayout.textWidth("t\u{00AD},", face: .flag), WalkLayout.textWidth("t,", face: .flag), 0.0001))
+        // What is drawn and counted has its words one space apart: no run of spaces, tab or line break.
+        #expect(WalkLayout.drawnTitle("  Call  Mum\tabout\nSunday lunch ", width: 150) == "Call Mum about Sunday lunch")
+        #expect(WalkLayout.lines(for: "  Call  Mum\tabout\nSunday lunch ", width: 150) == WalkLayout.lines(for: "Call Mum about Sunday lunch", width: 150))
+        let odd = flag(.year, "  Call  Mum\tabout\nSunday lunch ", in: "Home")
+        let cloth = ruled(state(1, kept: ["Home"], items: [odd], standing: "Home")).banner(for: odd)!
+        #expect(cloth.text == "Call Mum about Sunday lunch" && cloth.lines == 2 && cloth.label.contains(odd.title))
+        // Chinese and emoji: a line may end between any two; no soft hyphen is put among them.
+        #expect(!WalkLayout.drawnTitle("每天早上散步三十分钟然后做拉伸运动", width: 150).contains("\u{00AD}"))
+        #expect(WalkLayout.lines(for: "每天早上散步三十分钟然后做拉伸运动", width: 150) == 3)                    // 17 at 18.2 a character: 7 a line
         for title in Generated.titles {
             #expect(WalkLayout.lines(for: title, width: 226.5) <= WalkLayout.lines(for: title, width: 150))
         }
@@ -949,8 +966,69 @@ struct WalkLayoutTests {
         out += ["Feel strong again", "Finish the bathroom", "More slow weekends together", "Bathroom done by February",
                 "Lift twice a week", "Pick the tile and pay the deposit", "Send the contractor the deposit", "Choose the tile"]
         out += Generated.titles
+        out += oddTitles
         var seen = Set<String>()
         return out.filter { seen.insert($0).inserted }
+    }
+
+    /// Titles a person can make that the plans do not hold: runs of spaces, spaces at the ends, a tab
+    /// and a newline; accented capitals; letters with no plain letter under them; another script whose
+    /// letters do not break (Greek), one that breaks anywhere (Chinese), and emoji.
+    static let oddTitles = [
+        "Call  Mum about   Sunday lunch", "  Tile the bathroom wall  ", "Call Mum\tabout Sunday\nlunch at one",
+        "École d’été: finir le dossier Ödland", "Zamówić bilety do Łodzi, groß und Straße",
+        "Διαβάζω περισσότερα βιβλία φέτος", "每天早上散步三十分钟，然后做拉伸运动",
+        "Run a 5K 🏃 then coffee ☕️ with Sam 😀 and the kids 👨‍👩‍👧",
+    ]
+
+    /// One line of text as the text system sets it: its width, with any tracking.
+    private static func setWidth(_ text: String, font: UIFont, kern: CGFloat = 0) -> CGFloat {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font, .kern: kern]))
+        return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    }
+
+    /// The height of each line fragment the text system makes of a string at a width.
+    @MainActor private static func lineHeights(_ text: String, font: UIFont, width: CGFloat) -> [CGFloat] {
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+        var heights: [CGFloat] = []
+        manager.enumerateLineFragments(forGlyphRange: manager.glyphRange(for: container)) { rect, _, _, _, _ in heights.append(rect.height) }
+        return heights
+    }
+
+    /// The promise behind every count, made structural: no two characters are ever set wider than
+    /// they are counted. Every ordered pair of the characters the layout knows (the face's own table,
+    /// the extra marks and letters, and every accented Latin letter it counts as its letter), set by
+    /// the bundled face at each cloth's size and tracking, is no wider than `textWidth` says; so is
+    /// each character alone. (The face draws some pairs further apart than their widths, its
+    /// positive kerning: `t,`, `/B`, `r2`, `vf`. Those are counted; pairs it draws closer are not.)
+    @Test @MainActor func noPairIsSetWiderThanItIsCounted() throws {
+        var characters: [Character] = (32...126).map { Character(UnicodeScalar($0)!) }
+        characters += WalkLayout.otherGlyphWidths.keys.sorted()
+        characters += (0xC0...0x17F).compactMap { UnicodeScalar($0) }.filter { $0.properties.isAlphabetic }.map { Character($0) }
+            .filter { !WalkLayout.otherGlyphWidths.keys.contains($0) }
+        #expect(characters.count >= 95 + 8 + 150)
+        var wider: [String] = []
+        var pairs = 0
+        for face in [WalkLayout.Face.flag, .parent, .lookBack, .tag] {
+            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size), "the bundled face is not there")
+            for a in characters {
+                let alone = String(a)
+                if Self.setWidth(alone, font: font, kern: face.tracking) > WalkLayout.textWidth(alone, face: face) + 0.001 { wider.append("\(face) “\(alone)”") }
+                for b in characters {
+                    let pair = String([a, b])
+                    let set = Self.setWidth(pair, font: font, kern: face.tracking), counted = WalkLayout.textWidth(pair, face: face)
+                    if set > counted + 0.001 { wider.append("\(face) “\(pair)” set \(set), counted \(counted)") }
+                    pairs += 1
+                }
+            }
+        }
+        #expect(wider.isEmpty, "\(wider.count) set wider than counted: \(wider.prefix(12))")
+        print("The pairs: \(characters.count) characters, \(pairs) ordered pairs over four faces; set wider than counted: \(wider.count)")
     }
 
     /// The titles the count gives a line more than the face sets them on, by cloth: a blank band, never
@@ -960,17 +1038,19 @@ struct WalkLayoutTests {
 
     /// F33: the lines the layout counts are the lines the bundled face really sets, on every cloth
     /// (a flag at 13 pt, the goal above at 11, a Look back up cloth at 12; a phone, the outside screen
-    /// and the half window). Never fewer (that would cut a title); and for this corpus never more (a
-    /// blank band in the cloth), but for `blankBands`. And no string is counted narrower than it is set.
+    /// and the half window). Never fewer (that would cut a title), for the plans' titles and for the
+    /// odd ones (`oddTitles`: other scripts and emoji are counted wide, so they may get a line more);
+    /// and for the plans' titles never more (a blank band in the cloth), but for `blankBands`. No
+    /// string is counted narrower than it is set, and what is drawn has no odd spaces left in it.
     @Test @MainActor func theLinesAreTheRealFaces() throws {
         let corpus = Self.corpus
-        #expect(corpus.count > 120 && corpus.contains { $0.count == 200 })
+        #expect(corpus.count > 130 && corpus.contains { $0.count == 200 } && Self.oddTitles.allSatisfy(corpus.contains))
         var cloths: [(face: WalkLayout.Face, width: CGFloat)] = [(.lookBack, 150)]
         for wing: CGFloat in [0, 42.3, 110.3] {
             cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.parent, WalkLayout.parentWidth(wing: wing))]
         }
         var short: [String] = [], narrow: [String] = [], bands = Set<String>()
-        var checked = 0, twoOrMore = 0
+        var checked = 0, twoOrMore = 0, cautious = 0
         for (face, width) in cloths {
             let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size), "the bundled face is not there")
             for title in corpus {
@@ -978,10 +1058,16 @@ struct WalkLayoutTests {
                 let real = min(3, Self.realLines(drawn, font: font, width: width - face.inset))
                 let counted = WalkLayout.lines(for: title, width: width, face: face)
                 if counted < real { short.append("\(face) \(width): “\(title.prefix(50))” counted \(counted), set on \(real)") }
-                if counted > real { bands.insert("\(face) at \(Int(width)): \(title)") }
-                let across = (title as NSString).size(withAttributes: [.font: font]).width
-                if WalkLayout.textWidth(title, face: face) < across - 0.01 {
-                    narrow.append("\(face): “\(title.prefix(50))” counted \(WalkLayout.textWidth(title, face: face)), set \(across)")
+                if counted > real { if Self.oddTitles.contains(title) { cautious += 1 } else { bands.insert("\(face) at \(Int(width)): \(title)") } }
+                // What the cloth draws, on one line: never set wider than counted, whatever face the
+                // system sets it in (another script and an emoji are not the bundled face's).
+                let plain = drawn.replacingOccurrences(of: "\u{00AD}", with: "")
+                let across = Self.setWidth(plain, font: font)
+                if WalkLayout.textWidth(plain, face: face) < across - 0.01 {
+                    narrow.append("\(face): “\(plain.prefix(50))” counted \(WalkLayout.textWidth(plain, face: face)), set \(across)")
+                }
+                if drawn.contains("  ") || drawn.hasPrefix(" ") || drawn.hasSuffix(" ") || drawn.contains("\t") || drawn.contains("\n") {
+                    narrow.append("\(face): “\(title.prefix(50))” is drawn with its odd spaces")
                 }
                 checked += 1
                 if real > 1 { twoOrMore += 1 }
@@ -991,7 +1077,7 @@ struct WalkLayoutTests {
         #expect(narrow.isEmpty, "counted narrower than the face sets them: \(narrow.prefix(5))")
         #expect(bands == Self.blankBands, "a line more than the face needs: \(bands.sorted())")
         #expect(checked > 800 && twoOrMore > 200)
-        print("The faces: \(corpus.count) titles on \(cloths.count) cloths, \(checked) counts, \(twoOrMore) of them on two lines or more; a line more on \(bands.count)")
+        print("The faces: \(corpus.count) titles on \(cloths.count) cloths, \(checked) counts, \(twoOrMore) of them on two lines or more; a line more on \(bands.count), and on \(cautious) of the odd titles' \(Self.oddTitles.count * cloths.count)")
         // The tag line: no tag is wider than counted, and each fits the line of the cloth it is given.
         let tagFont = try #require(UIFont(name: "DMSans-SemiBold", size: WalkLayout.Face.tag.size))
         let days = (0..<9).map { WalkWords.tag(for: PlanCalendar.calendar.date(byAdding: .day, value: $0, to: today)!, today: today) }
@@ -1005,6 +1091,15 @@ struct WalkLayoutTests {
             let across = (tag as NSString).size(withAttributes: [.font: tagFont, .kern: WalkLayout.Face.tag.tracking]).width
             #expect(across <= width - WalkLayout.Face.tag.inset, "\(tag) at \(width): \(across)")
         }
+        // How tall a line really is. The face's own line is under the 17 a flag gives it. A line that
+        // holds Chinese or an emoji is set in the system's face and comes out taller than 17: the
+        // cloth's height does not allow for that (reported; not patched here).
+        let flagFont = try #require(UIFont(name: "DMSans-SemiBold", size: 13))
+        let own = Self.lineHeights("Call Mum about Sunday lunch", font: flagFont, width: 134)
+        let chinese = Self.lineHeights("每天早上散步三十分钟", font: flagFont, width: 134)
+        let emoji = Self.lineHeights("Run a 5K 🏃 then coffee", font: flagFont, width: 134)
+        #expect(own.count == 2 && own.allSatisfy { $0 <= WalkLayout.flagLine })
+        print("Line heights at 13 pt: the face \(own), Chinese \(chinese), with an emoji \(emoji); widths: 好 \(Self.setWidth("好", font: flagFont)), 😀 \(Self.setWidth("😀", font: flagFont)), at 11 pt 😀 \(Self.setWidth("😀", font: tagFont))")
     }
     #endif
 
