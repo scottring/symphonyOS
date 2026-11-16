@@ -11,7 +11,9 @@ struct WalkLabelView: View {
     var veiled = false
 
     /// The mark over a ground chip (10 × 7), and a line of the name (the pill is 23 on one line, 37 on two).
-    static let markHeight: CGFloat = 7, nameLine: CGFloat = 14
+    /// A line's height is read outside the view too (`WalkClothFace.lineHeight`), so it belongs to no actor.
+    static let markHeight: CGFloat = 7
+    nonisolated static let nameLine: CGFloat = 14
 
     var body: some View {
         if label.ground {

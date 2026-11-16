@@ -1314,13 +1314,14 @@ struct WalkPlantTests {
     }
 
     /// The why line offers the switch exactly when the goal above takes a tap: it counts the round
-    /// (`nextGoalAbove`), the nameless post's first thing included, not only the goals here.
+    /// (`nextGoalAbove`), the nameless post's first thing included, not only the goals here. On Today it
+    /// names the task above, which stands here (`WalkLayout.goalAboveCloth`).
     @Test func theWhyLineCountsTheRound() throws {
         let s = try seed("a loose task on the nameless post, marked")
-        #expect(s.parentsHere().count == 1 && s.nextGoalAbove() != nil)
-        #expect(WalkCopy.why(s, m.env.periods).hasSuffix(WalkCopy.focusAbove))
+        #expect(s.parentsHere().count == 1 && s.nextGoalAbove() != nil && WalkLayout.goalAboveCloth(s) != nil)
+        #expect(WalkCopy.why(s, m.env.periods).hasSuffix(WalkCopy.focusAboveTask))
         let alone = try seed("one area, one task")
-        #expect(alone.nextGoalAbove() == nil && !WalkCopy.why(alone, m.env.periods).hasSuffix(WalkCopy.focusAbove))
+        #expect(alone.nextGoalAbove() == nil && !WalkCopy.why(alone, m.env.periods).hasSuffix(WalkCopy.focusAboveTask))
     }
 
     @Test func moveToOffersOnlyKeptAreas() {

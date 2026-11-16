@@ -111,6 +111,40 @@ struct WalkCopyTests {
         #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAbove)
     }
 
+    /// F3 on Today's step (the final review's F3): the why line, which VoiceOver reads as it stands, offers
+    /// the switch only while a cloth stands above the first thing, and calls it a task ("goal" is kept for
+    /// Year, Season and Month). A first thing that is itself the goal above is drawn once, as the first
+    /// thing, with nothing above it: then the line says nothing about switching, though a tap on it still
+    /// goes round.
+    @Test func todaysWhyLineNamesTheTaskAboveOnlyWhenOneStandsThere() {
+        let p = nov13
+        let work = WalkArea(id: UUID(), name: "Work")
+        let call = WalkItem(id: UUID(), level: .week, title: "Call the first three leads", areaId: work.id)
+        let write = WalkItem(id: UUID(), level: .week, title: "Write the proposal intro", areaId: work.id)
+        var s = state(step: 5)
+        s.areas = [work]; s.kept = [work.id]; s.focusArea = work.id
+        s.items = [call, write]
+        let base = "Just one. The rest of today can wait its turn."
+        #expect(WalkCopy.focusAboveTask == " Tap the task above to switch.")
+        // No first thing yet: the task the question asks about stands above, and a tap switches.
+        s.focus[.today] = call.id
+        #expect(WalkLayout.goalAboveCloth(s) == call && s.nextGoalAbove() == write.id)
+        #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAboveTask)
+        // The first thing is the goal above: no cloth above it, so nothing about switching.
+        s.firstThing = call.id
+        #expect(WalkLayout.goalAboveCloth(s) == nil && s.nextGoalAbove() == write.id)
+        #expect(WalkCopy.why(s, p) == base)
+        #expect(!WalkLayout.words(s, p, wing: 0).why.joined(separator: " ").contains("switch"))
+        // Another task above the first thing: the line names the task above.
+        s.focus[.today] = write.id
+        #expect(WalkLayout.goalAboveCloth(s) == write)
+        #expect(WalkCopy.why(s, p) == base + WalkCopy.focusAboveTask)
+        #expect(!WalkCopy.why(s, p).contains("goal"))
+        // One task, nowhere to switch to.
+        s.items = [call]; s.firstThing = nil; s.focus[.today] = call.id
+        #expect(WalkCopy.why(s, p) == base)
+    }
+
     /// F27: the examples answer the question asked, for the area stood in and the step's level.
     @Test func theExamples() {
         #expect(WalkCopy.examples(.year, area: "Home") == ["Finish the bathroom", "Clear out the garage", "Grow a kitchen garden"])

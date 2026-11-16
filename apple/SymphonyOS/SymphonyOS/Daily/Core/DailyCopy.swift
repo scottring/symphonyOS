@@ -106,17 +106,22 @@ enum DailyCopy {
     /// The line over a mountain page's foot, the same on Year, Season and Month, the first that applies:
     /// with no goal on the page's level how to begin (S22); on a goal above with nothing under it, the
     /// sign's own words for it (`emptyStop`, P48); while the goal above is one of several, that a tap on it
-    /// switches (the walk's own words, Task 10); while other areas stand at the side, that a post walks
-    /// there; else what a flag does.
-    static func hint(_ level: WalkLevel, sides: Bool, empty: Bool, emptyStop: String? = nil, switches: Bool = false) -> String {
+    /// switches (the walk's own words, Task 10; `looseStop`: standing on the stop for the goals under none,
+    /// which the walk names, D4); while other areas stand at the side, that a post walks there; else what
+    /// a flag does. (While a goal is chosen the page gives no hint: `MountainPage.hint`.)
+    static func hint(_ level: WalkLevel, sides: Bool, empty: Bool, emptyStop: String? = nil, switches: Bool = false,
+                     looseStop: Bool = false) -> String {
         if empty { return emptyMountain }
         if let emptyStop { return emptyStop }
-        if switches { return switchGoalAbove }
+        if switches { return looseStop ? switchLooseStop : switchGoalAbove }
         return sides ? "Tap a post to walk to that area" : "Tap a flag to move it or walk it down"
     }
     static let emptyMountain = "Add your first goal with the bar below"
     /// While the goal above shown is one of several on a Season or Month page.
     static let switchGoalAbove = "Tap the goal above to switch"
+    /// The same while the page stands on the stop for the goals under none of the area's goals above, in
+    /// the walk's own words for that stop (Task 10, D4).
+    static let switchLooseStop = WalkCopy.switchToLooseStop
 
     /// A Season or Month page standing on a goal above with nothing under it (P48): the sign's own words,
     /// with the page's season ("No fall goal under this yet") or month ("No November goal under this yet").

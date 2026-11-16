@@ -918,8 +918,14 @@ struct WalkLayoutTests {
     /// are still by estimate: `WalkLayout.chipChar`, a known gap.)
     @Test @MainActor func aNamesLinesFitThePillTheyAreDrawnIn() throws {
         let pillFont = try #require(UIFont(name: "DMSans-SemiBold", size: 11))
-        let sideFont = try #require(UIFont(name: "DMSans-SemiBold", size: 9.5))
-        let names = WalkClassifier.defaults + [longName, "Money and the mortgage", "WWW MMM", "Mum’s workshop", "Wellbeing"]
+        // A side pill is set at 9.5 or at 7.6 (P53): each line is measured in the face the layout chose for it.
+        var sideFonts: [WalkLayout.Face: UIFont] = [:]
+        for face in [WalkLayout.Face.sidePill, .sidePillSmall] {
+            sideFonts[face] = try #require(UIFont(name: "DMSans-SemiBold", size: face.size))
+        }
+        var smallSeen = false
+        let names = WalkClassifier.defaults + [longName, "Money and the mortgage", "WWW MMM", "Mum’s workshop", "Wellbeing",
+                                               "Garden", "Learning", "Reading", "Friends", "Finances"]
         let areas = names.enumerated().map { WalkArea(id: uid(5000 + $0.offset), name: $0.element) }
         var off: [String] = [], cut: [String] = []
         for wing: CGFloat in [0, 42.3, 110.3] {
@@ -933,14 +939,17 @@ struct WalkLayoutTests {
                 if pill.words.last?.hasSuffix("…") == true { cut.append("pill \(a.name)") }
                 for side in layout.sides {
                     guard let frame = side.pill else { continue }
-                    let words = side.pillWords
-                    if Self.setWidth(words, font: sideFont, tracking: 1) > frame.width - WalkLayout.sidePillInset + 0.01 {
-                        off.append("wing \(wing) side \(side.name): “\(words)” in \(frame.width)")
+                    let words = side.pillWords, face = side.pillFace
+                    let sideFont = try #require(sideFonts[face], "a side pill set in \(face)")
+                    if face == .sidePillSmall { smallSeen = true }
+                    if Self.setWidth(words, font: sideFont, tracking: face.tracking) > frame.width - WalkLayout.sidePillInset + 0.01 {
+                        off.append("wing \(wing) side \(side.name) at \(face.size): “\(words)” in \(frame.width)")
                     }
                 }
             }
         }
         #expect(off.isEmpty, "\(off.count) lines set wider than their pill: \(off.prefix(10))")
+        #expect(smallSeen, "no side pill here is set at the small size, so it was not measured")
         // On its own post every one of these names stands whole: two lines hold them all.
         #expect(cut.isEmpty, "cut on the standing pill: \(cut)")
         #expect(WalkLayout.pillLines(for: longName, width: 126) == ["SIDE PROJECTS", "AND MAKING"])
@@ -1144,7 +1153,7 @@ struct WalkLayoutTests {
         #expect(characters.count >= 95 + 8 + 150)
         var wider: [String] = []
         var pairs = 0
-        for face in [WalkLayout.Face.flag, .parent, .lookBack, .tag, .pill, .sidePill] {
+        for face in [WalkLayout.Face.flag, .parent, .lookBack, .tag, .pill, .sidePill, .sidePillSmall] {
             let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size), "the bundled face is not there")
             for a in characters {
                 let alone = String(a)
@@ -1158,7 +1167,7 @@ struct WalkLayoutTests {
             }
         }
         #expect(wider.isEmpty, "\(wider.count) set wider than counted: \(wider.prefix(12))")
-        print("The pairs: \(characters.count) characters, \(pairs) ordered pairs over six faces; set wider than counted: \(wider.count)")
+        print("The pairs: \(characters.count) characters, \(pairs) ordered pairs over seven faces; set wider than counted: \(wider.count)")
     }
 
     /// Every tag (the example's two, FIRST THING, nine day tags) is no wider than counted and fits the line
@@ -1335,6 +1344,7 @@ struct WalkLayoutTests {
             #expect(WalkLayout.parentWidth(wing: wing) - WalkLayout.Face.parent.inset >= least(.parent))
             #expect(WalkLayout.standingWidth(wing: wing) - WalkLayout.Face.lookBack.inset >= least(.lookBack))
             #expect(WalkLayout.sidePill(wing: wing) - WalkLayout.sidePillInset >= least(.sidePill))
+            #expect(WalkLayout.sidePill(wing: wing) - WalkLayout.sidePillInset >= least(.sidePillSmall))
             #expect(WalkLayout.pillLeast - WalkLayout.pillInset >= least(.pill))
         }
     }
@@ -1505,17 +1515,16 @@ struct WalkLayoutTests {
     /// (The block counted these lines before F39 too; the text system then drew one line fewer.)
     static let questionsOtherwise: Set<String> = [
         "28.0 at 334.0: For “Clear out the old vanity”, what happens this week? (3, the system 2)",
+        "28.0 at 334.0: For “Open a savings account”, what happens this week? (3, the system 2)",
         "28.0 at 334.0: What part of “In bed by eleven” belongs to December? (3, the system 2)",
         "28.0 at 334.0: You’ll start the day with “Text the Okafors about Friday”. (3, the system 2)",
         "28.0 at 418.6: What part of “Find the old retirement account” belongs to December? (3, the system 2)",
         "28.0 at 418.6: What’s the first thing you’ll do today? (2, the system 1)",
         "28.0 at 419.6: What part of “Find the old retirement account” belongs to December? (3, the system 2)",
         "28.0 at 419.6: What’s the first thing you’ll do today? (2, the system 1)",
-        "28.0 at 500.0: Start the day with “Cancel the film channel”? (2, the system 1)",
         "32.0 at 334.0: For “No screens after ten”, what happens this week? (3, the system 2)",
-        "32.0 at 334.0: Start the day with “Cancel the film channel”? (3, the system 2)",
+        "32.0 at 334.0: Start the day with “Cancel the movie channel”? (3, the system 2)",
         "32.0 at 334.0: You’ll start the day with “Call the first three leads”. (3, the system 2)",
-        "32.0 at 334.0: You’ll start the day with “Cancel the film channel”. (3, the system 2)",
         "32.0 at 418.6: What part of “Bathroom done by February” belongs to December? (3, the system 2)",
         "32.0 at 419.6: You’ll start the day with “Choose between the two grey floor tiles”. (3, the system 2)",
     ]
@@ -2165,6 +2174,67 @@ struct WalkLayoutTests {
             #expect(Invariants.check(layout, s.settled, wing: wing, touch: wing == 0 ? 44 : 55.7).isEmpty)
             // The high row: its pill ends 1 above the pole of the post under it.
             #expect(near(layout.sides[0].poleTop - pills[2].maxY, 1, 0.01) && near(layout.sides[1].poleTop - pills[3].maxY, 1, 0.01))
+        }
+    }
+
+    /// Every side post of Year with these areas kept, standing in each in turn, on every window.
+    private static func sidePosts(_ names: [String], base: Int) -> [(wing: CGFloat, side: WalkLayout.Side)] {
+        let areas = names.enumerated().map { WalkArea(id: uid(base + $0.offset), name: $0.element) }
+        var out: [(wing: CGFloat, side: WalkLayout.Side)] = []
+        for wing in wings {
+            for a in areas {
+                var s = WalkState(); s.areas = areas; s.kept = areas.map(\.id); s.step = 1; s.focusArea = a.id
+                out += ruled(s.settled, wing: wing).sides.filter { $0.pill != nil }.map { (wing, $0) }
+            }
+        }
+        return out
+    }
+
+    /// The ridges the side pills are measured on: the six built-in areas with one of the person's own (each of
+    /// these, first and last), this file's eight (the 24-character name among them), and eight wide names.
+    private static let pillRidges: [[String]] = {
+        let own = ["Garden", "Learning", "Reading", "Friends", "Finances", "Family", "Travel", "Studio", "Wellbeing"]
+        return own.flatMap { [WalkClassifier.defaults + [$0], [$0] + WalkClassifier.defaults] } + [names]
+            + [["Health", "People", "Garden", "Family", "Travel", "Friends", "Reading", "Studio"]]
+    }()
+
+    /// Ruling P53: a side pill's name is set by the layout at 9.5, or at 7.6 where the whole name does not
+    /// fit its pill at 9.5, and drawn at that size unscaled. On every window each of these names of eight
+    /// letters or fewer stands whole (Task 10's whole-word cut turned GARDEN into "GARD…").
+    @Test func aShortNameIsWholeOnItsSidePill() {
+        var cut: [String] = [], small: Set<String> = []
+        for (n, ridge) in Self.pillRidges.enumerated() {
+            for (wing, side) in Self.sidePosts(ridge, base: 6000 + 100 * n) where side.name.count <= 8 {
+                if side.pillWords != side.name.uppercased() { cut.append("wing \(wing): \(side.name) as “\(side.pillWords)”") }
+                if side.pillFace == .sidePillSmall { small.insert(side.name) }
+            }
+        }
+        #expect(cut.isEmpty, "\(cut.count) short names cut: \(Array(Set(cut)).sorted().prefix(12))")
+        // The small size only where 9.5 does not hold the name: GARDEN does not fit a phone's 58 at 9.5; HOME does.
+        #expect(small.contains("Garden") && small.contains("Learning") && !small.contains("Home"), "\(small.sorted())")
+        #expect(WalkLayout.sidePillSet(for: "Home", width: 44) == (.sidePill, "HOME"))
+        #expect(WalkLayout.sidePillSet(for: "Garden", width: 44) == (.sidePillSmall, "GARDEN"))
+    }
+
+    /// Ruling P53: a name that fits its side pill at neither size is set at 7.6 and cut so it fills its room
+    /// by letters after its last whole word, never a bare first word with room to spare ("SIDE…", Task 10).
+    @Test func aLongNameFillsItsSidePill() {
+        var checked = 0
+        for (wing, side) in Self.sidePosts(names, base: 7000) where side.name == longName {
+            let room = side.pill!.width - WalkLayout.sidePillInset
+            let used = WalkLayout.textWidth(side.pillWords, face: side.pillFace)
+            #expect(side.pillFace == .sidePillSmall && side.pillWords.hasSuffix("…"), "wing \(wing): “\(side.pillWords)”")
+            #expect(side.pillWords.count > "SIDE…".count, "wing \(wing): a bare first word, “\(side.pillWords)”")
+            #expect(used >= 0.85 * room && used <= room + 0.01,
+                    "wing \(wing): “\(side.pillWords)” uses \(used) of \(room) (\(Int(100 * used / room))%)")
+            checked += 1
+        }
+        #expect(checked >= wings.count)
+        #expect(WalkLayout.sidePillSet(for: longName, width: 44) == (.sidePillSmall, "SIDE PRO…"))
+        // For the record: the fill on the phone's three side-pill rooms (alone 44; beside a 56 pill 43; beside a 58 pill 42).
+        for room: CGFloat in [42, 43, 44] {
+            let set = WalkLayout.sidePillSet(for: longName, width: room)
+            print("Side pill room \(room): “\(set.line)” uses \(WalkLayout.textWidth(set.line, face: set.face))")
         }
     }
 

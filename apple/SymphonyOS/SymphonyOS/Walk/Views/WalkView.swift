@@ -73,8 +73,9 @@ struct WalkView: View {
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: model.art.stage, left: left, right: right)
             ZStack(alignment: .topLeading) {
-                // VoiceOver reads the top row, the scene (the words, then the peaks and flags), then the
-                // light, then the hint row.
+                // VoiceOver reads, by these priorities: the top row (3), the scene (2: the words, then the peaks
+                // and flags), the hint row's hint, Undo pill or Move row (1.5, `WalkHintRow.aboveTheLightPriority`),
+                // the light (1), then Next (unprioritised, in the hint row).
                 ZStack(alignment: .topLeading) {
                     WalkSceneView(model: model)
                         // Under the raised sheet the mountain is covered: it takes no touch, and VoiceOver skips it too.

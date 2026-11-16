@@ -173,6 +173,15 @@ struct DailyMetrics: Equatable {
     /// Where the top shade has faded to clear.
     var shade: CGFloat { shadeSolid + Self.shadeFade }
 
+    /// Behind Today's and Week's lowered sheet ("See my whole plan") the top shade stands under the whole
+    /// plan's posts, as the walk's own band does, not over them: over them it dimmed the standing pill and
+    /// its caret (y 110 on the board, inside the shade's fade) to grey, where the walk's Look back up draws
+    /// them gold (the final review's F1). The same shade (`shadeSolid`, `shade`) in the whole plan's stage
+    /// points, measured from the window's top: where it stops being full strength and where it has faded out.
+    func wholePlanShade(stage: WalkStage) -> (solid: CGFloat, length: CGFloat) {
+        (shadeSolid / stage.scale, shade / stage.scale)
+    }
+
     // MARK: Today
 
     /// Today's board stretched to the window. Three rows always end above the fade: where the

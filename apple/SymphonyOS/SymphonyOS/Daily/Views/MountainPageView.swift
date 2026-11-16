@@ -22,6 +22,8 @@ struct MountainStage<Over: View>: View {
     let onBanner: (WalkLayout.Banner, WalkLayout.Post) -> Void
     /// A tap on a side post (`WalkLayout.tapEvent(side)`: a named one walks there, the nameless one raises the paper).
     let onSide: (WalkLayout.Side) -> Void
+    /// Drawn between the mountain's band and its posts, in stage points (`WalkWorldView.underWorld`).
+    let underWorld: AnyView?
     let over: Over
     /// The keyboard's top edge in screen points, while it is up.
     @State private var keyboardTop: CGFloat?
@@ -31,7 +33,9 @@ struct MountainStage<Over: View>: View {
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void,
          onSide: @escaping (WalkLayout.Side) -> Void = { _ in },
+         underWorld: AnyView? = nil,
          @ViewBuilder over: () -> Over) {
+        self.underWorld = underWorld
         self.state = state
         self.today = today
         self.stage = stage
@@ -51,7 +55,7 @@ struct MountainStage<Over: View>: View {
                 ?? WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing, stage: stage)
             ZStack(alignment: .topLeading) {
                 WalkWorldView(layout: layout, art: art, step: state.step, stage: stage, actions: actions,
-                              onLabel: onLabel, onBanner: onBanner, onSide: onSide)
+                              onLabel: onLabel, onBanner: onBanner, onSide: onSide, underWorld: underWorld)
                 over
             }
             .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
@@ -167,8 +171,8 @@ struct MountainPageView: View {
                     .offset(x: place.frame.minX, y: place.frame.minY)
                     .accessibilitySortPriority(3)
             }
-            if let page, let drawn, !raised {
-                MountainHint(model: model, words: page.hint(drawn), bar: foot.bar)
+            if let page, let drawn, !raised, let hint = page.hint(drawn) {
+                MountainHint(model: model, words: hint, bar: foot.bar)
                     .accessibilitySortPriority(2)
             }
             paperFoot(foot, paper: paper, raised: raised)

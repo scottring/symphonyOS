@@ -360,16 +360,20 @@ struct MountainPage: Equatable {
     }
 
     /// The line over the page's foot (`DailyCopy.hint`): how to begin with no flag on the page's level;
-    /// on a goal above with nothing under it, so (P48); while it is one of several, that a tap switches;
-    /// that a post walks while a named one stands at the side; else what a flag does.
-    func hint(_ layout: WalkLayout) -> String {
+    /// on a goal above with nothing under it, so (P48); while it is one of several, that a tap switches
+    /// (on the stop for the goals under none, in the walk's words for that stop); that a post walks while a
+    /// named one stands at the side; else what a flag does. Nil while a goal is chosen: its panel stands
+    /// over the goal above and carries the words (the final review's F2).
+    func hint(_ layout: WalkLayout) -> String? {
+        guard chosen == nil else { return nil }
         let w = walkState
         let stops = w.goalAboveStops()
-        let onStop = w.level.flatMap { w.focus[$0] }.map(stops.contains) ?? false
+        let current = w.level.flatMap { w.focus[$0] }
+        let onStop = current.map(stops.contains) ?? false
         let stopEmpty = w.standsOnAnEmptyStop
         return DailyCopy.hint(level, sides: layout.sides.contains { $0.area != nil }, empty: !items.contains { $0.level == level },
                               emptyStop: stopEmpty ? periods.flatMap { DailyCopy.emptyStop(level, periods: $0) } : nil,
-                              switches: onStop && !stopEmpty && stops.count > 1)
+                              switches: onStop && !stopEmpty && stops.count > 1, looseStop: current == WalkState.noGoalAbove)
     }
 
     // MARK: The paper

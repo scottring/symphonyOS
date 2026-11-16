@@ -184,8 +184,8 @@ final class WalkUITests: XCTestCase {
             XCTAssertTrue(paper.scrollViews.firstMatch.exists, "\(seed): the paper's list is not a scrolling list")
             let end = app.buttons["walk.paper.row.\(last)"]
             XCTAssertTrue(end.waitForExistence(timeout: 15), "\(seed): no row \(last)")
-            // Whole inside the list's own scrolling frame, and ending above the paper's own foot by more than
-            // the home indicator: the list's end, not a row half under the edge. (Task 10: the bound was the
+            // Whole inside the list's own scrolling frame, and ending at least `paperFootMargin` above the paper's
+            // own foot: the list's end, not a row half under the edge. (Task 10: the bound was the
             // list against the window's foot; the list's frame runs to the window's foot, so it could not fail.)
             let list = paper.scrollViews.firstMatch
             func inView() -> Bool {
@@ -222,7 +222,9 @@ final class WalkUITests: XCTestCase {
         XCTAssertEqual(at, at.sorted(), "read out of order: \(zip(order, at).map { "\($0.0) \($0.1)" }) in \(ids)")
     }
 
-    /// How far above the paper's own foot its list must end on the iPhone 17 (its home indicator is 34).
+    /// How far above the paper's own foot its list must end on the iPhone 17: enough to catch a last row
+    /// that runs under the paper's edge. It is less than the 34 points of that phone's home-indicator area,
+    /// so it does not show the row clears that area.
     static let paperFootMargin: CGFloat = 20
 
     /// The paper opened for a shot (`-SymphonyWalkOrb paper`) goes with "Show the mountain", and the walk is as it was.

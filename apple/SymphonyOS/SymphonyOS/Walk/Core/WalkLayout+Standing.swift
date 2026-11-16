@@ -84,19 +84,38 @@ extension WalkLayout {
 
     // MARK: Words
 
-    /// An area's name as its standing pill or ground chip draws it (P28, P30): in capitals, broken by
-    /// the one breaker (F39) at DM Sans SemiBold's own widths at 11 pt tracked 1.1 (`Face.pill`) into
-    /// lines no wider than `width`, at most two, the second cut with "…" only where two cannot hold it.
-    /// Drawn as given, never scaled.
+    /// An area's name as its standing pill draws it (P28, P30): in capitals, broken by the one breaker
+    /// (F39) at DM Sans SemiBold's own widths at 11 pt tracked 1.1 (`Face.pill`) into lines no wider than
+    /// `width`, at most two, the second cut with "…" only where two cannot hold it. Drawn as given, never
+    /// scaled. (A ground chip's name is still counted by estimate, `chipLines`: a known gap.)
     static func pillLines(for name: String, width: CGFloat) -> [String] {
         let lines = setLines(name.uppercased(), face: .pill, width: width, limit: 2)
         return lines.isEmpty ? [""] : lines
     }
 
-    /// An area's name as its side pill draws it: in capitals, one line no wider than `width` at 9.5 pt
-    /// tracked 1 (`Face.sidePill`), cut with "…" where it does not fit. Drawn as given, never scaled.
-    static func sidePillLine(for name: String, width: CGFloat) -> String {
-        setLines(name.uppercased(), face: .sidePill, width: width, limit: 1).first ?? ""
+    /// An area's name as its side pill draws it, in capitals on one line no wider than `width`, and the
+    /// face it is set in (ruling P53; drawn as given, never scaled): the whole name at 9.5 pt
+    /// (`Face.sidePill`) where it fits; else the whole name at 7.6 pt (`Face.sidePillSmall`) where it fits;
+    /// else at 7.6 cut so it fills the room, by letters after its last whole word, and "…" ("SIDE PRO…",
+    /// never "SIDE…" with room to spare). A cut drops a space or a stray mark before its "…".
+    static func sidePillSet(for name: String, width: CGFloat) -> (face: Face, line: String) {
+        let whole = normalised(name.uppercased())
+        for face in [Face.sidePill, .sidePillSmall] where textWidth(whole, face: face) <= width { return (face, whole) }
+        let characters = Array(whole), ellipsis = "…"
+        var k = 0
+        while k < characters.count, textWidth(String(characters[...k]) + ellipsis, face: .sidePillSmall) <= width { k += 1 }
+        var line = String(characters[..<k])
+        while let end = line.last, markBeforeCut.contains(end) || end.isWhitespace, line.count > 1 { line.removeLast() }
+        return (.sidePillSmall, line + ellipsis)
+    }
+
+    /// The goal above the step is about, where the standing post draws it as its `parent` cloth: on steps 2
+    /// to 5, standing here. On Today a first thing that is itself the goal above is drawn once, as the first
+    /// thing, so no cloth stands above it (nil). The why line reads this too (`WalkCopy.why`).
+    static func goalAboveCloth(_ s: WalkState) -> WalkItem? {
+        guard let level = s.level, level != .year, let item = s.item(s.focus[level]), item.level.rawValue == level.rawValue - 1,
+              s.column(of: item) == s.standing, !(level == .today && item.id == s.firstThing) else { return nil }
+        return item
     }
 
     /// How wide a name's line is on a pill of `face` (its capitals as the pill sets them).
@@ -284,11 +303,7 @@ struct WalkStanding {
     /// The goal above the step is about, where it is drawn as the `parent` flag: on steps 2 to 5,
     /// standing here. On Today a first thing that is itself the goal above is drawn once, as the
     /// first thing.
-    func parent(_ level: WalkLevel) -> WalkItem? {
-        guard level != .year, let item = s.item(s.focus[level]), item.level.rawValue == level.rawValue - 1,
-              s.column(of: item) == s.standing, !(level == .today && item.id == s.firstThing) else { return nil }
-        return item
-    }
+    func parent(_ level: WalkLevel) -> WalkItem? { L.goalAboveCloth(s) }
 
     /// The standing area's flags on the step's level that the post shows, in planting order
     /// (`WalkState.standingFlags`): on Season, Month and Week only the stop's (F40). Today has one: the first thing.

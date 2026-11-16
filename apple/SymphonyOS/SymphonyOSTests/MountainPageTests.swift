@@ -750,6 +750,53 @@ struct MountainPageTests {
         #expect(page.hint(page.layout(today: today)) == "No fall goal under this yet")
     }
 
+    /// The final review's F2: while a goal is chosen on a Month or Season page its panel stands over the goal
+    /// above and carries the words, so the page gives no hint at all ("Tap the goal above to switch" pointed
+    /// at a covered cloth). Let go, the hint is back.
+    @Test func aChosenGoalLeavesThePageWithoutAHint() {
+        let today = day(2026, 11, 10)
+        let fit = flag(.season, "Get fit for spring", in: "Health")
+        let sleep = flag(.season, "Sleep seven hours", in: "Health")
+        let gym = flag(.month, "Join the gym", in: "Health", parent: fit.id)
+        let checkup = flag(.month, "Book a checkup", in: "Health", parent: fit.id)
+        let run = flag(.year, "Run a half marathon", in: "Health")
+        let tenK = flag(.season, "Run a 10k in the fall", in: "Health", parent: run.id)
+        for (level, chosen, items) in [(WalkLevel.month, gym, [fit, sleep, gym, checkup]), (.season, tenK, [run, tenK])] {
+            var page = MountainPage(level: level, items: items, areas: ridge, saved: [area("Health").id])
+            page.periods = MountainPage.periods(level: level, selected: today, today: today, seasons: nil)
+            let before = page.hint(page.layout(today: today))
+            #expect(before != nil, "\(level)")
+            _ = page.apply(.flag(chosen.id))
+            #expect(page.selected == chosen.id && page.panel != nil, "\(level)")
+            #expect(page.hint(page.layout(today: today)) == nil, "\(level): \(page.hint(page.layout(today: today)) ?? "")")
+            _ = page.apply(.flag(chosen.id))
+            #expect(page.selected == nil && page.hint(page.layout(today: today)) == before, "\(level)")
+        }
+        // The case the review saw: on Month, among two goals above, the hint said a tap switches.
+        var month = MountainPage(level: .month, items: [fit, sleep, gym, checkup], areas: ridge, saved: [area("Health").id])
+        month.periods = MountainPage.periods(level: .month, selected: today, today: today, seasons: nil)
+        #expect(month.hint(month.layout(today: today)) == DailyCopy.switchGoalAbove)
+        _ = month.apply(.flag(gym.id))
+        #expect(month.hint(month.layout(today: today)) == nil)
+    }
+
+    /// Task 10 (D4), for the pages: standing on the stop for the goals under none of the area's goals above,
+    /// the hint names that stop in the walk's own words (`WalkCopy.switchToLooseStop`), not "the goal above".
+    @Test func theLooseStopsHintNamesTheStop() {
+        let today = day(2026, 11, 10)
+        let run = flag(.year, "Run a half marathon", in: "Health")
+        let tenK = flag(.season, "Run a 10k in the fall", in: "Health", parent: run.id)
+        let stretch = flag(.season, "Stretch every morning", in: "Health")
+        var page = MountainPage(level: .season, items: [run, tenK, stretch], areas: ridge, saved: [area("Health").id])
+        page.periods = MountainPage.periods(level: .season, selected: today, today: today, seasons: nil)
+        #expect(page.focus == run.id)
+        #expect(page.hint(page.layout(today: today)) == DailyCopy.switchGoalAbove)
+        _ = page.apply(.flag(run.id))
+        #expect(page.focus == WalkState.noGoalAbove)
+        #expect(page.hint(page.layout(today: today)) == DailyCopy.switchLooseStop)
+        #expect(page.hint(page.layout(today: today)) == "Tap “Not under a goal yet” to switch")
+    }
+
     // MARK: Walk it down
 
     @Test func walkDownOpensTheNextLevelAboutTheFlag() {

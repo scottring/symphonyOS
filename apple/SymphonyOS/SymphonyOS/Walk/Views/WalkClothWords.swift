@@ -18,7 +18,7 @@ enum WalkClothFace {
         case .lookBack: WalkLayout.lookBackLine
         case .tag: WalkLayout.tagLine
         case .pill: WalkLabelView.nameLine
-        case .sidePill: WalkLayout.sidePillHeight
+        case .sidePill, .sidePillSmall: WalkLayout.sidePillHeight
         }
     }
 }

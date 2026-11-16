@@ -96,7 +96,8 @@ struct WalkLayout: Equatable {
         /// nil where the pill reaches too near it (the pill's own outline still marks where you stand),
         /// and for a chip on the ground, whose mark is inside its frame.
         var caret: CGRect? = nil
-        /// The name as its pill or chip draws it: in capitals, one line each (`pillLines`), at most two.
+        /// The name as its pill or chip draws it: in capitals, one line each (`pillLines`; a ground chip's by
+        /// estimate, `chipLines`), at most two.
         var words: [String] = [] }
     /// One wordless flag on a side post, in the colour of the level it stands for.
     struct Pennant: Equatable { let frame: CGRect; let level: WalkLevel }
@@ -122,10 +123,15 @@ struct WalkLayout: Equatable {
             return (pill.map { [$0] } ?? []) + [pole] + pennants.map(\.frame) + (extraFrame.map { [$0] } ?? [])
         }
 
-        /// The name as the side pill draws it, in its final width: one line in capitals, cut with "…"
-        /// where it does not fit (`sidePillLine`); empty for the nameless post.
-        var pillWords: String {
-            pill.map { WalkLayout.sidePillLine(for: name, width: $0.width - WalkLayout.sidePillInset) } ?? ""
+        /// The name as the side pill draws it, in its final width: one line in capitals, at 9.5 pt or
+        /// 7.6 pt (`pillFace`), cut with "…" only where it fits at neither (`sidePillSet`, P53); empty for
+        /// the nameless post.
+        var pillWords: String { pillSet.line }
+        /// The face the side pill's name is set in, unscaled: `Face.sidePill`, or `Face.sidePillSmall`
+        /// where the whole name does not fit its pill at 9.5 (P53).
+        var pillFace: WalkLayout.Face { pillSet.face }
+        private var pillSet: (face: WalkLayout.Face, line: String) {
+            pill.map { WalkLayout.sidePillSet(for: name, width: $0.width - WalkLayout.sidePillInset) } ?? (.sidePill, "")
         }
 
         /// The small shadow at the pole's foot (`WalkLayout.sideFootShadow`).

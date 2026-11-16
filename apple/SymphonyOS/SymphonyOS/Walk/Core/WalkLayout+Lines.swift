@@ -27,11 +27,15 @@ extension WalkLayout {
         case lookBack
         /// A tag line (a Week day, FIRST THING, an example's tag): 11 pt, tracked 0.6, 8 either side.
         case tag
-        /// An area's name on its standing pill or its ground chip, in capitals: 11 pt, tracked 1.1, 12
-        /// either side (`pillInset`; a ground chip leaves `chipInset` for its mark).
+        /// An area's name on its standing pill, in capitals: 11 pt, tracked 1.1, 12 either side
+        /// (`pillInset`). (The ground's chips are still counted by estimate, `chipChar`: a known gap.)
         case pill
         /// An area's name on a side pill, in capitals: 9.5 pt, tracked 1, 7 either side (`sidePillInset`).
         case sidePill
+        /// The side pill's small size (ruling P53): 7.6 pt (0.8 of 9.5), tracked 0.5, 7 either side, for
+        /// a name that does not fit its pill whole at 9.5 (`sidePillSet`). Tracked 0.5, not 0.8, so that
+        /// LEARNING (37.3 of letters) stays whole in a phone's narrowest side pill (56, 42 of room).
+        case sidePillSmall
 
         var size: CGFloat {
             switch self {
@@ -39,6 +43,7 @@ extension WalkLayout {
             case .lookBack: 12
             case .parent, .tag, .pill: 11
             case .sidePill: 9.5
+            case .sidePillSmall: 7.6
             }
         }
         var tracking: CGFloat {
@@ -46,6 +51,7 @@ extension WalkLayout {
             case .tag: 0.6
             case .pill: 1.1
             case .sidePill: 1
+            case .sidePillSmall: 0.5
             case .flag, .parent, .lookBack: 0
             }
         }
@@ -54,7 +60,7 @@ extension WalkLayout {
             case .flag, .tag: 16
             case .parent, .lookBack: 12
             case .pill: 24
-            case .sidePill: 14
+            case .sidePill, .sidePillSmall: 14
             }
         }
     }

@@ -62,13 +62,14 @@ struct LightTodayView: View {
             ZStack(alignment: .topLeading) {
                 if low != nil {
                     DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
-                                   today: model.today, me: userId, size: size)
+                                   today: model.today, me: userId, size: size, shade: m)
                         .allowsHitTesting(paper == nil)
                         .accessibilityHidden(paper != nil)
                 } else {
                     DailyBand(picture: m.picture, cut: m.todayCut, height: m.band.height + sheetDrop)
+                    // Behind the whole plan the shade stands under its posts (`DailyWholePlan`), not over them (F1).
+                    DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 }
-                DailyTopShade(solid: m.shadeSolid, height: m.shade)
                 DailyNavRow(current: .today, gap: m.navGap, go: go)
                     .frame(width: size.width)
                     .offset(y: m.navTop)

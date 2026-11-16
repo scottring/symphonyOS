@@ -384,6 +384,24 @@ struct DailyMetricsTests {
         #expect(contrast >= 4.5)
     }
 
+    /// The final review's F1: behind Today's and Week's lowered sheet the whole plan's standing pill (board y 110)
+    /// and its caret (101) stand inside the reach of the page's top shade, so that shade is drawn under the
+    /// whole plan's posts (`DailyWholePlan`), not over them: the same shade, in the whole plan's stage points.
+    @Test func theWholePlansShadeIsThePagesInStagePoints() {
+        for (size, top, bottom, shape) in [(CGSize(width: 402, height: 874), CGFloat(62), CGFloat(34), DailyMetrics.Shape.tall),
+                                           (CGSize(width: 375, height: 667), 20, 0, .short), (CGSize(width: 466, height: 678), 22, 0, .short)] {
+            for m in [DailyMetrics.today(size: size, safeTop: top, safeBottom: bottom, shape: shape),
+                      DailyMetrics.week(size: size, safeTop: top, safeBottom: bottom, shape: shape)] {
+                let stage = WalkStage(device: size, stage: WalkArt.overlookSquare.stage)
+                let under = m.wholePlanShade(stage: stage)
+                #expect(abs(under.solid * stage.scale - m.shadeSolid) < 0.001 && abs(under.length * stage.scale - m.shade) < 0.001)
+                // From the window's top, in stage points: the caret's top is inside the shade's reach.
+                let caretTop = stage.origin.y / stage.scale + WalkLayout.lookBackPill - WalkLayout.caretGap - WalkLayout.caretSize.height
+                #expect(caretTop < under.length, "\(size): the caret at \(caretTop) is clear of a shade ending at \(under.length)")
+            }
+        }
+    }
+
     @Test func theSignIsNailedOnItsPost() {
         for m in [DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34),
                   DailyMetrics.today(size: outside, safeTop: 22, safeBottom: 0, shape: .short)] {

@@ -13,8 +13,9 @@ struct WalkSideView: View {
     let box: CGRect
     var veiled = false
 
-    /// The pill: navy 0.86, a white 0.7 outline of 1, its name DM Sans SemiBold 9.5 in capitals
-    /// (`WalkLayout.Face.sidePill`), tracked 1, white, 7 either side, as the layout broke it (`Side.pillWords`).
+    /// The pill: navy 0.86, a white 0.7 outline of 1, its name DM Sans SemiBold in capitals, white, 7
+    /// either side, as the layout set it (`Side.pillWords`) in the face it chose (`Side.pillFace`: 9.5 pt
+    /// tracked 1, or 7.6 pt tracked 0.5, P53), never scaled. "+n" is set at 9.5.
     static let pillSize: CGFloat = WalkLayout.Face.sidePill.size, pillPadding: CGFloat = 7
     /// A pennant's edge: white, thin.
     static let pennantEdge = (width: CGFloat(0.75), opacity: 0.6)
@@ -60,8 +61,8 @@ struct WalkSideView: View {
             }
             if let pill = side.pill {
                 Text(side.pillWords)
-                    .font(.custom(WalkClothFace.name, fixedSize: WalkLayout.Face.sidePill.size))
-                    .tracking(WalkLayout.Face.sidePill.tracking)
+                    .font(.custom(WalkClothFace.name, fixedSize: side.pillFace.size))   // the size the layout chose (P53)
+                    .tracking(side.pillFace.tracking)
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize()                    // the layout's line, as given: it already fits

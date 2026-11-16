@@ -80,8 +80,10 @@ final class LightDailyUITests: XCTestCase {
         let standing = any["walk.standing"]
         XCTAssertEqual(standing.label, "Health")
         XCTAssertTrue(year.label.contains("tap to read the list"), year.label)
-        // A tap in the first second, while the cloths are still dropping in, was once lost in the suite (cause
-        // not found, P43): the tap is tried again until the paper rises, rather than waiting a fixed second.
+        // At this launch the cloths do not drop in: present at the first draw, they stand still from the start.
+        // A first tap was once lost in the suite, as the first test of a run under load (cause not found, P43;
+        // the final review found no state of the walk that refuses it): so the tap is tried again until the
+        // paper rises, rather than waiting a fixed second.
         var tries = 0
         repeat {
             year.tap()

@@ -53,13 +53,14 @@ struct LightWeekView: View {
         ZStack(alignment: .topLeading) {
             if low != nil {
                 DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
-                               today: model.today, me: userId, size: size)
+                               today: model.today, me: userId, size: size, shade: m)
                     .allowsHitTesting(paper == nil)
                     .accessibilityHidden(paper != nil)
             } else {
                 DailyBand(picture: m.picture, cut: m.weekCut, height: m.band.height, veil: 0.97)
+                // Behind the whole plan the shade stands under its posts (`DailyWholePlan`), not over them (F1).
+                DailyTopShade(solid: m.shadeSolid, height: m.shade)
             }
-            DailyTopShade(solid: m.shadeSolid, height: m.shade)
             if low == nil {
                 DailyBandFlags(flags: DailyMetrics.bandFlags(bandGoals, width: size.width, navTop: m.navTop),
                                open: { go(.month) })

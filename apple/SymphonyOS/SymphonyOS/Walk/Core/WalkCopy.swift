@@ -81,9 +81,11 @@ enum WalkCopy {
         case .today: line = "Just one. The rest of today can wait its turn."
         }
         // Exactly when the goal above takes a tap: the round it walks (on Today the nameless post's first
-        // thing is in it too), not only the goals here.
-        if s.nextGoalAbove() != nil { line += s.focus[level] == WalkState.noGoalAbove ? focusAboveLoose : focusAbove }
-        return line
+        // thing is in it too), not only the goals here. On Today only while a task stands above the first
+        // thing (`WalkLayout.goalAboveCloth`: a first thing that is the goal above has nothing above it).
+        guard s.nextGoalAbove() != nil else { return line }
+        if level == .today { return WalkLayout.goalAboveCloth(s) != nil ? line + focusAboveTask : line }
+        return line + (s.focus[level] == WalkState.noGoalAbove ? focusAboveLoose : focusAbove)
     }
 
     /// The hint: one line saying what to do now (hold the light to speak, tap a choice, a note). At rest
@@ -392,6 +394,9 @@ enum WalkCopy {
     static let groundWhy = "Tap the ones that matter to you."
     /// F40: the goal above's stop for the flags hanging under none of the area's goals, on its pale cloth.
     static let noGoalAbove = "Not under a goal yet"
+    /// What a tap on that stop does, in the walk's why line (`focusAboveLoose`) and the pages' hint
+    /// (`DailyCopy.switchLooseStop`): one source for both.
+    static let switchToLooseStop = "Tap “\(noGoalAbove)” to switch"
     /// F40: the goal above's place in the area's round, on its own line under its words: "1 of 3".
     static func goalAboveCount(_ index: Int, of count: Int) -> String { "\(index) of \(count)" }
     /// The "Not under a goal yet" cloth to VoiceOver, with the level every cloth's label starts with and
@@ -403,7 +408,9 @@ enum WalkCopy {
     /// Added to a step's why line while a tap on the goal above switches to another (F3, `nextGoalAbove`).
     static let focusAbove = " Tap the goal above to switch."
     /// The same, while the cloth above is the "Not under a goal yet" stop, which is not a goal (Task 10, D4).
-    static let focusAboveLoose = " Tap “\(noGoalAbove)” to switch."
+    static let focusAboveLoose = " \(switchToLooseStop)."
+    /// On Today's step, while a week task stands above the first thing ("goal" is kept for Year, Season and Month).
+    static let focusAboveTask = " Tap the task above to switch."
 
     // MARK: The paper (F7)
 

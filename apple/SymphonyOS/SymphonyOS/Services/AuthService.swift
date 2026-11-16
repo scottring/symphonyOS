@@ -172,6 +172,17 @@ final class AuthService {
     // MARK: - Sign Out
 
     func signOut() async {
+        #if DEBUG
+        // A demo launch was never signed in to the server (`init`): it signs out here, locally, and calls
+        // nothing, so no test of the demo can send a sign-out for an account the simulator may hold.
+        if DemoMode.isOn {
+            await MainActor.run {
+                currentUser = nil
+                isAuthenticated = false
+            }
+            return
+        }
+        #endif
         do {
             try await supabase.auth.signOut()
             await MainActor.run {

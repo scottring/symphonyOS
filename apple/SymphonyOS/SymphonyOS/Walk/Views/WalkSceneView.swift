@@ -179,6 +179,9 @@ struct WalkWorldView: View {
     let onBanner: (WalkLayout.Banner, WalkLayout.Post) -> Void
     /// A tap on a side post (the walk sends `WalkLayout.tapEvent(side)`: a named one walks there).
     let onSide: (WalkLayout.Side) -> Void
+    /// A page's own layer between the band and the world, in stage points from the board's top-left (behind
+    /// Today and Week, the page's top shade: `DailyWholePlan`), so it dims none of the world either. None in the walk.
+    var underWorld: AnyView? = nil
     /// Banners present when the world first draws stand still; later ones drop in.
     @State private var arrived = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -191,7 +194,8 @@ struct WalkWorldView: View {
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void,
-         onSide: @escaping (WalkLayout.Side) -> Void) {
+         onSide: @escaping (WalkLayout.Side) -> Void, underWorld: AnyView? = nil) {
+        self.underWorld = underWorld
         self.layout = layout
         self.art = art
         self.step = step
@@ -246,6 +250,12 @@ struct WalkWorldView: View {
             .offset(x: stage.window.minX, y: stage.window.minY)
             .frame(width: art.stage.width, alignment: .leading)
             .allowsHitTesting(false)
+            if let underWorld {
+                underWorld
+                    .frame(width: art.stage.width, alignment: .leading)      // as the band: it may run past the board
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
             world
         }
     }

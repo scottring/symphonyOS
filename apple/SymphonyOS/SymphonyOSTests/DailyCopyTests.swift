@@ -166,6 +166,12 @@ struct DailyCopyTests {
         #expect(DailyCopy.hint(.month, sides: true, empty: true, emptyStop: stop, switches: true) == DailyCopy.emptyMountain)
         #expect(DailyCopy.hint(.month, sides: true, empty: false, emptyStop: stop, switches: true) == stop)
         #expect(DailyCopy.hint(.month, sides: true, empty: false, switches: true) == DailyCopy.switchGoalAbove)
+        // Task 10 (D4): on the stop for the goals under none, the walk's own words for it, from one source.
+        #expect(DailyCopy.hint(.month, sides: true, empty: false, switches: true, looseStop: true) == DailyCopy.switchLooseStop)
+        #expect(DailyCopy.hint(.season, sides: false, empty: false, switches: true, looseStop: true) == DailyCopy.switchLooseStop)
+        #expect(DailyCopy.switchLooseStop == "Tap “Not under a goal yet” to switch")
+        #expect(WalkCopy.focusAboveLoose == " " + DailyCopy.switchLooseStop + ".")
+        #expect(DailyCopy.hint(.month, sides: true, empty: false, emptyStop: stop, switches: true, looseStop: true) == stop)
         #expect(DailyCopy.hint(.month, sides: true, empty: false) == "Tap a post to walk to that area")
         #expect(DailyCopy.hint(.month, sides: false, empty: false) == "Tap a flag to move it or walk it down")
     }

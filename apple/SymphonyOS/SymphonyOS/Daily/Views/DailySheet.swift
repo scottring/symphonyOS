@@ -125,7 +125,9 @@ struct DailyListTopFade: View {
 /// Behind Today's or Week's lowered sheet (`DailyLookBack`), in place of the band: the walk's own
 /// Look back up over the whole window: one area read top to bottom, the others as side posts (F6). A
 /// side post stands in its area; a cloth opens its level's paper (F21); every other flag is read.
-/// Its words stop growing at extra large, as the walk's stage does.
+/// Its words stop growing at extra large, as the walk's stage does. The page's top shade, behind its
+/// row of words, stands between the mountain's band and its posts (`DailyMetrics.wholePlanShade`), so
+/// it dims none of them: the page draws no shade of its own over the whole plan.
 struct DailyWholePlan: View {
     @Binding var lookBack: DailyLookBack
     let goals: [Goal]
@@ -134,12 +136,19 @@ struct DailyWholePlan: View {
     let today: Date
     let me: UUID
     let size: CGSize
+    /// The page's top shade, in page points (`DailyMetrics.shadeSolid`, `shade`).
+    let shade: DailyMetrics
 
     var body: some View {
+        let stage = WalkStage(device: size, stage: WalkArt.overlookSquare.stage)
+        let under = shade.wholePlanShade(stage: stage)
         MountainStage(state: lookBack.plan(goals: goals, tasks: tasks, periods: periods, me: me),
                       today: today, onLabel: { _ in },
                       onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) },
-                      onSide: { side in lookBack.tap(WalkLayout.tapEvent(side)) }) {
+                      onSide: { side in lookBack.tap(WalkLayout.tapEvent(side)) },
+                      underWorld: AnyView(DailyTopShade(solid: under.solid, height: under.length)
+                        .frame(width: stage.window.width)
+                        .offset(x: stage.window.minX, y: stage.window.minY))) {
             EmptyView()
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
