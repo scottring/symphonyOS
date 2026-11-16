@@ -97,10 +97,10 @@ extension DailyMetrics {
     /// chosen cloth, in page points), its foot stands 8 over the cloth instead, while its top stays 8
     /// under the row of words' foot; if neither fits, bottom-anchored with its line dropped (`dropsLine`).
     /// Its height is its estimate (`mountainPanelHeight`, lines and rows counted by estimate), its chips
-    /// on one row unless they wrap (beside the cloths, or while Move to is open: S46).
+    /// on one row unless they wrap (`wraps`: beside the cloths, or while Move to is open: S46).
     static func mountainPanel(size: CGSize, line: CGFloat, navTop: CGFloat, stage: WalkStage, chosen: CGRect?,
                               title: String, hasLine: Bool, chips: [String], moving: Bool)
-        -> (frame: CGRect, beside: Bool, dropsLine: Bool) {
+        -> (frame: CGRect, beside: Bool, wraps: Bool, dropsLine: Bool) {
         let cloths = stage.toDevice(CGPoint(x: WalkLayout.centreX + WalkLayout.standingWidth(wing: stage.wing) / 2, y: 0)).x
         let left = cloths + mountainPanelBesideGap
         let beside = size.width - mountainPanelInset - left >= mountainPanelBeside
@@ -115,11 +115,11 @@ extension DailyMetrics {
         let foot = line - mountainPanelAbove
         let tall = height(line: hasLine)
         let anchored = CGRect(x: x, y: foot - tall, width: width, height: tall)
-        guard let chosen, anchored.intersects(chosen) else { return (anchored, beside, false) }
+        guard let chosen, anchored.intersects(chosen) else { return (anchored, beside, wraps, false) }
         let raised = anchored.offsetBy(dx: 0, dy: chosen.minY - mountainPanelClear - anchored.maxY)
-        if raised.minY >= navTop + navHeight + mountainPanelClear { return (raised, beside, false) }
+        if raised.minY >= navTop + navHeight + mountainPanelClear { return (raised, beside, wraps, false) }
         let short = height(line: false)
-        return (CGRect(x: x, y: foot - short, width: width, height: short), beside, true)
+        return (CGRect(x: x, y: foot - short, width: width, height: short), beside, wraps, true)
     }
 
     /// Lines by estimate: words set greedily at `perChar` points a character in `width`, a word longer

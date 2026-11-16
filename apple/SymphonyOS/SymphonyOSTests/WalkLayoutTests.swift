@@ -378,8 +378,12 @@ struct WalkLayoutTests {
         #expect(home.count == 1 && home[0].pennants.count == 3 && home[0].extra == 3 && home[0].count == 6)
         // "+3" has the fourth pennant's place: 14 under the third, on the pole (Health stands; Home is right, inner low).
         #expect(home[0].extraFrame == CGRect(x: 301.75, y: 462 + 3 * 14, width: 20, height: 13))
-        #expect(home[0].label == "Home, 6 goals this year")
-        #expect(WalkCopy.sideLabel(name: "Work", count: 1, level: .year, periods: WalkPeriods.pick(now: today)) == "Work, 1 goal this year")
+        // On 13 November the walk plans 2027, "the year ahead": its posts count the goals "in 2027".
+        #expect(home[0].label == "Home, 6 goals in 2027")
+        #expect(WalkCopy.sideLabel(name: "Work", count: 1, level: .year, periods: WalkPeriods.pick(now: today)) == "Work, 1 goal in 2027")
+        // In March the walk plans the year in force: "this year".
+        #expect(WalkCopy.sideLabel(name: "Work", count: 1, level: .year, periods: WalkPeriods.pick(now: day(2026, 3, 10)))
+                == "Work, 1 goal this year")
         #expect(WalkCopy.sideLabel(name: "Home", count: 3, level: .week, periods: WalkPeriods.pick(now: today)) == "Home, 3 tasks this week")
         #expect(WalkCopy.sideLabel(name: WalkCopy.noArea, count: 2, level: .month, periods: WalkPeriods.pick(now: today)) == "No area, 2 goals in December")
         #expect(WalkCopy.sideLabel(name: "Fun", count: 0, level: .season, periods: WalkPeriods.pick(now: today)) == "Fun, no goals in winter")
@@ -400,7 +404,7 @@ struct WalkLayoutTests {
         let onYear = ruled(state(1, kept: kept, items: [year, season, month], standing: "Work")).sides
         #expect(onYear.map(\.name) == ["Home", "Health"])
         #expect(onYear.allSatisfy { $0.pennants.isEmpty && $0.count == 0 && WalkLayout.tapEvent($0) == .areaTapped($0.area!) })
-        #expect(onYear.first?.label == "Home, no goals this year")
+        #expect(onYear.first?.label == "Home, no goals in 2027")
         // An area with only a goal above, or only a flag on this level, has one.
         let above = flag(.season, "Lift twice a week", in: "Health"), own = flag(.month, "Hire a skip", in: "Home")
         let both = ruled(state(3, kept: kept, items: [year, season, month, above, own], standing: "Work", focus: season)).sides

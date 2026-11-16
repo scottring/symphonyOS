@@ -344,6 +344,32 @@ struct MountainPageTests {
         let added = flag(.month, "Book the skip", in: "Health")
         page.read(flags(december, [gym, tile, added]), areas: ridge, saved: [])
         #expect(page.focusArea == area("Home").id)
+
+        // A day turning while the page is open is the same page: only the page's own period counts
+        // (fix round 1, item 2). The choice, the paper, where it stands and that it was walked all hold.
+        let nextDay = MountainPage.periods(level: .month, selected: day(2026, 12, 3), today: day(2026, 11, 29), seasons: nil)
+        #expect(nextDay.monthStart == december.monthStart && nextDay.today != december.today)
+        _ = page.apply(.flag(tile.id))
+        let before = page
+        page.read(flags(nextDay, [gym, tile, added]), areas: ridge, saved: [])
+        #expect(page.selected == tile.id && page.focusArea == before.focusArea && page.walked)
+        _ = page.apply(.paper(true))
+        page.read(flags(MountainPage.periods(level: .month, selected: day(2026, 12, 3), today: day(2026, 11, 30), seasons: nil),
+                        [gym, tile, added]), areas: ridge, saved: [])
+        #expect(page.paperOpen && page.walked)
+        // A Year page's own period is its year.
+        let goals = [flag(.year, "Feel strong again", in: "Health"), flag(.year, "Finish the bathroom", in: "Home")]
+        var year = MountainPage(level: .year, flags: flags(MountainPage.periods(level: .year, selected: day(2027, 1, 5),
+                                                                                today: today, seasons: nil), goals),
+                                areas: ridge, saved: [])
+        #expect(year.focusArea == area("Health").id)
+        _ = year.apply(.peak(area("Home").id))
+        year.read(flags(MountainPage.periods(level: .year, selected: day(2027, 1, 5), today: day(2026, 11, 29), seasons: nil),
+                        goals), areas: ridge, saved: [])
+        #expect(year.walked && year.focusArea == area("Home").id)
+        year.read(flags(MountainPage.periods(level: .year, selected: day(2026, 12, 5), today: today, seasons: nil), goals),
+                  areas: ridge, saved: [])
+        #expect(!year.walked && year.focusArea == area("Health").id)
     }
 
     /// A side post's tap stands there on every level (on Season and Month on that area's newest goal

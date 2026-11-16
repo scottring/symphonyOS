@@ -76,9 +76,10 @@ struct MountainPage: Equatable {
 
     /// `read(items:…)` with what `flags(...)` found, and the walk's flags and the page's periods with them.
     /// Another period (the heading's tap) is a fresh page: it stands afresh where its own flags are, with
-    /// nothing chosen and the paper down. The same period read again keeps where it stands.
+    /// nothing chosen and the paper down. The same period read again (a flag changed, or the day turned
+    /// while the page is open) keeps where it stands, its choice and its paper.
     mutating func read(_ flags: Flags, areas: [WalkArea], saved: [UUID], savedAreas: [WalkArea] = []) {
-        if let periods, periods != flags.periods {
+        if let periods, !Self.samePeriod(periods, flags.periods, level: level) {
             focusArea = nil
             focus = nil
             walked = false
@@ -108,6 +109,16 @@ struct MountainPage: Equatable {
         if level != .year, let id = focus, item(id)?.level.rawValue != level.rawValue - 1 { focus = nil }
         adopt(walk.settled)
         if !items.contains(where: { $0.level == level }) { paperOpen = false }
+    }
+
+    /// Whether two periods hold the same page: only the page's own period counts (its year, its season,
+    /// its month), never the day they were read on.
+    static func samePeriod(_ a: WalkPeriods, _ b: WalkPeriods, level: WalkLevel) -> Bool {
+        switch level {
+        case .year: a.year == b.year
+        case .season: PlanCalendar.sameDay(a.season.start, b.season.start)
+        case .month, .week, .today: PlanCalendar.sameDay(a.monthStart, b.monthStart)
+        }
     }
 
     /// The walk's state for this page, before it settles: the page's own standing, goal above and choice.

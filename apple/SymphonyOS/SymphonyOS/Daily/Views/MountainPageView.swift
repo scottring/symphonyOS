@@ -152,6 +152,7 @@ struct MountainPageView: View {
                 .offset(y: m.navTop)
                 .accessibilitySortPriority(6)
             heading(flags.periods, m)
+                .opacity(raised ? 0 : 1)                        // it would peek over the raised paper's edge
                 .allowsHitTesting(!raised)
                 .accessibilityHidden(raised)
                 .accessibilitySortPriority(5)
@@ -160,7 +161,7 @@ struct MountainPageView: View {
                                                        chosen: page.chosenCloth(in: drawn, stage: foot.stage),
                                                        title: panel.title, hasLine: panel.line != nil,
                                                        chips: MountainPage.chips(panel, moving: page.moving), moving: page.moving)
-                MountainPanel(panel: panel, moving: page.moving, wraps: place.beside || page.moving,
+                MountainPanel(panel: panel, moving: page.moving, wraps: place.wraps,
                               showsLine: !place.dropsLine, send: apply)
                     .frame(width: place.frame.width, height: place.frame.height, alignment: .bottom)
                     .offset(x: place.frame.minX, y: place.frame.minY)

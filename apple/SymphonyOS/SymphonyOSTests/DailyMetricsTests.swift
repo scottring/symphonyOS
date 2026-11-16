@@ -948,52 +948,65 @@ extension DailyMetricsTests {
     }
 
     /// S23: the chosen flag's panel never covers that flag: every Month and Year flag of the full demo
-    /// plan chosen (from the paper, so the page stands where it is) on four windows, the panel's box does
-    /// not meet the chosen cloth; or, where it can neither stand bottom-anchored nor above the flag under
-    /// the row of words, it stays bottom-anchored and drops its line, as the rule says.
+    /// plan chosen (from the paper, so the page stands where it is) on five windows. With Move to closed
+    /// the panel's box never meets the chosen cloth and never gives up its line. With Move to open (its
+    /// chips wrap, so it is taller, more so with all eight areas) it may give up its line, and still never
+    /// meets the cloth.
     @Test func thePanelNeverCoversTheChosenFlag() throws {
         let today = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!
-        let areas = ["Health", "Home", "People", "Work", "Money", "Fun"].map { WalkArea(id: UUID(), name: $0) }
+        // The demo's ridge (six areas), and the fullest one (eight: Move to then offers seven chips).
+        let six = ["Health", "Home", "People", "Work", "Money", "Fun"], eight = six + ["Faith", "Learning"]
+        let ridge = eight.map { WalkArea(id: UUID(), name: $0) }
         var items: [WalkItem] = []
         for (level, words, name) in DemoStress.full.script {
             guard let said = WalkWords.said(words, level: level, today: today) else { continue }
-            let area = areas.first { $0.name == name }
+            let area = ridge.first { $0.name == name }
             let parent = items.first { $0.level.rawValue == level.rawValue - 1 && $0.areaId == area?.id }
             items.append(WalkItem(id: UUID(), level: level, title: said.title, areaId: area?.id, parentId: parent?.id,
                                   day: said.day, mine: true))
         }
-        var checked = 0, dropped = 0
-        for w in pageWindows where ["phone", "narrow", "outside", "half"].contains(w.name) {
-            let f = foot(w)
-            for level in [WalkLevel.month, .year] {
-                for flag in items where flag.level == level {
-                    var page = MountainPage(level: level, items: items, areas: areas, saved: [])
-                    page.periods = MountainPage.periods(level: level, selected: today, today: today, seasons: nil)
-                    _ = page.apply(.paper(true))
-                    _ = page.apply(.paperRow(flag.id))
-                    let panel = try #require(page.panel, "\(w.name) \(flag.title)")
-                    let layout = page.layout(today: today, stage: f.stage)
-                    let chosen = try #require(page.chosenCloth(in: layout, stage: f.stage), "\(w.name) \(flag.title)")
-                    let place = DailyMetrics.mountainPanel(size: w.size, line: f.bar.line, navTop: w.top, stage: f.stage,
-                                                           chosen: chosen, title: panel.title, hasLine: panel.line != nil,
-                                                           chips: MountainPage.chips(panel, moving: page.moving), moving: page.moving)
-                    let foot = f.bar.line - DailyMetrics.mountainPanelAbove
-                    #expect(place.frame.minX >= 0 && place.frame.maxX <= w.size.width, "\(w.name) \(flag.title)")
-                    if place.dropsLine {
-                        dropped += 1
-                        #expect(place.frame.maxY == foot, "\(w.name) \(flag.title)")
-                    } else {
-                        #expect(!place.frame.intersects(chosen), "\(w.name) \(flag.title): \(place.frame) meets \(chosen)")
-                        #expect(place.frame.maxY == foot || place.frame.maxY == chosen.minY - 8, "\(w.name) \(flag.title)")
-                        #expect(place.frame.minY >= w.top + DailyMetrics.navHeight + 8 || place.frame.maxY == foot,
-                                "\(w.name) \(flag.title)")
+        var checked = 0, covered: Set<String> = []
+        for (moving, names) in [(false, six), (true, six), (true, eight)] {
+            let areas = ridge.filter { names.contains($0.name) }
+            for w in pageWindows where ["phone", "narrow", "outside", "outside page", "half"].contains(w.name) {
+                let f = foot(w)
+                for level in [WalkLevel.month, .year] {
+                    for flag in items where flag.level == level {
+                        var page = MountainPage(level: level, items: items, areas: areas, saved: [])
+                        page.periods = MountainPage.periods(level: level, selected: today, today: today, seasons: nil)
+                        _ = page.apply(.paper(true))
+                        _ = page.apply(.paperRow(flag.id))
+                        if moving { _ = page.apply(.moveTapped) }
+                        #expect(page.moving == moving, "\(w.name) \(flag.title)")
+                        let panel = try #require(page.panel, "\(w.name) \(flag.title)")
+                        let layout = page.layout(today: today, stage: f.stage)
+                        let chosen = try #require(page.chosenCloth(in: layout, stage: f.stage), "\(w.name) \(flag.title)")
+                        let place = DailyMetrics.mountainPanel(size: w.size, line: f.bar.line, navTop: w.top, stage: f.stage,
+                                                               chosen: chosen, title: panel.title, hasLine: panel.line != nil,
+                                                               chips: MountainPage.chips(panel, moving: page.moving),
+                                                               moving: page.moving)
+                        let foot = f.bar.line - DailyMetrics.mountainPanelAbove
+                        let name = "\(w.name) \(level) \(flag.title)\(moving ? " moving \(areas.count)" : "")"
+                        #expect(place.frame.minX >= 0 && place.frame.maxX <= w.size.width, "\(name)")
+                        #expect(place.wraps == (place.beside || moving), "\(name)")
+                        if !moving { #expect(!place.dropsLine, "\(name) gave up its line") }
+                        if place.dropsLine {
+                            #expect(place.frame.maxY == foot, "\(name)")
+                        } else {
+                            #expect(place.frame.maxY == foot || place.frame.maxY == chosen.minY - 8, "\(name)")
+                            #expect(place.frame.minY >= w.top + DailyMetrics.navHeight + 8 || place.frame.maxY == foot, "\(name)")
+                        }
+                        if place.frame.intersects(chosen) { covered.insert(name) }
+                        checked += 1
                     }
-                    checked += 1
                 }
             }
         }
-        #expect(checked > 100, "\(checked)")
-        #expect(dropped < checked / 4, "\(dropped) of \(checked) dropped their line")
+        #expect(checked > 300, "\(checked)")
+        // Verified exactly: no case, Move to open or closed, six areas or eight. (The review reported two, on
+        // 375 x 667 and 382 x 678 for "More slow weekends together" with Move to open; with the panel's own
+        // estimate and the page standing where a paper row puts it, neither meets the chosen cloth.)
+        #expect(covered.isEmpty, "\(covered.sorted())")
     }
 
     /// The panel's height by estimate: 18 + 20 a title line + 19 for its line + 4 + 44 a row of chips.
