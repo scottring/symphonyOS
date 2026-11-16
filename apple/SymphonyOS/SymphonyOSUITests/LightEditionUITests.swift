@@ -105,6 +105,25 @@ final class LightEditionUITests: XCTestCase {
                        "the walk-down was stored as a waiting walk")
     }
 
+    /// Task 10 (S44): "Walk it down" tapped on a Month flag opens the walk on Week, standing in the
+    /// flag's own area (the demo's chosen Month flag is Home's).
+    @MainActor func testWalkItDownOnMonthStandsInTheFlagsArea() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailySeed", "morning", "-SymphonyDailyPage", "month", "-SymphonyDailyState", "select"]
+        app.launchDemo()
+        let any = app.descendants(matching: .any)
+        XCTAssertTrue(any["daily.mountain.month"].waitForExistence(timeout: 60), "never reached Month")
+        let walkItDown = any["daily.panel"].buttons["Walk it down"]
+        XCTAssertTrue(walkItDown.waitForExistence(timeout: 15), "the chosen flag offers no Walk it down")
+        walkItDown.tap()
+
+        XCTAssertTrue(app.buttons["walk.orb"].waitForExistence(timeout: 30), "the walk did not open")
+        let standing = any["walk.standing"].firstMatch           // the pill, and the element it is drawn in
+        XCTAssertTrue(standing.waitForExistence(timeout: 15), "no standing post")
+        XCTAssertTrue(standing.label.localizedCaseInsensitiveContains("Home"), "not standing in Home: \(standing.label)")
+    }
+
     /// The handle on Today's sheet lowers it over the whole plan, with no bar; a tap anywhere on
     /// the lowered sheet raises it, and so does a drag up on it.
     @MainActor func testTheHandleShowsTheWholePlanAndComesBack() throws {

@@ -555,7 +555,8 @@ struct MountainPage: Equatable {
 
     // MARK: Walk it down
 
-    /// Opens the walk one level below `item`, about it: a quick walk, in progress, `focus[level + 1] = item.id`.
+    /// Opens the walk one level below `item`, about it: a quick walk, in progress, `focus[level + 1] = item.id`,
+    /// walking down that goal's own line (`walkingDown`), so it stands in the goal's area and never borrows another's.
     /// It runs in the walk's own `periods`, over the walk's `items` (every one of them may be
     /// moved or pulled up there, so all are planted), with `item`'s area kept. The light is
     /// not taught again: this person has met it.
@@ -571,6 +572,7 @@ struct MountainPage: Equatable {
         s.kept = Self.kept(items: all, areas: areas, saved: kept)
         s.items = all
         s.focus = [next: item.id]
+        s.walkingDown = [item.id]           // only this goal's own line is a goal above (ruling P9)
         s.taught = true
         return WalkPosition(s, status: .inProgress, planted: Set(all.map(\.id)), periods: periods, now: now)
     }

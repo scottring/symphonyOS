@@ -255,8 +255,14 @@ struct iOSMainView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            // A walk left up overnight reopens on today's periods.
-            if let walk, WalkEntry.dayHasTurned(walkDay: walk.periods.today, now: .now) {
+            // A walk left up overnight reopens on today's periods. A debug demo pinned to a day
+            // (`-SymphonyDailyNow`) never turns it: its walk-down reads the pinned day, not the real one.
+            #if DEBUG
+            let dayPinned = DailyClock.pinned(in: ProcessInfo.processInfo.arguments) != nil
+            #else
+            let dayPinned = false
+            #endif
+            if !dayPinned, let walk, WalkEntry.dayHasTurned(walkDay: walk.periods.today, now: .now) {
                 closeWalk()
                 considerWalk()
             }

@@ -48,6 +48,37 @@ struct DailyWalkDownTests {
         }
     }
 
+    /// Task 10 (Step 1 and the addendum's A1): a walk down from a page opens standing in its goal's
+    /// area with that goal as the goal above, and keeps to that goal's own line (ruling P9): Next past
+    /// Season with nothing planted finds no goal above on Month rather than another year goal's season goal.
+    @Test func aWalkDownStandsInItsGoalsArea() {
+        let periods = WalkPeriods.pick(now: today)
+        let areas = WalkLoad.areas([], me: me)
+        let home = areas[1], fun = areas[2]
+        let walked = WalkItem(id: UUID(), level: .year, title: "Fix up the house", areaId: home.id)
+        let other = WalkItem(id: UUID(), level: .year, title: "Paint the porch", areaId: home.id)
+        let otherSeason = WalkItem(id: UUID(), level: .season, title: "Sand the porch boards",
+                                   areaId: home.id, parentId: other.id)
+        let newest = WalkItem(id: UUID(), level: .year, title: "Learn to paint", areaId: fun.id)
+        let items = [walked, other, otherSeason, newest]
+        let position = MountainPage.walkDown(walked, items: items, areas: areas, kept: [fun.id, home.id],
+                                             periods: periods, now: today)
+        #expect(position.walkingDown == [walked.id])
+
+        var s = WalkState()
+        s.items = items
+        position.restored(for: periods, existing: Set(items.map(\.id))).apply(to: &s)
+        let opened = s.settled
+        #expect(opened.step == 2 && opened.standing == home.id)
+        #expect(opened.focus[.season] == walked.id)
+
+        let env = WalkEnv(periods: periods, now: today)
+        _ = s.act(.next, env)
+        let month = s.settled
+        #expect(month.step == 3 && month.standing == home.id)
+        #expect(month.focus[.month] == nil)                     // never "Sand the porch boards", another goal's line
+    }
+
     @Test func itOpensOnTheStepBelowAboutTheGoalWithNoLesson() throws {
         let ctx = try walkTestContext()
         let (down, goal) = try yearGoalWalkedDown(ctx)
