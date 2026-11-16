@@ -57,10 +57,14 @@ struct LightTodayView: View {
             let line = DailyTodayHooks.walkLine(walkPosition, goalCount: goals.count, edition: appState.edition)
             let m = metrics(waiting: line != nil)
             let low = lookBack.sheet(on: m, safeBottom: safeBottom)
+            // A cloth's paper over the lowered sheet (F21): nothing under it takes a touch or is read.
+            let paper = lookBack.paper(goals: goals, tasks: tasks, periods: model.periods, me: userId)
             ZStack(alignment: .topLeading) {
                 if low != nil {
                     DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
                                    today: model.today, me: userId, size: size)
+                        .allowsHitTesting(paper == nil)
+                        .accessibilityHidden(paper != nil)
                 } else {
                     DailyBand(picture: m.picture, cut: m.todayCut, height: m.band.height + sheetDrop)
                 }
@@ -78,6 +82,11 @@ struct LightTodayView: View {
                     if let low { header(page, m, at: low.header) } else { sheet(page, m, line: line) }
                 }
                 .offset(y: sheetDrop)
+                .allowsHitTesting(paper == nil)
+                .accessibilityHidden(paper != nil)
+                if low != nil {
+                    DailyWholePlanPaper(lookBack: $lookBack, paper: paper, size: size, navTop: m.navTop)
+                }
                 if low == nil {
                     DailyPaperFade(fade: m.bar.fade, size: size)
                     DailyBarView(model: model, metrics: m.bar, placeholder: DailyCopy.placeholder(.today, periods: model.periods),
@@ -263,6 +272,11 @@ struct LightTodayView: View {
         DemoMode.showDaily(model, DemoMode.dailyStates)
         if let panel = DemoMode.dailyPanel { appState.dailyPanel = panel }
         if DemoMode.dailyStates.contains("lookback") { handleTapped() }
+        // `lookbackpaper`: the handle tapped and the year cloth's paper raised over the whole plan.
+        if DemoMode.dailyStates.contains("lookbackpaper") {
+            handleTapped()
+            lookBack.tap(.lookBackPaper(.year))
+        }
         // `details` (with `speak`): a moment later the first row's Details opens, as its menu would,
         // the bar letting go first (`sheetOpening`).
         if DemoMode.dailyStates.contains("details"), let row = page.rows.first {

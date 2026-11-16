@@ -47,10 +47,11 @@ struct PlanPaper: Equatable {
 }
 
 extension WalkState {
-    /// The paper over the walk while it is open: the step's whole level, titled with the step's period.
+    /// The paper over the walk while it is open: the step's whole level, titled with the step's period;
+    /// on Look back up the level of the cloth that opened it (`paperLevel`, F21).
     func paper(_ p: WalkPeriods) -> PlanPaper? {
-        guard paperOpen, let level else { return nil }
+        guard paperOpen, let level = paperLevel ?? level else { return nil }
         return PlanPaper.make(level: level, items: items, areas: areas, kept: kept,
-                              title: WalkCopy.paperTitle(self, p), today: p.today)
+                              title: WalkCopy.paperTitle(level, p), today: p.today)
     }
 }

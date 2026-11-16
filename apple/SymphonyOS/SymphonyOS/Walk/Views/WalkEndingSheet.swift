@@ -26,22 +26,40 @@ struct WalkEndingView: View {
         let stage = model.art.stage
         let top = s.sheetRaised ? Self.raisedTop : Self.peekTop
         let bleed = device.bleed
+        // The header, the hint and the sheet's content stand in the reading column (on a phone, the board).
+        let column = WalkLayout.column(wing: device.wing)
+        let width = column.upperBound - column.lowerBound
         ZStack(alignment: .topLeading) {
             Text(s.endingTitle)
-                .font(.custom("CrimsonPro-Regular", size: 24))
+                .font(.custom("CrimsonPro-Regular", fixedSize: 24))
                 .foregroundStyle(.white)
                 .walkGlow()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .padding(.horizontal, 20)
-                .frame(width: stage.width, alignment: .leading)
-                .offset(y: 54)
+                .padding(.horizontal, WalkLayout.lookBackInset)
+                .frame(width: width, alignment: .leading)
+                .offset(x: column.lowerBound, y: WalkLayout.lookBackHeaderTop)
                 .allowsHitTesting(false)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilitySortPriority(3)       // read before the flags behind it
-            WalkEndingSheet(model: model, raised: s.sheetRaised, bleed: bleed)
-                .frame(width: stage.width, height: stage.height - top, alignment: .top)
-                .offset(y: top)
+            // "Tap a post to see that area", once, while other areas stand at the side and the sheet is down.
+            if let hint = model.layout(wing: device.wing).lookBackHint, !s.sheetRaised {
+                Text(WalkCopy.lookBackHint)
+                    .font(.custom("DMSans-Regular", fixedSize: 12.5))
+                    .foregroundStyle(.white)
+                    .walkGlow()
+                    .lineLimit(1)
+                    .frame(width: hint.width, height: hint.height, alignment: .leading)
+                    .offset(x: hint.minX, y: hint.minY)
+                    .allowsHitTesting(false)
+                    .accessibilitySortPriority(2.5)
+                    .accessibilityIdentifier("walk.lookback.hint")
+            }
+            WalkEndingSheet(model: model, raised: s.sheetRaised,
+                            bleed: WalkStage.Bleed(left: bleed.left + column.lowerBound, right: bleed.right + stage.width - column.upperBound,
+                                                   top: bleed.top, bottom: bleed.bottom))
+                .frame(width: width, height: stage.height - top, alignment: .top)
+                .offset(x: column.lowerBound, y: top)
                 .offset(y: risen ? 0 : stage.height - top + bleed.bottom)
                 .animation(reduceMotion ? WalkSceneView.crossFade : Self.move, value: top)
         }
@@ -51,7 +69,8 @@ struct WalkEndingView: View {
 }
 
 /// The paper itself: handle, today's date and ring, the next event, the rows,
-/// "Walk another one down", the closing line and "Go to Today".
+/// "Walk another one down", the closing line and "Open Today". It is laid out in the reading
+/// column; `bleed` is how far its paper runs past the column to the window's edges.
 struct WalkEndingSheet: View {
     let model: WalkModel
     let raised: Bool
@@ -61,11 +80,15 @@ struct WalkEndingSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Lowered, the handle and the head stop growing at the large text size (S27), so the date
+            // stays above the home indicator at every size.
             handle
+                .dynamicTypeSize(raised ? ...DynamicTypeSize.xLarge : ...DynamicTypeSize.large)
             ScrollViewReader { scroller in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
                         head.id(Self.top)
+                            .dynamicTypeSize(raised ? ...DynamicTypeSize.xLarge : ...DynamicTypeSize.large)
                         if let next = model.nextUp { nextCard(next) }
                         if !model.endingRows.isEmpty { rows }
                         if let name = model.nextToWalk { walkAnother(name) }
@@ -111,22 +134,32 @@ struct WalkEndingSheet: View {
 
     // MARK: Handle
 
+    /// A labelled button (S37): a capsule 36 high, its words and a chevron (up to raise the sheet, down
+    /// to lower it) 20 in from either end, inside the 56-point tap height. With nothing to look back at,
+    /// only the grabber.
     @ViewBuilder private var handle: some View {
-        let grabber = Capsule().fill(EndingPaper.grabber).frame(width: 40, height: 5)
         if let label = model.state.sheetHandleLabel {
-            VStack(spacing: 6) {
-                grabber
-                Text(label)
-                    .font(.custom("DMSans-SemiBold", size: 13))
-                    .foregroundStyle(EndingPaper.muted)
+            Button { model.send(.sheetHandle) } label: {
+                HStack(spacing: 6) {
+                    Text(label)
+                        .font(.custom("DMSans-SemiBold", size: 14))
+                        .lineLimit(1)
+                    Image(systemName: raised ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 12, weight: .semibold))
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(EndingPaper.deepGreen)
+                .padding(.horizontal, 20)
+                .frame(height: 36)
+                .background(Capsule().fill(EndingPaper.walkFill))
+                .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
-            .contentShape(Rectangle())
-            .onTapGesture { model.send(.sheetHandle) }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier("walk.sheetHandle")
         } else {
-            grabber
+            Capsule().fill(EndingPaper.grabber).frame(width: 40, height: 5)
                 .frame(maxWidth: .infinity, minHeight: 20)
                 .accessibilityHidden(true)
         }
@@ -221,15 +254,27 @@ struct WalkEndingSheet: View {
 
     // MARK: Go to Today
 
+    /// A filled capsule (S37): 50 high, the sheet's width less 36, green, white words and an arrow,
+    /// inside the 56-point tap height.
     private var goToToday: some View {
-        Text(WalkCopy.goToToday)
-            .font(.custom("DMSans-SemiBold", size: 15))
-            .foregroundStyle(EndingPaper.green)
-            .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
+        Button { model.send(.goToToday) } label: {
+            HStack(spacing: 8) {
+                Text(WalkCopy.goToToday)
+                    .font(.custom("DMSans-SemiBold", size: 17))
+                    .lineLimit(1)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(Capsule().fill(EndingPaper.green))
+            .frame(minHeight: Self.tapHeight)
             .contentShape(Rectangle())
-            .onTapGesture { model.send(.goToToday) }
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("walk.goToToday")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(WalkCopy.goToToday)
+        .accessibilityIdentifier("walk.goToToday")
     }
 }
 

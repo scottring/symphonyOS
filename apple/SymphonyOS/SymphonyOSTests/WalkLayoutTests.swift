@@ -1571,7 +1571,7 @@ struct WalkLayoutTests {
         let kinds = Set(layouts.flatMap { $0.posts.flatMap(\.banners) }.map { b -> String in
             switch b.kind { case .full: "full"; case .parent: "parent"; case .compact: "compact"; case .more: "more"; case .ghost: "ghost" }
         })
-        #expect(kinds == ["full", "parent", "more", "ghost"])
+        #expect(kinds == ["full", "parent", "more", "ghost", "compact"])
     }
 
     // MARK: Many states
@@ -1655,21 +1655,280 @@ struct WalkLayoutTests {
         #expect(checked > 50_000)
     }
 
-    /// Look back up arrives with its own cloths in Task 8. Until then step 6 keeps the area's name
-    /// (the pill's top at 110) and the side posts, every other kept area one, and no post.
-    @Test func lookBackUpKeepsItsNameAndSidePosts() {
-        let s = plan(DemoStress.full, step: 6, standing: "People")
-        #expect(s.standing == area("People").id)
+    // MARK: Look back up (Task 8)
+
+    /// F6: the full plan, standing in Health: the area's name in its pill at 110, then one cloth for
+    /// each level, year above season above month above week above today, each centred on the
+    /// midline and a standing flag's width (120…270 on a phone), 6 under the pill and 4 apart; every
+    /// other kept area a side post, nearest first.
+    @Test func lookingBackUpReadsOneAreaTopToBottom() throws {
+        let s = plan(DemoStress.full, step: 6, standing: "Health")
+        #expect(s.standing == area("Health").id)
+        for wing in wings {
+            let layout = ruled(s, wing: wing)
+            let pill = try #require(layout.standingLabel)
+            #expect(pill.frame.minY == 110 && pill.name == "Health" && pill.caret == CGRect(x: 190, y: 101, width: 10, height: 7))
+            let cloths = layout.banners
+            #expect(layout.posts.count == 1 && cloths.allSatisfy { $0.kind == .compact }, "wing \(wing)")
+            #expect(cloths.map(\.level) == [.year, .season, .month, .week, .today], "wing \(wing)")
+            #expect(cloths.first.map { $0.frame.minY == pill.frame.maxY + 6 } == true)
+            for (a, b) in zip(cloths, cloths.dropFirst()) { #expect(near(b.frame.minY - a.frame.maxY, 4, 0.001), "\(a.id), \(b.id)") }
+            let width = WalkLayout.standingWidth(wing: wing)
+            for c in cloths { #expect(near(c.frame.midX, 195, 0.001) && near(c.frame.width, width, 0.001), "wing \(wing): \(c.frame)") }
+            if wing == 0 { #expect(cloths.allSatisfy { $0.frame.minX == 120 && $0.frame.maxX == 270 }) }
+            // Every cloth is Health's own; the others are the side posts, all at the right of Health, nearest first.
+            #expect(cloths.allSatisfy { s.item($0.itemId).map { s.column(of: $0) } == s.standing })
+            #expect(layout.sides.map(\.name) == ["Home", "People", "Work", "Money"])
+            #expect(Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7).isEmpty)
+        }
+    }
+
+    /// Each cloth shows its level's newest flag and stands for the rest ("+n more" on its own line):
+    /// Health holds four year goals, so the year cloth is the newest and three more. Today's cloth is
+    /// the newest of the tasks dated today; Week's is the newest that Today's cloth does not show.
+    /// A level holding one flag carries no count. A cloth's tap opens its level's paper (F21).
+    @Test func theNewestCarriesTheCountOfTheRest() throws {
+        let s = plan(DemoStress.full, step: 6, standing: "Health")
         let layout = ruled(s)
-        #expect(layout.posts.isEmpty && layout.camera == art.stops[6])
-        #expect(layout.standingLabel?.frame.minY == 110 && layout.standingLabel?.name == "People")
-        #expect(layout.standingLabel?.caret == CGRect(x: 190, y: 101, width: 10, height: 7))
-        #expect(layout.sides.map(\.name) == ["Home", "Health", "Work", "Money"])
-        // A pennant for each of an area's flags, newest first, in its own level's colour.
-        #expect(layout.sides[0].count == 14 && layout.sides[0].pennants.count == 3 && layout.sides[0].extra == 11)
-        #expect(layout.sides[0].pennants.allSatisfy { $0.level == .week })
-        #expect(layout.sides[0].label == "Home, 14 in your plan")
-        #expect(layout.sides.allSatisfy { WalkLayout.tapEvent($0) == .areaTapped($0.area!) })
+        let health = area("Health").id
+        func held(_ level: WalkLevel) -> [WalkItem] { s.items(on: level).filter { $0.areaId == health } }
+        func cloth(_ level: WalkLevel) throws -> WalkLayout.Banner { try #require(layout.banners.first { $0.level == level }) }
+        #expect(held(.year).count == 4)
+        let year = try cloth(.year)
+        #expect(year.itemId == held(.year).last?.id && year.more == 3 && year.text == "Cook at home on weeknights")
+        #expect(year.label == "Year: Cook at home on weeknights, and 3 more, tap to read the list")
+        #expect(try cloth(.season).more == 2 && cloth(.month).more == 3)
+        let tasks = held(.week)
+        #expect(tasks.map(\.title) == ["Tour the gym on Main Street", "Lay out running kit"])
+        #expect(try cloth(.today).itemId == tasks[1].id && cloth(.today).more == 1)
+        #expect(try cloth(.week).itemId == tasks[0].id && cloth(.week).more == 1)
+        for c in layout.banners { #expect(c.taps && WalkLayout.tapEvent(c, on: layout.posts[0]) == .lookBackPaper(c.level)) }
+        // One flag on a level: no count, and the label says only what a tap does.
+        let lone = flag(.year, "Run a 10k", in: "Home")
+        let one = try #require(ruled(state(6, kept: ["Home"], items: [lone])).banners.first)
+        #expect(one.more == nil && one.frame.height == 23 && one.label == "Year: Run a 10k, tap to read the list")
+    }
+
+    /// A quick walk plants one chain in one area: looking back up reads it top to bottom, with no
+    /// side post (the other kept areas hold nothing), no hint, and no count on any cloth.
+    @Test func aQuickWalksLookBackIsOneChainAndNoPosts() {
+        let year = flag(.year, "Sign one more contract", in: "Work")
+        let season = flag(.season, "Pitch three new clients", in: "Work", parent: year.id)
+        let month = flag(.month, "Make 10 sales calls", in: "Work", parent: season.id)
+        let week = flag(.week, "Call the first three leads", in: "Work", parent: month.id, day: today)
+        let s = state(6, kept: ["Health", "Home", "Work"], items: [year, season, month, week])
+        #expect(s.standing == area("Work").id)
+        let layout = ruled(s)
+        #expect(layout.sides.isEmpty && layout.lookBackHint == nil)
+        #expect(layout.banners.map(\.level) == [.year, .season, .month, .week, .today])
+        #expect(layout.banners.map(\.itemId) == [year.id, season.id, month.id, week.id, week.id])
+        #expect(layout.banners.allSatisfy { $0.more == nil && $0.kind == .compact })
+        #expect(Invariants.check(layout, s).isEmpty)
+    }
+
+    /// While the ending sheet or a cloth's paper is raised over the mountain nothing stands on it (the
+    /// area's pill would peek over the sheet's top at 130, the paper's at 116): no post, no name, no side
+    /// post, no hint. Lowered, all of it again.
+    @Test func theRaisedSheetCoversTheMountain() {
+        let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
+        var s = plan(DemoStress.full, step: 6, standing: "Health")
+        s.sheetOpen = true
+        #expect(s.sheetRaised)
+        let raised = ruled(s)
+        #expect(raised.posts.isEmpty && raised.labels.isEmpty && raised.sides.isEmpty && raised.lookBackHint == nil)
+        s.sheetOpen = false
+        #expect(ruled(s).posts.count == 1 && ruled(s).lookBackHint != nil)
+        _ = s.apply(.lookBackPaper(.month), env)
+        #expect(s.paperOpen && ruled(s).posts.isEmpty && ruled(s).labels.isEmpty && ruled(s).sides.isEmpty)
+        _ = s.apply(.paperClosed, env)
+        #expect(ruled(s).posts.count == 1)
+    }
+
+    /// The hint under the header ("Tap a post to see that area") stands only while other areas stand
+    /// at the side, in the reading column 20 in, 84 to 100; nothing on the mountain meets it. The nameless
+    /// post alone (only read here) brings no hint.
+    @Test func theHintStandsUnderTheHeaderWhileThereArePosts() {
+        let s = plan(DemoStress.full, step: 6, standing: "Health")
+        #expect(ruled(s).lookBackHint == CGRect(x: 20, y: 84, width: 350, height: 16))
+        let column = WalkLayout.column(wing: 110.3)
+        #expect(ruled(s, wing: 110.3).lookBackHint == CGRect(x: column.lowerBound + 20, y: 84, width: column.upperBound - column.lowerBound - 40, height: 16))
+        for step in 1...5 { #expect(ruled(plan(DemoStress.full, step: step, standing: "Health")).lookBackHint == nil) }
+        let alone = state(6, kept: ["Home"], items: [flag(.year, "Run a 10k", in: "Home")])
+        #expect(ruled(alone).lookBackHint == nil)
+        let loose = state(6, kept: ["Home"], items: [flag(.year, "Run a 10k", in: "Home"), flag(.year, "No area yet")])
+        #expect(ruled(loose).sides.map(\.area) == [nil] && ruled(loose).lookBackHint == nil)
+        #expect(ruled(loose).sides.first.map { WalkLayout.tapEvent($0) } == .some(nil))
+    }
+
+    /// F20: a Look back up cloth holds its newest title on up to three lines at its width (DM Sans
+    /// SemiBold 12, 6 either side), the lines the layout broke (F39), and "+n more" on a line of its
+    /// own (14); it is `23 + 13 × (lines − 1)` high, and 14 more with the count. The long plan, standing
+    /// in each of its areas in turn, on every wing; nothing below 700.
+    @Test func aLookBackClothHoldsAFortyFourLetterTitle() {
+        var checked = 0, threeLines = 0
+        for standing in ["Health", "Home", longName] {
+            let s = plan(DemoStress.long, step: 6, standing: standing)
+            #expect(s.area(s.standing)?.name == standing)
+            for wing in wings {
+                let layout = ruled(s, wing: wing)
+                let width = WalkLayout.standingWidth(wing: wing)
+                #expect(!layout.banners.isEmpty)
+                for b in layout.banners {
+                    let words = WalkLayout.setLines(b.text, face: .lookBack, width: width - WalkLayout.Face.lookBack.inset, limit: 3)
+                    #expect(b.words == words && b.lines == words.count, "\(standing), wing \(wing): \(b.text)")
+                    #expect(b.lines == min(3, WalkLayout.lines(for: b.text, width: width, face: .lookBack)))
+                    #expect(b.frame.height == 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14))
+                    #expect(b.frame.maxY <= WalkLayout.lookBackFoot)
+                    if b.lines == 3 { threeLines += 1 }
+                    checked += 1
+                }
+                #expect(Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7).isEmpty, "\(standing), wing \(wing)")
+            }
+        }
+        #expect(checked > 40 && threeLines > 0, "\(checked) cloths, \(threeLines) on three lines")
+    }
+
+    /// Nothing sits under the ending sheet (it peeks at 716): over every generated Look back up, on
+    /// every wing and both footings, every frame the layout makes and every cloth's touch frame ends at
+    /// or above 700.
+    @Test func nothingSitsUnderTheEndingSheet() {
+        let states = Generated.all.filter { $0.step == 6 }
+        var checked = 0
+        for wing in wings { for footing in [WalkFooting.natural, .level] {
+            let touch: CGFloat = wing == 0 ? 44 : 55.7
+            for s in states {
+                let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
+                let frames = Invariants.everything(layout).map(\.1) + layout.posts.flatMap { $0.touchFrames(touch: touch) }
+                    + layout.sides.map { $0.touchFrame(touch: touch) }
+                for f in frames where f.maxY > WalkLayout.lookBackFoot + 0.01 {
+                    Issue.record("\(footing), wing \(wing), \(Generated.describe(s)): \(f) ends at \(f.maxY)")
+                    return
+                }
+                checked += 1
+            }
+        } }
+        #expect(checked > 2000)
+    }
+
+    /// The generated Look back ups (every count of areas, loose flags, flags a post, each standing
+    /// area) keep every guarantee, cloths and all, on every wing, ruled and by hand.
+    @Test func theGeneratedLookBacksKeepEveryGuarantee() {
+        let states = Generated.all.filter { $0.step == 6 }
+        var withCloths = 0, withSides = 0
+        for wing in wings { for footing in [WalkFooting.natural, .level] {
+            for s in states {
+                let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
+                let problems = Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7)
+                if !problems.isEmpty { Issue.record("\(footing), wing \(wing), \(Generated.describe(s)): \(problems.prefix(3))"); return }
+                if !layout.banners.isEmpty { withCloths += 1 }
+                if !layout.sides.isEmpty { withSides += 1 }
+            }
+        } }
+        #expect(states.count > 300 && withCloths > 2000 && withSides > 1000, "\(states.count) states, \(withCloths) with cloths, \(withSides) with sides")
+    }
+
+    /// A tap on a side post looking back up stands the walk in that area: its cloths come to the
+    /// middle, and the area stood in before becomes a side post. A side post says how many goals and
+    /// tasks stand in its area, with a pennant for each (at most four, year first, each in its
+    /// level's colour; with more, three and "+n").
+    @Test func tappingAPostOnTheLookBackWalksThere() throws {
+        var s = plan(DemoStress.full, step: 6, standing: "Health")
+        let people = try #require(ruled(s).sides.first { $0.name == "People" })
+        let peopleId = area("People").id
+        let goals = s.items.filter { $0.areaId == peopleId && $0.level != .week }.count
+        let tasks = s.items.filter { $0.areaId == peopleId && $0.level == .week }.count
+        #expect(people.count == goals + tasks && people.label == "People, \(goals + tasks) goals and tasks")
+        #expect(people.pennants.count == 3 && people.extra == goals + tasks - 3 && people.pennants.allSatisfy { $0.level == .year })
+        #expect(WalkLayout.tapEvent(people) == .areaTapped(peopleId))
+        let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
+        #expect(s.apply(.areaTapped(peopleId), env) == [.save])
+        #expect(s.standing == peopleId)
+        let after = ruled(s)
+        #expect(after.standingLabel?.name == "People" && after.banners.first?.text == "Host one big family dinner")
+        #expect(after.sides.map(\.name) == ["Home", "Health", "Work", "Money"])
+        // A side with one flag on each level: a pennant each, year first.
+        let year = flag(.year, "Run a 10k", in: "Health")
+        let chain = [flag(.year, "Sign one more contract", in: "Work")]
+        let season = flag(.season, "Pitch three new clients", in: "Work", parent: chain[0].id)
+        let month = flag(.month, "Make 10 sales calls", in: "Work", parent: season.id)
+        let week = flag(.week, "Call the first three leads", in: "Work", parent: month.id)
+        let work = try #require(ruled(state(6, kept: ["Health", "Work"], items: [year] + chain + [season, month, week], standing: "Health")).sides.first)
+        #expect(work.pennants.map(\.level) == [.year, .season, .month, .week] && work.extra == 0)
+        #expect(work.label == "Work, 4 goals and tasks")
+    }
+
+    /// The count on a cloth and its paper agree (F21): the paper a cloth opens reads exactly the
+    /// standing area's flags on that level that the cloth counts (the one shown and "+n more"), and
+    /// every other kept area with a flag there, in ridge order. The full and long plans, standing in
+    /// each of their areas.
+    @Test func aClothsCountIsItsPapersSection() {
+        let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
+        var checked = 0
+        for (stress, areas) in [(DemoStress.full, DemoStress.full.areas), (DemoStress.long, DemoStress.long.areas)] {
+            for standing in areas {
+                let s = plan(stress, step: 6, standing: standing)
+                let layout = ruled(s)
+                for cloth in layout.banners {
+                    var open = s
+                    _ = open.apply(.lookBackPaper(cloth.level), env)
+                    guard let paper = open.paper(env.periods) else { Issue.record("\(standing) \(cloth.level): no paper"); continue }
+                    let here = paper.sections.first { $0.area == s.standing }
+                    #expect(here?.rows.count == (cloth.more ?? 0) + 1, "\(standing) \(cloth.level)")
+                    #expect(here?.rows.contains { $0.id == cloth.itemId } == true, "\(standing) \(cloth.level)")
+                    #expect(paper.title == WalkCopy.paperTitle(cloth.level, env.periods))
+                    let level: WalkLevel = cloth.level
+                    let holding = s.keptAreas.filter { a in
+                        s.items.contains { $0.areaId == a.id && (level == .today ? $0.level == .week && PlanCalendar.sameDay($0.day, today) : $0.level == level) }
+                    }
+                    #expect(paper.sections.compactMap(\.area) == holding.map(\.id), "\(standing) \(cloth.level)")
+                    checked += 1
+                }
+            }
+        }
+        #expect(checked > 25)
+    }
+
+    /// Each cloth on a post takes a tap in a frame of its own (`Post.touchFrames(touch:)`), over every
+    /// generated state on each wing: it holds the cloth as drawn; it is at least a touch high where its
+    /// neighbours leave room, and otherwise reaches the middle of the gap to each neighbour; no two
+    /// overlap, none covers another cloth's centre, and none meets a side post. Prints the smallest.
+    @Test func aClothsTouchFrameIsItsOwn() {
+        var smallest: (height: CGFloat, at: String) = (.infinity, ""), smallestBack: (height: CGFloat, at: String) = (.infinity, "")
+        var frames = 0
+        for wing in wings {
+            let touch: CGFloat = wing == 0 ? 44 : 55.7
+            for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) {
+                for post in layout.posts {
+                    let touchFrames = post.touchFrames(touch: touch)
+                    guard touchFrames.count == post.banners.count else { Issue.record("\(touchFrames.count) frames for \(post.banners.count)"); return }
+                    let drawn = post.banners.map(\.drawn)
+                    for (i, frame) in touchFrames.enumerated() {
+                        frames += 1
+                        let box = drawn[i]
+                        if !frame.insetBy(dx: -0.01, dy: -0.01).contains(box) { Issue.record("\(Generated.describe(s)): \(frame) does not hold \(box)"); return }
+                        if frame.width < min(touch, box.width) - 0.01 { Issue.record("\(Generated.describe(s)): \(frame) narrower than a touch") }
+                        let above = drawn.filter { $0.maxY <= box.minY + 0.01 }.map(\.maxY).max()
+                        let below = drawn.filter { $0.minY >= box.maxY - 0.01 }.map(\.minY).min()
+                        let room = (below.map { ($0 + box.maxY) / 2 } ?? .infinity) - (above.map { ($0 + box.minY) / 2 } ?? -.infinity)
+                        if frame.height < min(touch, room) - 0.01 { Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) is short of \(min(touch, room))"); return }
+                        for (j, other) in drawn.enumerated() where j != i && frame.contains(CGPoint(x: other.midX, y: other.midY)) {
+                            Issue.record("\(Generated.describe(s)): \(frame) covers a neighbour's centre"); return
+                        }
+                        for (j, other) in touchFrames.enumerated() where j > i && Invariants.overlap(frame, other) {
+                            Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) meets \(other)"); return
+                        }
+                        for side in layout.sides { for b in side.boxes where Invariants.overlap(frame, b) {
+                            Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) meets \(side.name)'s \(b)"); return
+                        } }
+                        let at = "\(post.banners[i].kind) on step \(s.step), wing \(wing), \(post.banners[i].lines) lines"
+                        if frame.height < smallest.height { smallest = (frame.height, at) }
+                        if s.step == 6, frame.height < smallestBack.height { smallestBack = (frame.height, at) }
+                    }
+                }
+            }
+        }
+        #expect(frames > 20_000)
+        print("Cloth touch frames: \(frames); smallest \(smallest.height) (\(smallest.at)); looking back up \(smallestBack.height) (\(smallestBack.at))")
     }
 
     /// The side pills at their widest: two in one row of one side give way equally and stand 1
@@ -2488,8 +2747,10 @@ enum Invariants {
         let steps = (1...5).contains(s.step)
 
         // The shape of it.
-        if s.step == 0 || s.ground || s.step == 6 {
+        if s.step == 0 || s.ground {
             if !layout.posts.isEmpty { problems.append("a post on step \(s.step) ground \(s.ground)") }
+        } else if s.step == 6 {
+            problems += lookBack(layout, s, wing: wing)
         } else if layout.posts.count != 1 {
             problems.append("\(layout.posts.count) standing posts")
         }
@@ -2505,11 +2766,12 @@ enum Invariants {
             case .full, .ghost: size = CGSize(width: width, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
             case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines))
             case .more: size = CGSize(width: 78, height: 22)
-            case .compact: size = b.frame.size
+            case .compact: size = CGSize(width: width, height: 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14))
             }
             if !(1...3).contains(b.lines) || abs(b.frame.width - size.width) > 0.01 || abs(b.frame.height - size.height) > 0.01 {
                 problems.append("\(b.id) holds \(b.lines) lines in \(b.frame)")
             }
+            if case .more = b.kind {} else if b.words.count != b.lines { problems.append("\(b.id) draws \(b.words.count) lines for \(b.lines)") }
             if b.kind == .ghost, b.tag == nil { problems.append("an example without its tag") }
         }
         let full = banners.filter { $0.kind == .full }.count, above = banners.filter { $0.kind == .parent }.count
@@ -2557,6 +2819,10 @@ enum Invariants {
         // (c), (d)
         let ceiling: CGFloat = s.step >= 6 ? WalkLayout.lookBackHeader : WalkLayout.question
         for (what, f) in all where s.step >= 1 && f.minY < ceiling - 0.01 { problems.append("(c) \(what) at \(f.minY), above \(ceiling)") }
+        // Look back up's hint under its header: nothing meets it.
+        if let hint = layout.lookBackHint {
+            for (what, f) in all where overlap(hint, f) { problems.append("(c) \(what) \(f) meets the hint \(hint)") }
+        }
         if steps {
             for c in cloths where c.box.maxY > WalkLayout.lowestCloth + 0.5 { problems.append("(d) \(c.id) ends at \(c.box.maxY)") }
             for (what, f) in all where f.maxY > WalkLayout.standingFoot + 0.01 { problems.append("(d) \(what) ends at \(f.maxY)") }
@@ -2583,6 +2849,49 @@ enum Invariants {
         } }
         // (h)
         if let flag = layout.spokenFlag { problems += spoken(flag, layout).map { "(h) \($0)" } }
+        return problems
+    }
+
+    /// Look back up's shape (F6, F20): one post standing in the area the walk stands in (none, and no
+    /// name, only with nothing planted); on it one `.compact` cloth for each level holding a flag there, year at the
+    /// top and Today at the foot, each standing for the newest (Week: the newest Today's cloth does not
+    /// show, where there is another) and carrying the count of the rest; the hint exactly while another
+    /// area stands at the side (a named post: the nameless one is only read here); and every named side
+    /// post an area with a flag.
+    static func lookBack(_ layout: WalkLayout, _ s: WalkState, wing: CGFloat) -> [String] {
+        var problems: [String] = []
+        let banners = layout.posts.flatMap(\.banners)
+        // Nothing planted at all: nothing stands (the sheet is up over the mountain).
+        if layout.posts.count != (s.items.isEmpty ? 0 : 1) || (s.items.isEmpty && !layout.labels.isEmpty) {
+            problems.append("\(layout.posts.count) posts and \(layout.labels.count) names looking back up")
+        }
+        let here = s.items.filter { s.column(of: $0) == s.standing }
+        func held(_ level: WalkLevel) -> [WalkItem] {
+            level == .today ? here.filter { $0.level == .week && PlanCalendar.sameDay($0.day, today) } : here.filter { $0.level == level }
+        }
+        let levels = WalkLevel.allCases.filter { !held($0).isEmpty }
+        if banners.map(\.level) != levels || banners.contains(where: { $0.kind != .compact }) {
+            problems.append("cloths \(banners.map(\.level)) for levels \(levels)")
+        }
+        for (a, b) in zip(banners, banners.dropFirst()) where b.frame.minY < a.frame.maxY {
+            problems.append("\(b.id) stands above \(a.id)")
+        }
+        for b in banners {
+            let flags = held(b.level)
+            guard let item = flags.first(where: { $0.id == b.itemId }) else { problems.append("\(b.id) shows no flag of its level here"); continue }
+            if (b.more ?? 0) != flags.count - 1 || b.more == 0 { problems.append("\(b.id): more \(String(describing: b.more)) for \(flags.count)") }
+            let todays = banners.first { $0.level == .today }?.itemId
+            let newest = b.level == .week ? (flags.last { $0.id != todays } ?? flags.last) : flags.last
+            if b.level != .today, item.id != newest?.id { problems.append("\(b.id) is not the newest") }
+            if !b.taps || WalkLayout.tapEvent(b, on: layout.posts[0]) != .lookBackPaper(b.level) { problems.append("\(b.id) opens no paper") }
+        }
+        if (layout.lookBackHint != nil) != layout.sides.contains(where: { $0.area != nil }) {
+            problems.append("the hint \(String(describing: layout.lookBackHint)) with \(layout.sides.count) sides")
+        }
+        for side in layout.sides {
+            guard let area = side.area else { continue }
+            if !s.items.contains(where: { s.column(of: $0) == area }) { problems.append("\(side.name) has nothing and stands") }
+        }
         return problems
     }
 }

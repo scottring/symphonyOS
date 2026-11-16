@@ -51,7 +51,13 @@ struct WalkFootingTests {
             for post in layout.posts {
                 guard post.lean == 0, post.base == CGPoint(x: 195, y: 556), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
                 else { Issue.record("\(Generated.describe(s)): the ruled post is not ruled"); return }
-                if let lowest = post.banners.last, lowest.frame.maxY != 532 { Issue.record("\(Generated.describe(s)): lowest cloth at \(lowest.frame.maxY)"); return }
+                // Year to Today hang from the lowest cloth's place; Look back up from 6 under its pill at 110 (or from 110).
+                if s.step == 6 {
+                    let first = layout.labels.first.map { $0.frame.maxY + 6 } ?? 110
+                    if let top = post.banners.first, top.frame.minY != first || layout.labels.first.map({ $0.frame.minY != 110 }) == true {
+                        Issue.record("\(Generated.describe(s)): looking back up, the top cloth at \(top.frame.minY)"); return
+                    }
+                } else if let lowest = post.banners.last, lowest.frame.maxY != 532 { Issue.record("\(Generated.describe(s)): lowest cloth at \(lowest.frame.maxY)"); return }
             }
             guard layout.sides.allSatisfy({ $0.lean == 0 }), layout.labels.allSatisfy({ $0.footing == 0 })
             else { Issue.record("\(Generated.describe(s)): a ruled side post or chip is off its place"); return }

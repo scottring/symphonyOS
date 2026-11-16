@@ -407,12 +407,18 @@ enum WalkCopy {
     /// The paper's heading: the step's period in words ("2027, the year ahead", "Winter", "December",
     /// "This week", "Today").
     static func paperTitle(_ s: WalkState, _ p: WalkPeriods) -> String {
-        switch s.level {
-        case .year?, nil: return "\(p.year), the year ahead"
-        case .season?: return p.season.name
-        case .month?: return p.monthName
-        case .week?: return "This week"
-        case .today?: return todayEyebrow
+        paperTitle(s.level ?? .year, p)
+    }
+
+    /// The paper's heading for a level (Look back up's cloths open a level's paper, F21): its period
+    /// in words, as the step's own paper reads it.
+    static func paperTitle(_ level: WalkLevel, _ p: WalkPeriods) -> String {
+        switch level {
+        case .year: return "\(p.year), the year ahead"
+        case .season: return p.season.name
+        case .month: return p.monthName
+        case .week: return "This week"
+        case .today: return todayEyebrow
         }
     }
 
@@ -429,6 +435,8 @@ enum WalkCopy {
     // MARK: The ending
 
     static let lookBack = "Look back up: that’s your plan."; static let heresToday = "Here’s today."
+    /// Under Look back up's header while other areas stand at the side (F6).
+    static let lookBackHint = "Tap a post to see that area"
     static let showMyDay = "Show my day"; static let lookBackHandle = "See my whole plan"
     static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Open Today"
     static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing for today yet."
@@ -504,13 +512,15 @@ enum WalkCopy {
         /// tap goes on to the next week task here); `firstThingFocusable`, not planted by this walk,
         /// while another is (a tap makes it the goal above).
         case firstThingFocusable, firstThingFocused
+        /// Look back up (F21): the level's newest flag, standing for this many more; a tap opens the paper.
+        case opensPaper(Int)
         /// A tap does something: the label says what. A plain flag, someone else's first thing,
         /// or the only goal above, is only read.
         var taps: Bool {
             switch self {
             case .plain, .firstThing, .focused: return false
             case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                 .example, .stub:
+                 .example, .stub, .opensPaper:
                 return true
             }
         }
@@ -532,6 +542,8 @@ enum WalkCopy {
         case .firstThingFocused: return "Today: \(text), first thing, tap for the next one here"
         case .example: return "Example: \(text), tap to make it yours"
         case .stub(let n): return "\(n) more, tap to show"
+        case .opensPaper(let n):
+            return n > 0 ? "\(withTag), and \(n) more, \(readTheList.lowercased())" : "\(withTag), \(readTheList.lowercased())"
         }
     }
 
@@ -564,9 +576,13 @@ enum WalkCopy {
         }
         return "\(name), \(many) \(when)"
     }
-    /// Look back up, where a side post stands for every flag of its area.
-    static func sideLabelWholePlan(name: String, count: Int) -> String {
-        "\(name), \(count == 0 ? "nothing" : "\(count)") in your plan"
+    /// Look back up, where a side post stands for every flag of its area: "Health, 9 goals and tasks",
+    /// "Work, 3 goals", "Home, 1 task". A count of what stands there, never of what is undone.
+    static func sideLabelWholePlan(name: String, goals: Int, tasks: Int) -> String {
+        func many(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n) \(one)s" }
+        if goals > 0 && tasks > 0 { return "\(name), \(goals + tasks) goals and tasks" }
+        if tasks > 0 { return "\(name), \(many(tasks, "task"))" }
+        return "\(name), \(goals == 0 ? "nothing" : many(goals, "goal"))"
     }
     /// The nameless post's name, to VoiceOver.
     static let noArea = "No area"

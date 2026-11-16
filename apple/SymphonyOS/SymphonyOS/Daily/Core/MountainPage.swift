@@ -5,8 +5,8 @@ import SwiftData
 /// level, with the person's flags, and no question and no light. It is drawn by
 /// `WalkLayout.make(walkState, …, footing: .natural)` at the walk's own step for the
 /// level (1 Year, 2 Season, 3 Month): the walk's camera for that level, peak labels under
-/// their posts, and only the level shown and those above it. (Look back up, step 6, is
-/// every level at once with the labels heading their columns; only `lookBack` uses it.)
+/// their posts, and only the level shown and those above it. (Look back up, step 6, reads one
+/// area top to bottom, every level, the others as side posts (F6); only `lookBack` uses it.)
 ///
 /// Pure: what should be written comes back as `Effect`s for the page's model to carry out.
 /// Its flags come from the person's own rows by their links (`flags(...)`), and every one may
@@ -262,7 +262,8 @@ struct MountainPage: Equatable {
         return s
     }
 
-    /// Look back up (step 6): every level at once, each area with a flag a column.
+    /// Look back up (step 6): every level of the area it stands in, top to bottom; every other kept area
+    /// holding a flag a side post (F6). It stands where the walk's own rule puts it (`WalkState.settled`).
     static func lookBack(items: [WalkItem], areas: [WalkArea], kept: [UUID]) -> WalkState {
         var s = WalkState()
         s.step = 6

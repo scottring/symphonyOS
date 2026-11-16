@@ -46,7 +46,28 @@ struct WalkLayout: Equatable {
     struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
         let pale: Bool; let banners: [Banner]
         var lean: Double = 0
-        var pole: CGFloat = WalkLayout.pole }
+        var pole: CGFloat = WalkLayout.pole
+
+        /// Where each banner takes a tap, in `banners` order: the cloth as drawn, made at least `touch`
+        /// across and, where its neighbours leave room, `touch` high about its middle (room it cannot take
+        /// on one side, it takes on the other). Toward a neighbouring cloth it reaches only the middle of
+        /// the gap between them, so no two touch frames meet and none covers another cloth: three or five
+        /// one-line Look back up cloths 4 apart are each their own height and 4 more.
+        func touchFrames(touch: CGFloat) -> [CGRect] {
+            let drawn = banners.map(\.drawn)
+            return drawn.map { box in
+                let above = drawn.filter { $0.maxY <= box.minY + 0.01 && $0 != box }.map(\.maxY).max()
+                let below = drawn.filter { $0.minY >= box.maxY - 0.01 && $0 != box }.map(\.minY).min()
+                let ceiling = above.map { ($0 + box.minY) / 2 } ?? -.infinity
+                let floor = below.map { ($0 + box.maxY) / 2 } ?? .infinity
+                let grow = max(0, touch - box.height) / 2
+                var top = box.minY - grow, foot = box.maxY + grow
+                if top < ceiling { foot += ceiling - top; top = ceiling }
+                if foot > floor { top = max(ceiling, top - (foot - floor)); foot = floor }
+                let across = max(0, touch - box.width) / 2
+                return CGRect(x: box.minX - across, y: top, width: box.width + 2 * across, height: foot - top)
+            }
+        } }
     /// An area's name: a choice on the ground (`ground`), or the pill on the standing post
     /// (`standing`: its frame is the pill alone, and the caret is drawn 2 above it).
     struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
@@ -117,6 +138,8 @@ struct WalkLayout: Equatable {
     var back: CGRect? = nil
     var leave: CGRect? = nil
     var moveRow: CGRect? = nil
+    /// Look back up's hint under its header ("Tap a post to see that area"), while other areas stand at the side.
+    var lookBackHint: CGRect? = nil
 
     // MARK: Stage numbers (the art's numbers live in `WalkArt`; the standing post's in `WalkLayout+Standing.swift`)
 
@@ -129,6 +152,8 @@ struct WalkLayout: Equatable {
     /// Look back up: the bottom of its header line (nothing stands above it), the standing pill's
     /// top, and the lowest anything stands (the ending sheet peeks at 716).
     static let lookBackHeader: CGFloat = 92, lookBackPill: CGFloat = 110, lookBackFoot: CGFloat = 700
+    /// Look back up's header line's top, and the foot of its words (the hint under it included).
+    static let lookBackHeaderTop: CGFloat = 54, lookBackWordsFoot: CGFloat = 100
     /// The paper (F7): its top on the board while raised, and how far its words stand in from the
     /// reading column's edges (`column(wing:)`).
     static let paperTop: CGFloat = 116, paperInset: CGFloat = 24
@@ -146,7 +171,9 @@ struct WalkLayout: Equatable {
                      footing: WalkFooting = .natural, wing: CGFloat = 0, periods: WalkPeriods? = nil) -> WalkLayout {
         let s = state.settled
         var labels: [Label] = [], posts: [Post] = [], sides: [Side] = []
-        if s.step >= 1 {
+        // Look back up with the sheet or the paper raised over the mountain: nothing stands (the area's pill,
+        // at 110, would peek over the sheet's top at 130 and the paper's at 116); lowered, it all drops in again.
+        if s.step >= 1, !(s.step == 6 && (s.sheetRaised || s.paperOpen)) {
             if s.ground {
                 labels = groundLabels(s, footing: footing, wing: wing)
             } else {
@@ -169,8 +196,21 @@ struct WalkLayout: Equatable {
         made.back = backFrame(s, wing: wing)
         made.leave = leaveFrame(s, wing: wing)
         made.moveRow = moveRowFrame(s)
+        // The hint says a post walks there: only while a named one stands at the side.
+        made.lookBackHint = s.step == 6 && sides.contains { $0.area != nil } ? lookBackHintFrame(wing: wing) : nil
         return made
     }
+
+    /// Look back up's hint ("Tap a post to see that area"): one line under the header, 84 to 100, in
+    /// the reading column 20 in from either edge, as the header stands.
+    static let lookBackHintTop: CGFloat = 84
+    static func lookBackHintFrame(wing: CGFloat) -> CGRect {
+        let column = column(wing: wing)
+        return CGRect(x: column.lowerBound + lookBackInset, y: lookBackHintTop,
+                      width: column.upperBound - column.lowerBound - 2 * lookBackInset, height: lookBackWordsFoot - lookBackHintTop)
+    }
+    /// How far Look back up's header and hint stand in from the reading column's edges.
+    static let lookBackInset: CGFloat = 20
 
     /// The art's stop for a step (never a zoom); an art with too few stops falls back to its last one.
     static func stop(_ art: WalkArt, _ step: Int) -> Camera {
@@ -196,11 +236,11 @@ struct WalkLayout: Equatable {
 
     /// What a tap on a banner sends: an example plants its words; a flag of the step's level or the
     /// goal above is tapped by its id. "+n more" opens the paper (F7), and a Look back up cloth the
-    /// paper for its level (Task 8; nothing until then).
+    /// paper for its level (F21).
     static func tapEvent(_ banner: Banner, on post: Post) -> WalkEvent? {
         switch banner.kind {
         case .more: return .paperOpened
-        case .compact: return nil
+        case .compact: return .lookBackPaper(banner.level)
         case .ghost: return .exampleTapped(banner.text)
         case .full, .parent: return banner.itemId.map { .bannerTapped($0) }
         }

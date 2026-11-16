@@ -27,8 +27,9 @@ struct WalkBackdrop: Equatable {
     /// Seven, Welcome … Look back up: the picture's camera on each step.
     let stops: [WalkLayout.Camera]
     /// Per step, the top shade's strength where the painting behind the words is bright (nil: the
-    /// walk's own faint band). It holds from the top to the question's foot (`WalkLayout.question`)
-    /// and fades out over `shadeFade`, so every word above the flags reads at 4.5:1 on the painting.
+    /// walk's own faint band). It holds from the top to the question's foot (`WalkLayout.question`;
+    /// on Look back up its header's, `shadeReach`) and then fades out, so every word above the flags
+    /// reads at 4.5:1 on the painting.
     let shade: [Double?]
     /// Per step, the held shade on a stretched stage (one with wings), where the enlarged picture
     /// brings brighter paint up behind the words than the phone has there (nil: as `shade`).
@@ -40,6 +41,15 @@ struct WalkBackdrop: Equatable {
     var skyline: [CGPoint] = []
     var water: [CGRect] = []
     static let shadeFade: CGFloat = 50
+
+    /// Where the held shade ends on a step, and how far it then fades to nothing: to the question's
+    /// foot on Year to Today, fading over `shadeFade`; on Look back up only to its header's words'
+    /// foot (the hint included), fading over `lookBackShadeFade`, so where the picture is enlarged no
+    /// edge runs across the peaks under the header.
+    static func shadeReach(step: Int) -> (held: CGFloat, fade: CGFloat) {
+        step >= 6 ? (WalkLayout.lookBackWordsFoot, lookBackShadeFade) : (WalkLayout.question, shadeFade)
+    }
+    static let lookBackShadeFade: CGFloat = 90
     /// The bundled picture's pixels across its width, and the most it is ever enlarged past them on a 3x screen.
     static let pixelsAcross: CGFloat = 2048
     static let sharpest: CGFloat = 1.6

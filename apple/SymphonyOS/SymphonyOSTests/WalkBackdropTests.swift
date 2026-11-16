@@ -227,15 +227,16 @@ struct WalkBackdropTests {
     }
 
     /// Every side post stands on land (P29): on every window the tests know (the phone, 375 × 667, the
-    /// Duo's outside screen, 484 × 669, 669 × 951, 951 × 669), on every step from Year to Today, each
-    /// of the eight side slots (both sides, both rows, inner and outer: every slot the layout can fill)
+    /// Duo's outside screen, 484 × 669, 669 × 951, 951 × 669), on every step from Year to Look back up, each
+    /// of the eight side slots (both sides, both rows, inner and outer: every slot the layout can fill;
+    /// on Look back up too, which uses the same slots, Task 8)
     /// has its pole's foot and its pill's centre on the painting's land (`WalkBackdrop.standsOnLand`:
     /// below the skyline, off the river and the braided flats) under the step's picture. The only
     /// slots let off are named in `offTheLand`, each with its reason.
     @Test func sidePostsStandOnLand() {
         var off: [String] = [], excused = Set<String>(), checked = 0
         for (name, _, stage) in WalkWindows.all {
-            for step in 1...5 {
+            for step in 1...6 {
                 let c = art.backdropCamera(step: step, stage: stage)!
                 let poles = WalkLayout.sidePoles(wing: stage.wing)
                 for (i, x) in poles.enumerated() {
@@ -273,8 +274,11 @@ struct WalkBackdropTests {
         "484x669, step 3, right outer low": river,
         "669x951, step 3, right outer low": river,
         "951x669, step 3, left inner high": river,
+        "390x844, step 6, right inner low": lookBackRiver, "390x844, step 6, right outer low": lookBackRiver,
+        "484x669, step 6, left inner low": lookBackRiver, "669x951, step 6, left inner low": lookBackRiver,
     ]
     private static let skyline = "On the phone's Year the high row's pole foot (and the outer pill) stands at the skyline: the peaks' bases between summits are at 0.29 to 0.30 of the painting, and below them needs k of about 0.72 or more (the board's 0.42, P27's 0.55)."
+    private static let lookBackRiver = "Look back up shows the whole mountain at one stop (k 0.30 across the painting's width, the year's flats under the header): its low row of side slots falls on the river's thin channels on this window (Task 8); clearing them would mean moving that picture or the slots, which only a new board can."
     private static let river = "On Month the river's thin channels cross the side slots' two rows on this window; no single stop clears all six windows (k 0.44, x 230 clears the phone's eight slots but not the wider windows')."
 
     @Test func theHeldShadeIsOnlyWhereThePaintingIsBright() {
@@ -288,6 +292,12 @@ struct WalkBackdropTests {
         }
         // A phone a little taller for its width has no wings: the phone's shades.
         #expect(art.topShade(step: 6, stage: WalkStage(device: CGSize(width: 402, height: 874))) == nil)
+        // Where it holds (Task 2A's carried item): to the question's foot on Year to Today, fading over
+        // 50; on Look back up only to its header's foot (the hint under it included), fading over a
+        // longer reach, so no edge runs across the peaks under the header.
+        for step in 1...5 { #expect(WalkBackdrop.shadeReach(step: step) == (held: WalkLayout.question, fade: 50)) }
+        #expect(WalkBackdrop.shadeReach(step: 6) == (held: WalkLayout.lookBackWordsFoot, fade: 90))
+        #expect(WalkLayout.lookBackWordsFoot == 100)
     }
 
     #if os(iOS)
@@ -296,7 +306,9 @@ struct WalkBackdropTests {
     /// the picture, so other paint stands behind them). Steps 1 to 5 are sampled where the question
     /// block stands (P19): from its top (`WalkLayout.wordsTop`) to the lowest it may end
     /// (`WalkLayout.wordsFootLimit`), across its width (`WalkLayout.wordsWidth(wing:)`), centred on x 195.
-    /// Welcome and Look back up keep their own words where they were (stage y 64 to 248, x 40 to 350).
+    /// Welcome keeps its own words where they were (stage y 64 to 248, x 40 to 350); Look back up is
+    /// sampled where its header and hint stand (y 54 to 100, from 20 in from the reading column's left,
+    /// 330 across), the only words over its painting.
     /// The words' own glow is not counted.
     @Test func theWordsReadOnThePaintingAtEveryStep() throws {
         let image = try #require(UIImage(named: backdrop.imageName)?.cgImage)
@@ -311,8 +323,10 @@ struct WalkBackdropTests {
         for (name, _, stage) in WalkWindows.all {
             for step in 0...6 {
                 let block = (1...5).contains(step)
-                let words = block ? WalkLayout.wordsWidth(wing: stage.wing) : 310
-                let top = block ? WalkLayout.wordsTop : 64, foot = block ? WalkLayout.wordsFootLimit : 248
+                let words = block ? WalkLayout.wordsWidth(wing: stage.wing) : (step == 6 ? 330 : 310)
+                let top = block ? WalkLayout.wordsTop : (step == 6 ? WalkLayout.lookBackHeaderTop : 64)
+                let foot = block ? WalkLayout.wordsFootLimit : (step == 6 ? WalkLayout.lookBackWordsFoot : 248)
+                let midX = step == 6 ? WalkLayout.column(wing: stage.wing).lowerBound + 20 + words / 2 : WalkLayout.centreX
                 do {
                     let c = art.backdropCamera(step: step, stage: stage)!
                     var behind: [Double] = []
@@ -323,7 +337,7 @@ struct WalkBackdropTests {
                         } else {            // the faint band: 0.55 at the top, 0.25 at 156, gone by 260
                             a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : max(0, 0.25 * Double(1 - (y - 156) / 104))
                         }
-                        for x in stride(from: WalkLayout.centreX - words / 2, through: WalkLayout.centreX + words / 2, by: 5) {
+                        for x in stride(from: midX - words / 2, through: midX + words / 2, by: 5) {
                             let px = min(w - 1, Int((c.x + x / c.k) / backdrop.size.width * CGFloat(w)))
                             let py = min(h - 1, Int((c.y + y / c.k) / backdrop.size.height * CGFloat(h)))
                             let i = (py * w + px) * 4

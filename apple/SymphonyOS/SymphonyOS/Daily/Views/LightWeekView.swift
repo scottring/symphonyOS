@@ -48,10 +48,14 @@ struct LightWeekView: View {
         let week = read()
         let m = metrics
         let low = lookBack.sheet(on: m, safeBottom: safeBottom)
+        // A cloth's paper over the lowered sheet (F21): nothing under it takes a touch or is read.
+        let paper = lookBack.paper(goals: goals, tasks: tasks, periods: model.periods, me: userId)
         ZStack(alignment: .topLeading) {
             if low != nil {
                 DailyWholePlan(lookBack: $lookBack, goals: goals, tasks: tasks, periods: model.periods,
                                today: model.today, me: userId, size: size)
+                    .allowsHitTesting(paper == nil)
+                    .accessibilityHidden(paper != nil)
             } else {
                 DailyBand(picture: m.picture, cut: m.weekCut, height: m.band.height, veil: 0.97)
             }
@@ -73,6 +77,11 @@ struct LightWeekView: View {
                     header(week, at: m.header)
                     list(week, m)
                 }
+            }
+            .allowsHitTesting(paper == nil)
+            .accessibilityHidden(paper != nil)
+            if low != nil {
+                DailyWholePlanPaper(lookBack: $lookBack, paper: paper, size: size, navTop: m.navTop)
             }
             if low == nil {
                 DailyPaperFade(fade: m.bar.fade, size: size)
@@ -185,6 +194,11 @@ struct LightWeekView: View {
         let states = DemoMode.dailyStates
         if states.contains("unfold") { unfolded = true }
         if states.contains("lookback") { handleTapped() }
+        // `lookbackpaper`: the handle tapped and the year cloth's paper raised over the whole plan.
+        if states.contains("lookbackpaper") {
+            handleTapped()
+            lookBack.tap(.lookBackPaper(.year))
+        }
         // `nextweek`: the page on next week, as the "Tomorrow" sign opens it on the week's last day;
         // with `undo`, a moment later one task said there with no day (`DemoMode.showDaily`).
         if states.contains("nextweek") {

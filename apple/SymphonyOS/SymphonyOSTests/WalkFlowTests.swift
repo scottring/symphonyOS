@@ -1024,6 +1024,92 @@ final class WalkFlowTests {
         #expect(s.standing == health.id && s.selected == gym.id)
     }
 
+    // MARK: Look back up (Task 8)
+
+    /// Look back up with Health and Work kept, each holding a year goal, a season goal and a month goal;
+    /// Work a second season goal. Standing in Health.
+    private func lookBack() -> (s: WalkState, health: UUID, work: UUID, workSeason: WalkItem) {
+        let health = WalkArea(id: UUID(), name: "Health"), work = WalkArea(id: UUID(), name: "Work"), home = WalkArea(id: UUID(), name: "Home")
+        var s = WalkState()
+        s.areas = [health, home, work]
+        s.kept = [health.id, home.id, work.id]
+        s.step = 6
+        let strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
+        let contract = WalkItem(id: UUID(), level: .year, title: "Sign one more contract", areaId: work.id)
+        let lift = WalkItem(id: UUID(), level: .season, title: "Lift twice a week", areaId: health.id, parentId: strong.id)
+        let pitch = WalkItem(id: UUID(), level: .season, title: "Pitch three new clients", areaId: work.id, parentId: contract.id)
+        let draft = WalkItem(id: UUID(), level: .season, title: "Draft the talk outline", areaId: work.id, parentId: contract.id)
+        s.items = [strong, contract, lift, pitch, draft]
+        s.focusArea = health.id
+        return (s.settled, health.id, work.id, pitch)
+    }
+
+    /// F21: a cloth on Look back up opens its level's paper; "Show the mountain" closes it; a row closes
+    /// it and stands the walk in that flag's area, choosing nothing.
+    @Test func aLookBackClothOpensItsLevelsPaper() throws {
+        let start = lookBack()
+        var s = start.s
+        let (health, work, pitch) = (start.health, start.work, start.workSeason)
+        #expect(s.standing == health)
+        #expect(s.apply(.lookBackPaper(.season), paperEnv).isEmpty)
+        #expect(s.paperOpen && s.paperLevel == .season)
+        let paper = try #require(s.paper(paperEnv.periods))
+        #expect(paper.title == paperEnv.periods.season.name && paper.count == WalkCopy.paperCount(3, level: .season))
+        #expect(paper.sections.map(\.area) == [health, work] && paper.sections.map(\.rows.count) == [1, 2])
+        // Nothing under the paper moves: a side post's tap, another cloth, the sheet's handle.
+        for event in [WalkEvent.areaTapped(work), .lookBackPaper(.year), .sheetHandle, .goToToday] {
+            var after = s
+            _ = after.apply(event, paperEnv)
+            #expect(after == s, "\(event)")
+        }
+        let effects = s.apply(.paperRow(pitch.id), paperEnv)
+        #expect(!s.paperOpen && s.paperLevel == nil && s.paper(paperEnv.periods) == nil)
+        #expect(s.standing == work && s.selected == nil && effects == [.save])
+        // "Show the mountain" closes it where it stood.
+        _ = s.apply(.lookBackPaper(.year), paperEnv)
+        #expect(s.paper(paperEnv.periods)?.title == "\(paperEnv.periods.year), the year ahead")
+        _ = s.apply(.paperClosed, paperEnv)
+        #expect(!s.paperOpen && s.paperLevel == nil && s.standing == work)
+        // Only on Look back up, and not under the raised sheet.
+        var month = paperMonth().s
+        _ = month.apply(.lookBackPaper(.season), paperEnv)
+        #expect(!month.paperOpen && month.paperLevel == nil)
+        var raised = s
+        _ = raised.apply(.sheetHandle, paperEnv)
+        #expect(raised.sheetRaised)
+        _ = raised.apply(.lookBackPaper(.year), paperEnv)
+        #expect(!raised.paperOpen)
+        // A row with no kept area only closes the paper.
+        var loose = s
+        loose.items.append(WalkItem(id: UUID(), level: .year, title: "No area yet", areaId: nil))
+        _ = loose.apply(.lookBackPaper(.year), paperEnv)
+        _ = loose.apply(.paperRow(loose.items.last!.id), paperEnv)
+        #expect(!loose.paperOpen && loose.standing == work && loose.selected == nil)
+    }
+
+    /// Entering Look back up stands where the walk last stood when that area holds a flag, else in the
+    /// first kept area with one; a tap on a side post stands there. An area with nothing in it is never
+    /// stood in while another holds something.
+    @Test func lookingBackStandsWhereTheWalkLastStood() {
+        let start = lookBack()
+        var s = start.s
+        let (health, work) = (start.health, start.work)
+        var down = s
+        down.step = 5
+        down.focusArea = work
+        _ = down.act(.next, paperEnv)
+        #expect(down.step == 6 && down.standing == work)
+        // Last stood in Home, which holds nothing: the first kept area with a flag.
+        var bare = s
+        bare.step = 5
+        bare.focusArea = s.kept[1]
+        _ = bare.act(.next, paperEnv)
+        #expect(bare.step == 6 && bare.standing == health)
+        #expect(!s.walksThere(s.kept[1]) && s.walksThere(work))
+        #expect(s.apply(.areaTapped(work), paperEnv) == [.save] && s.standing == work)
+        #expect(s.apply(.areaTapped(s.kept[1]), paperEnv).isEmpty && s.standing == work)
+    }
+
     /// The paper belongs to the step it was opened on: a step change closes it, and it is never saved.
     @Test func thePaperClosesWhenTheStepChanges() {
         let (base, _, _, _) = paperMonth()

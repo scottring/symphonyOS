@@ -94,7 +94,8 @@ struct DailyMetrics: Equatable {
     let sheetRadius: CGFloat
     let sign: Sign
     let bar: Bar
-    /// The handle's touch shape ("see my whole plan"); nil on a short window.
+    /// The handle's touch shape ("see my whole plan"), on every phone window (F25: short ones too);
+    /// nil on the spread, which has none.
     let lookBack: CGRect?
     /// The waiting walk's line, 44 high under the handle; nil without one.
     let waiting: CGRect?
@@ -215,11 +216,12 @@ struct DailyMetrics: Equatable {
         let navTop = safeTop
         let tall = shape == .tall
         let sheetTop = navTop + (tall ? 242 : 168)
-        let lookBack = tall ? handle(width: size.width, sheetTop: sheetTop) : nil
+        // The handle on both shapes (F25): a short window's header stands under it, as a tall one's does.
+        let lookBack = handle(width: size.width, sheetTop: sheetTop)
 
         // The waiting walk's line takes the 44 above where the header would stand;
         // everything below it starts 44 lower.
-        let headerAt = sheetTop + (tall ? 46 : 26)
+        let headerAt = sheetTop + 46
         let inset: CGFloat = 16
         let waitingLine = waiting
             ? CGRect(x: inset, y: headerAt - 6, width: size.width - 2 * inset, height: minTouch) : nil
@@ -262,8 +264,8 @@ struct DailyMetrics: Equatable {
         let navTop = safeTop
         let tall = shape == .tall
         let sheetTop = navTop + (tall ? 160 : 168)
-        // With no handle on a short window, the header and list stand 20 higher, as Today's do.
-        let header = CGRect(x: 22, y: sheetTop + (tall ? 44 : 24), width: size.width - 44, height: 48)
+        // The header under the handle, on both shapes (F25).
+        let header = CGRect(x: 22, y: sheetTop + 44, width: size.width - 44, height: 48)
         let rowsTop = header.minY + 60
         return DailyMetrics(
             size: size, navTop: navTop, navGap: tall ? 18 : 22,
@@ -272,7 +274,7 @@ struct DailyMetrics: Equatable {
             sheetTop: sheetTop, sheetRadius: tall ? 28 : 26,
             sign: .none,
             bar: bar(size: size, safeBottom: safeBottom, shape: shape),
-            lookBack: tall ? handle(width: size.width, sheetTop: sheetTop) : nil, waiting: nil,
+            lookBack: handle(width: size.width, sheetTop: sheetTop), waiting: nil,
             header: header, ring: 0,
             card: .zero, rowsTop: rowsTop, rowsTopNoCard: rowsTop,
             row: 46, rowGap: 5, inset: 16, shape: shape)
@@ -317,7 +319,7 @@ struct DailyMetrics: Equatable {
     /// handle and the header where they stand on the sheet, with no waiting line between them,
     /// except that nothing readable or tappable goes below the safe area's foot: the header
     /// rises to stand on it, and the handle's words stay above the header. Nil where the
-    /// window has no handle (short windows).
+    /// window has no handle (the spread).
     func lowered(safeBottom: CGFloat) -> Lowered? {
         guard let lookBack else { return nil }
         let top = size.height - Self.lookBackPeek

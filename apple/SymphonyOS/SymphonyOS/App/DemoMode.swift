@@ -219,6 +219,8 @@ enum DemoMode {
     /// - `area:<name>`: a tap on that area's side post, so the walk stands there.
     /// - `paper`: the paper raised over the step, as "+n more" raises it, so a shot needs no tap.
     /// - `row:<n>`: a tap on the raised paper's row n (from 0, in reading order).
+    /// - `lookback:<level>`: on Look back up, a tap on that level's cloth (year, season, month, week,
+    ///   today), so its paper is raised.
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
     /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
@@ -272,6 +274,9 @@ enum DemoMode {
                 } else if step.hasPrefix("row:"), let n = Int(step.dropFirst(4)),
                           let row = model.state.paper(model.periods)?.numberedRows.first(where: { $0.index == n }) {
                     model.send(.paperRow(row.row.id))
+                } else if step.hasPrefix("lookback:"),
+                          let level = WalkLevel.allCases.first(where: { "\($0)" == step.dropFirst(9).lowercased() }) {
+                    model.send(.lookBackPaper(level))
                 } else if step.hasPrefix("area:") {
                     let name = step.dropFirst(5).lowercased()
                     if let area = model.state.areas.first(where: { $0.name.lowercased() == name }) { model.send(.areaTapped(area.id)) }

@@ -311,7 +311,7 @@ extension WalkEvent {
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled, .speechUnavailable, .typeChanged, .typeSubmitted,
              .typeDismissed, .point, .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
              .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .veilTapped, .moreTapped, .backTapped,
-             .leaveTapped:
+             .leaveTapped, .lookBackPaper:
             return true
         }
     }
@@ -329,7 +329,7 @@ extension WalkEvent {
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
              .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped, .backTapped, .leaveTapped,
-             .paperOpened, .paperClosed, .paperRow:
+             .paperOpened, .paperClosed, .paperRow, .lookBackPaper:
             return false
         }
     }

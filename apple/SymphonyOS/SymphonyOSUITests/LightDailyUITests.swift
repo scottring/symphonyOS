@@ -45,6 +45,48 @@ final class LightDailyUITests: XCTestCase {
         XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 15), "Today did not open again")
     }
 
+    /// F25 (S40): on the Duo's outside screen (the page 382 × 678 beside the system's column) Today's
+    /// sheet has "See my whole plan" too; a tap lowers it over the whole plan, standing in one area,
+    /// whose cloth opens the paper (F21); "Show the mountain" closes it and the strip raises the sheet.
+    @MainActor func testTheWholePlanOnTheOutsideScreen() throws {
+        let (_, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                               "-SymphonyDailySeed", "full", "-TodaySize", "382x678"])
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 60), "never reached Today")
+        let handle = any["daily.lookBack"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 15), "no handle on the outside screen")
+        XCTAssertEqual(handle.label, "See my whole plan")
+        handle.tap()
+        XCTAssertTrue(any["walk.standing"].waitForExistence(timeout: 15), "the whole plan is not behind the sheet")
+        XCTAssertFalse(any["daily.bar.field"].exists, "the bar stands over the plan")
+        let year = any["walk.lookback.year"]
+        XCTAssertTrue(year.exists, "no year cloth")
+        year.tap()
+        XCTAssertTrue(any["walk.paper"].waitForExistence(timeout: 10), "the cloth did not open the paper")
+        any["walk.paper.close"].tap()
+        XCTAssertTrue(any["walk.paper"].waitForNonExistence(timeout: 10), "Show the mountain did not close the paper")
+        any["daily.lookBack"].tap()
+        XCTAssertTrue(any["daily.bar.field"].waitForExistence(timeout: 15), "the strip did not raise the sheet")
+    }
+
+    /// F21: on the walk's Look back up (the full plan) the year cloth opens the year's paper; a row in
+    /// another area closes it and stands the walk there, choosing nothing.
+    @MainActor func testALookBackClothOpensThePaper() throws {
+        let (_, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk", "-SymphonyWalkStep", "6",
+                               "-SymphonyWalkSeed", "full"])
+        let year = any["walk.lookback.year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 60), "no year cloth on Look back up")
+        let standing = any["walk.standing"]
+        XCTAssertEqual(standing.label, "Health")
+        XCTAssertTrue(year.label.contains("tap to read the list"), year.label)
+        year.tap()
+        XCTAssertTrue(any["walk.paper"].waitForExistence(timeout: 10), "the cloth did not open the paper")
+        // Health's four year goals are rows 0 to 3; Home's first is row 4.
+        any["walk.paper.row.4"].tap()
+        XCTAssertTrue(any["walk.paper"].waitForNonExistence(timeout: 10), "the row did not close the paper")
+        XCTAssertEqual(any["walk.standing"].label, "Home")
+        XCTAssertTrue(any["walk.lookback.year"].exists)
+    }
+
     /// Someone who left the walk part-way and has nothing at all still lands on a page with a way
     /// back into the walk, and a bar that works.
     @MainActor func testAWaitingWalkHasItsLineOnAnEmptyToday() throws {

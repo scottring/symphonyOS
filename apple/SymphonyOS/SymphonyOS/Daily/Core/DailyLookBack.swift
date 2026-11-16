@@ -1,16 +1,19 @@
 import Foundation
 import SwiftData
 
-/// "See my whole plan" on Today's and Week's sheet (the boards' "Look back up"), on windows
-/// that have the handle. The handle lowers the sheet until only its grabber, the handle's words
-/// and the header show (`DailyMetrics.lowered`), the bar goes, and the walk's own top-to-bottom
-/// plan (`MountainPage.lookBack`) stands behind it; the handle raises it again. There a tap on a
-/// post's "+n" opens that post; every other flag is read, not tapped. Nothing is written, and no
-/// walk is started or resumed.
+/// "See my whole plan" on Today's and Week's sheet (the boards' "Look back up"), on every phone
+/// window (F25: short ones too). The handle lowers the sheet until only its grabber, the handle's words
+/// and the header show (`DailyMetrics.lowered`), the bar goes, and the walk's own Look back up
+/// (`MountainPage.lookBack`) stands behind it: one area read top to bottom, the others as side posts
+/// (F6). There a tap on a side post stands in that area, and a cloth opens the paper for its level
+/// (F21), where a row stands in its area. Nothing is written, and no walk is started or resumed.
 struct DailyLookBack: Equatable {
     private(set) var lowered = false
-    /// The post whose "+n" was tapped.
-    private(set) var expanded: WalkPostKey?
+    /// The area the plan stands in, once a side post or a paper's row was tapped; nil: the first kept
+    /// area with a flag (the walk's own rule, `WalkState.settled`).
+    private(set) var standing: UUID?
+    /// The level whose paper a cloth opened; nil while no paper is up.
+    private(set) var paperLevel: WalkLevel?
     /// The ridge and the kept areas, read once as the sheet lowers, so area ids hold while it is down.
     private(set) var areas: [WalkArea] = []
     private(set) var kept: [UUID] = []
@@ -24,7 +27,8 @@ struct DailyLookBack: Equatable {
             return []
         }
         lowered = true
-        expanded = nil
+        standing = nil
+        paperLevel = nil
         self.areas = areas
         self.kept = kept
         return [.left]
@@ -33,7 +37,8 @@ struct DailyLookBack: Equatable {
     /// Back to the day: the sheet up, nothing open.
     mutating func raise() {
         lowered = false
-        expanded = nil
+        standing = nil
+        paperLevel = nil
         areas = []
         kept = []
     }
@@ -60,11 +65,29 @@ struct DailyLookBack: Equatable {
     /// A drag up of this many points on the lowered strip raises the sheet.
     static let raiseDrag: CGFloat = 30
 
-    /// A tap the walk's layout reads on the plan (`WalkLayout.tapEvent`): only "+n" does
-    /// anything, and only while the plan shows; a second tap closes that post again.
+    /// A tap the walk's layout reads on the plan (`WalkLayout.tapEvent`), only while the plan shows:
+    /// a side post stands in its area, a cloth opens its level's paper, "Show the mountain" closes it.
+    /// While the paper is up nothing under it takes a tap; a flag is only read.
     mutating func tap(_ event: WalkEvent?) {
-        guard lowered, case .stubTapped(let key) = event else { return }
-        expanded = expanded == key ? nil : key
+        guard lowered, let event else { return }
+        switch event {
+        case .paperClosed:
+            paperLevel = nil
+        case .areaTapped(let id) where paperLevel == nil:
+            standing = id
+        case .lookBackPaper(let level) where paperLevel == nil:
+            paperLevel = level
+        default:
+            return
+        }
+    }
+
+    /// A row on the paper: it closes, and the plan stands in that row's area (as a side post's tap
+    /// does); a row with no kept area only closes it.
+    mutating func rowTapped(_ id: UUID, on paper: PlanPaper) {
+        guard lowered, paperLevel != nil else { return }
+        paperLevel = nil
+        if let area = paper.sections.first(where: { $0.rows.contains { $0.id == id } })?.area { standing = area }
     }
 
     /// The handle's words: the walk's "see my whole plan" while the sheet is up; lowered,
@@ -74,20 +97,31 @@ struct DailyLookBack: Equatable {
         return horizon == .week ? DailyCopy.showMyWeek : DailyCopy.showMyDay
     }
 
-    /// The lowered sheet's numbers on this window: nil while it is up, and on a window with no
-    /// handle (short windows), where nothing lowers. While nil the page is as it always is.
+    /// The lowered sheet's numbers on this window: nil while it is up. While nil the page is as it always is.
     func sheet(on metrics: DailyMetrics, safeBottom: CGFloat) -> DailyMetrics.Lowered? {
         lowered ? metrics.lowered(safeBottom: safeBottom) : nil
     }
 
     /// The plan behind the lowered sheet: the walk's step 6 over every flag of the walk's own
-    /// periods, read from the person's own personal rows, on the ridge read as it lowered.
+    /// periods, read from the person's own personal rows, on the ridge read as it lowered, standing
+    /// where a tap put it (the walk's own rule settles it where that area holds nothing), with the
+    /// paper a cloth opened.
     func plan(goals: [Goal], tasks: [SymphonyTask], periods: WalkPeriods, me: UUID) -> WalkState {
         let items = WalkLoad.items(goals: goals, tasks: DailyDay.mine(tasks, me: me), periods: periods, me: me,
                                    planted: [], areas: areas)
         var state = MountainPage.lookBack(items: items, areas: areas, kept: kept)
-        state.expanded = lowered ? expanded : nil
-        return state
+        state.focusArea = standing
+        if lowered, let paperLevel {
+            state.paperOpen = true
+            state.paperLevel = paperLevel
+        }
+        return state.settled
+    }
+
+    /// The paper a cloth opened, over the kept areas the plan read: nil while none is up.
+    func paper(goals: [Goal], tasks: [SymphonyTask], periods: WalkPeriods, me: UUID) -> PlanPaper? {
+        guard lowered, paperLevel != nil else { return nil }
+        return plan(goals: goals, tasks: tasks, periods: periods, me: me).paper(periods)
     }
 
     /// The ridge as the mountain pages read it, and the saved walk's kept areas on it.

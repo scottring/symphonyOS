@@ -168,6 +168,9 @@ struct MountainPageTests {
         }
     }
 
+    /// Look back up (step 6) behind Today's lowered sheet reads one area top to bottom (F6): standing in
+    /// the first kept area with a flag, one cloth for each of its levels, year first; every other kept
+    /// area holding a flag a side post.
     @Test func lookBackShowsEveryLevel() {
         let y = flag(.year, "Run a half marathon", in: "Health")
         let s = flag(.season, "Build up to ten miles", in: "Health", parent: y.id)
@@ -180,9 +183,15 @@ struct MountainPageTests {
         #expect(state.items.map(\.id) == [y.id, s.id, m.id, w.id])
         #expect(state.kept == [area("Health").id, area("People").id, area("Money").id])
         let layout = WalkLayout.make(state, today: day(2026, 11, 14), footing: .natural)
-        for level in [WalkLevel.year, .season, .month, .week] {
-            #expect(layout.posts.contains { $0.key.level == level }, "\(level)")
-        }
+        #expect(layout.labels.first?.name == "Health")
+        let cloths = layout.posts.flatMap(\.banners)
+        #expect(cloths.map(\.level) == [.year, .season, .week] && cloths.allSatisfy { $0.kind == .compact })
+        #expect(cloths.map(\.itemId) == [y.id, s.id, w.id])
+        // People holds nothing: no post. Money's month goal stands at the side, and a tap stands there.
+        #expect(layout.sides.map(\.name) == ["Money"])
+        var there = state
+        _ = there.apply(.areaTapped(area("Money").id), WalkEnv(periods: WalkPeriods.pick(now: day(2026, 11, 14)), now: day(2026, 11, 14)))
+        #expect(WalkLayout.make(there, today: day(2026, 11, 14), footing: .natural).posts.flatMap(\.banners).map(\.itemId) == [m.id])
     }
 
     // MARK: Taps
@@ -793,62 +802,115 @@ struct MountainPageTests {
     // MARK: See my whole plan
 
     /// The handle lowers Today's sheet over the walk's own top-to-bottom plan and raises it
-    /// again. Lowered, the bar lets go, the handle says "Show my day" (Week: "Show my week"),
-    /// and only a post's "+n" answers a tap. Nothing is written and no walk opens.
+    /// again. Lowered, the bar lets go and the handle says "Show my day" (Week: "Show my week").
+    /// Nothing is written and no walk opens.
     @Test func theWholePlanLowersTheSheetAndIsOnlyRead() {
-        let today = day(2026, 11, 10)
-        let periods = WalkPeriods.pick(now: today)
-        let strong = goal("Feel strong again", year: periods.year, in: "Health")
-        let piece = row("Strength twice a week", .season, start: periods.season.start, in: "Health", goal: strong.id)
-        let month = row("Find a gym that fits", .month, start: periods.monthStart, in: "Health", source: piece.id)
-        let week = row("Tour the gym", .week, start: periods.weekStart, in: "Health", source: month.id)
-        let theirs = row("Their task", .week, start: periods.weekStart, in: "Health", user: UUID())
-        let tasks = [piece, month, week, theirs]
-
-        var look = DailyLookBack()
-        #expect(!look.lowered)
-        #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
-        #expect(look.handleTapped(areas: ridge, kept: [area("People").id]) == [.left])   // the bar stops listening
-        #expect(look.lowered)
+        let w = wholePlan()
+        var look = w.look
+        let (goals, tasks, periods) = (w.goals, w.tasks, w.periods)
+        let plan = look.plan(goals: goals, tasks: tasks, periods: periods, me: me)
+        #expect(plan.step == 6)
+        #expect(plan.taught && !plan.teaching)
+        #expect(plan.items.map(\.id) == ([goals.map(\.id), tasks.filter { $0.userId == me }.map(\.id)].flatMap { $0 }))
+        #expect(plan.kept == [area("Health").id, area("Home").id, area("People").id])
         #expect(look.label(on: .today) == DailyCopy.showMyDay)
         #expect(DailyCopy.showMyDay == WalkCopy.showMyDay)
         #expect(look.label(on: .week) == DailyCopy.showMyWeek)
-
-        let plan = look.plan(goals: [strong], tasks: tasks, periods: periods, me: me)
-        #expect(plan.step == 6)
-        #expect(plan.taught && !plan.teaching)
-        #expect(plan.items.map(\.id) == [strong.id, piece.id, month.id, week.id])
-        #expect(plan.kept == [area("Health").id, area("People").id])
-
-        // "+n" opens its post and closes it again; a flag is read, not tapped.
-        let post = WalkPostKey(level: .month, column: area("Health").id)
-        look.tap(.stubTapped(post))
-        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == post)
-        look.tap(.bannerTapped(strong.id))
-        look.tap(.areaTapped(area("Health").id))
+        // A flag is read: its tap does nothing here.
+        look.tap(.bannerTapped(goals[0].id))
         look.tap(nil)
-        let read = look.plan(goals: [strong], tasks: tasks, periods: periods, me: me)
-        #expect(read.expanded == post && read.selected == nil && read.focusArea == nil)
-        look.tap(.stubTapped(post))
-        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
+        #expect(look.plan(goals: goals, tasks: tasks, periods: periods, me: me).selected == nil)
 
         // Raised again: nothing open, nothing for the bar.
-        look.tap(.stubTapped(post))
         #expect(look.handleTapped(areas: ridge, kept: []) == [])
-        #expect(!look.lowered)
+        #expect(!look.lowered && look.standing == nil && look.paperLevel == nil)
         #expect(look.label(on: .today) == WalkCopy.lookBackHandle)
-        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
-        look.tap(.stubTapped(post))                     // raised, the plan is not there to tap
-        #expect(look.plan(goals: [strong], tasks: tasks, periods: periods, me: me).expanded == nil)
 
-        // Only where the window has a handle: a short window never lowers.
+        // Every phone window has the handle (F25): a short one lowers too.
         var short = DailyLookBack()
         _ = short.handleTapped(areas: ridge, kept: [])
         let tall = DailyMetrics.today(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
         let outside = DailyMetrics.today(size: CGSize(width: 466, height: 678), safeTop: 22, safeBottom: 0, shape: .short)
         #expect(short.sheet(on: tall, safeBottom: 34) == tall.lowered(safeBottom: 34))
-        #expect(short.sheet(on: outside, safeBottom: 0) == nil)
+        #expect(short.sheet(on: outside, safeBottom: 0) == outside.lowered(safeBottom: 0) && outside.lowered(safeBottom: 0) != nil)
         #expect(DailyLookBack().sheet(on: tall, safeBottom: 34) == nil)
+    }
+
+    /// The whole plan behind Today's lowered sheet: Health holds a year goal, a season goal, a month goal
+    /// and a week task dated today; Home a year goal and a month goal; People a month goal and a week
+    /// task under it. Lowered.
+    private func wholePlan() -> (look: DailyLookBack, goals: [Goal], tasks: [SymphonyTask], periods: WalkPeriods,
+                                 home: (year: Goal, month: SymphonyTask)) {
+        let today = day(2026, 11, 10)
+        let periods = WalkPeriods.pick(now: today)
+        let strong = goal("Feel strong again", year: periods.year, in: "Health")
+        let bathroom = goal("Finish the bathroom", year: periods.year, in: "Home")
+        let piece = row("Strength twice a week", .season, start: periods.season.start, in: "Health", goal: strong.id)
+        let month = row("Find a gym that fits", .month, start: periods.monthStart, in: "Health", source: piece.id)
+        let tile = row("Pick the tile", .month, start: periods.monthStart, in: "Home")
+        let cabin = row("Book the cabin", .month, start: periods.monthStart, in: "People")
+        let week = row("Tour the gym", .week, start: periods.weekStart, in: "Health", source: month.id)
+        week.scheduledFor = today
+        let mum = row("Call Mum", .week, start: periods.weekStart, in: "People", source: cabin.id)
+        let theirs = row("Their task", .week, start: periods.weekStart, in: "Health", user: UUID())
+        var look = DailyLookBack()
+        #expect(look.handleTapped(areas: ridge, kept: [area("People").id]) == [.left])   // the bar stops listening
+        return (look, [strong, bathroom], [piece, month, tile, cabin, week, mum, theirs], periods, (bathroom, tile))
+    }
+
+    /// F6 behind Today: the plan stands in the first kept area with a flag; a tap on a side post stands
+    /// it there; a tap on an area that holds nothing, or while the sheet is up, does nothing.
+    @Test func theWholePlanBehindTodaySwitchesAreaOnATap() {
+        let w = wholePlan()
+        var look = w.look
+        let (goals, tasks, periods, home) = (w.goals, w.tasks, w.periods, w.home)
+        func plan() -> WalkState { look.plan(goals: goals, tasks: tasks, periods: periods, me: me) }
+        func cloths() -> [UUID?] { WalkLayout.make(plan(), today: periods.today, footing: .level).posts.flatMap(\.banners).map(\.itemId) }
+        #expect(look.standing == nil && plan().standing == area("Health").id)
+        let sides = WalkLayout.make(plan(), today: periods.today, footing: .level).sides
+        #expect(sides.map(\.name) == ["Home", "People"])
+        look.tap(WalkLayout.tapEvent(sides[0]))
+        #expect(look.standing == area("Home").id && plan().standing == area("Home").id)
+        #expect(cloths() == [home.year.id, home.month.id])
+        // Raised, the plan is not there to tap; lowered again it starts where it always does.
+        look.raise()
+        look.tap(.areaTapped(area("People").id))
+        #expect(look.standing == nil)
+        _ = look.handleTapped(areas: ridge, kept: [])
+        #expect(plan().standing == area("Health").id)
+    }
+
+    /// F21 behind Today: a cloth opens the paper for its level, over the kept areas the sheet read; a
+    /// row closes it and stands the plan in that row's area; "Show the mountain" closes it.
+    @Test func theWholePlanBehindTodayOpensAPaper() throws {
+        let w = wholePlan()
+        var look = w.look
+        let (goals, tasks, periods, home) = (w.goals, w.tasks, w.periods, w.home)
+        func plan() -> WalkState { look.plan(goals: goals, tasks: tasks, periods: periods, me: me) }
+        #expect(look.paper(goals: goals, tasks: tasks, periods: periods, me: me) == nil)
+        let layout = WalkLayout.make(plan(), today: periods.today, footing: .level)
+        let month = try #require(layout.posts.first?.banners.first { $0.level == .month })
+        look.tap(WalkLayout.tapEvent(month, on: layout.posts[0]))
+        #expect(look.paperLevel == .month)
+        let paper = try #require(look.paper(goals: goals, tasks: tasks, periods: periods, me: me))
+        #expect(paper.title == periods.monthName && paper.count == WalkCopy.paperCount(3, level: .month))
+        #expect(paper.sections.map(\.area) == [area("Health").id, area("Home").id, area("People").id])
+        // While it is open a side post's tap is under it.
+        look.tap(.areaTapped(area("People").id))
+        #expect(look.paperLevel == .month && plan().standing == area("Health").id)
+        look.rowTapped(home.month.id, on: paper)
+        #expect(look.paperLevel == nil && look.standing == area("Home").id && plan().standing == area("Home").id)
+        // Today's paper reads the tasks dated today; "Show the mountain" closes it.
+        look.tap(.lookBackPaper(.today))
+        #expect(look.paper(goals: goals, tasks: tasks, periods: periods, me: me)?.sections.flatMap(\.rows).map(\.title) == ["Tour the gym"])
+        look.tap(.paperClosed)
+        #expect(look.paperLevel == nil && look.paper(goals: goals, tasks: tasks, periods: periods, me: me) == nil)
+        // Raised, nothing is open.
+        look.tap(.lookBackPaper(.year))
+        look.raise()
+        #expect(look.paperLevel == nil)
+        look.tap(.lookBackPaper(.year))
+        #expect(look.paperLevel == nil)
     }
 
     /// A Tell (the Lock Screen control, `symphony://tell`) while the plan shows raises the sheet

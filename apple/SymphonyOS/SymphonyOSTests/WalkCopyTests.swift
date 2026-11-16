@@ -469,8 +469,11 @@ struct WalkCopyTests {
                  WalkCopy.areaHint(ground: false, kept: true, focused: true)]
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
                                             .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                                            .example, .stub(2)]
+                                            .example, .stub(2), .opensPaper(3), .opensPaper(0)]
         said += roles.map { WalkCopy.bannerLabel("Run a 5K", level: .week, tag: "TODAY", role: $0) }
+        said += [WalkCopy.lookBackHint, WalkCopy.sideLabelWholePlan(name: "Health", goals: 7, tasks: 2),
+                 WalkCopy.sideLabelWholePlan(name: "Work", goals: 1, tasks: 0), WalkCopy.sideLabelWholePlan(name: "Home", goals: 0, tasks: 3)]
+        said += WalkLevel.allCases.flatMap { [WalkCopy.paperTitle($0, p), WalkCopy.paperTitle($0, july)] }
         return said
     }
 
@@ -739,6 +742,10 @@ struct WalkCopyTests {
                 == "Today: Gym induction, first thing, tap for the next one here")
         #expect(b("Run a 5K", .year, nil, .example) == "Example: Run a 5K, tap to make it yours")
         #expect(b("", .year, nil, .stub(3)) == "3 more, tap to show")
+        // Look back up (F21): the level's newest flag, how many more stand on it, and that a tap reads them all.
+        #expect(b("Feel strong again", .year, nil, .opensPaper(3)) == "Year: Feel strong again, and 3 more, tap to read the list")
+        #expect(b("Tour the gym", .today, nil, .opensPaper(0)) == "Today: Tour the gym, tap to read the list")
+        #expect(WalkCopy.BannerRole.opensPaper(0).taps && WalkCopy.BannerRole.opensPaper(2).taps)
         #expect(WalkCopy.areaHint(ground: true, kept: false, focused: false) == "Tap to keep")
         #expect(WalkCopy.areaHint(ground: true, kept: true, focused: false) == "Tap to let go")
         #expect(WalkCopy.areaHint(ground: false, kept: true, focused: false) == "Tap to walk there")
@@ -748,11 +755,27 @@ struct WalkCopyTests {
         #expect(WalkCopy.typeFieldLabel == "Your words")         // the one-line field, once it holds text
     }
 
+    /// Look back up's words (F6, F21): the hint under the header, a side post's count of what stands in
+    /// its area (goals and tasks, never what is undone), and the paper's heading for each level's cloth.
+    @Test func lookingBackSaysWhatItShows() {
+        #expect(WalkCopy.lookBackHint == "Tap a post to see that area")
+        #expect(WalkCopy.sideLabelWholePlan(name: "Health", goals: 7, tasks: 2) == "Health, 9 goals and tasks")
+        #expect(WalkCopy.sideLabelWholePlan(name: "Work", goals: 1, tasks: 0) == "Work, 1 goal")
+        #expect(WalkCopy.sideLabelWholePlan(name: "Work", goals: 3, tasks: 0) == "Work, 3 goals")
+        #expect(WalkCopy.sideLabelWholePlan(name: "Home", goals: 0, tasks: 1) == "Home, 1 task")
+        #expect(WalkCopy.sideLabelWholePlan(name: "Home", goals: 0, tasks: 0) == "Home, nothing")
+        let p = WalkPeriods.pick(now: day(2026, 11, 13), weekStartsOn: 0)
+        #expect(WalkLevel.allCases.map { WalkCopy.paperTitle($0, p) }
+                == ["2027, the year ahead", p.season.name, p.monthName, "This week", "Today"])
+        // The step's own paper reads its level's heading.
+        for step in 1...5 { #expect(WalkCopy.paperTitle(state(step: step), p) == WalkCopy.paperTitle(WalkLevel(rawValue: step)!, p)) }
+    }
+
     /// Only a banner whose label says what a tap does takes a tap; the rest are read as plain text.
     @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
                                             .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                                            .example, .stub(2)]
+                                            .example, .stub(2), .opensPaper(3), .opensPaper(0)]
         for role in roles {
             let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
             #expect(role.taps == label.contains(", tap "), "\(role)")

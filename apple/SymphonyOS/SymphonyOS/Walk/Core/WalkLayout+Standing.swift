@@ -28,6 +28,8 @@ extension WalkLayout {
     static let parentPad: CGFloat = 12, parentLine: CGFloat = 14
     /// The caret over the standing pill: 10 × 7, 2 above it (F34).
     static let caretSize = CGSize(width: 10, height: 7), caretGap: CGFloat = 2
+    /// A Look back up cloth: 23 high on one line, 13 a line more (F20), 14 more with "+n more" on its own line.
+    static let lookBackFirstLine: CGFloat = 23, lookBackLine: CGFloat = 13, lookBackLines = 3
     /// By estimate: a capital in the standing pill (11 pt, tracked) and one in a side pill (9.5 pt,
     /// tracked). A title's lines are counted from the face itself (`WalkLayout+Lines.swift`).
     static let pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3
@@ -132,6 +134,8 @@ struct WalkStanding {
         let text: String; let tag: String?; let glows: Bool; let label: String; let taps: Bool
         /// The lines the cloth draws (`WalkLayout.setLines`), and how many it is high for.
         let words: [String]; let lines: Int; let size: CGSize
+        /// Look back up: how many more flags of its level the cloth stands for.
+        var more: Int? = nil
     }
 
     let s: WalkState
@@ -155,36 +159,53 @@ struct WalkStanding {
 
     func layout() -> (label: L.Label?, post: L.Post?, sides: [L.Side]) {
         let sides = self.sides()
-        // Look back up arrives with its own cloths (Task 8); until then the area's name and the side posts.
-        guard let level = s.level else {
-            return (s.area(s.standing).map { label($0, top: L.lookBackPill, dx: 0, caret: true) }, nil, sides)
-        }
-        let pieces = self.pieces(level)
         let area = s.area(s.standing)
         let pill = area.map(pillSize)
+        let level = s.level
+        let pieces = level.map(self.pieces) ?? lookBackPieces()
+        // Look back up with nothing in the area stood in (nothing planted at all): nothing stands there.
+        if level == nil, pieces.isEmpty { return (nil, nil, sides) }
 
-        // Ruled: the cloths hang from the lowest cloth's place, the pill 6 above the top one; a
-        // post with nothing on it is a short pole with the pill on its top.
         var frames: [CGRect] = []
-        var y = L.lowestCloth
-        for piece in pieces.reversed() {
-            frames.insert(CGRect(x: L.centreX - piece.size.width / 2, y: y - piece.size.height,
-                                 width: piece.size.width, height: piece.size.height), at: 0)
-            y -= piece.size.height + L.clothGap
+        let pillTop: CGFloat?
+        let ceiling: CGFloat
+        if level != nil {
+            // Ruled: the cloths hang from the lowest cloth's place, the pill 6 above the top one; a
+            // post with nothing on it is a short pole with the pill on its top.
+            var y = L.lowestCloth
+            for piece in pieces.reversed() {
+                frames.insert(CGRect(x: L.centreX - piece.size.width / 2, y: y - piece.size.height,
+                                     width: piece.size.width, height: piece.size.height), at: 0)
+                y -= piece.size.height + L.clothGap
+            }
+            let clothsTop = frames.first?.minY ?? L.standingFoot - L.barePole
+            pillTop = pill.map { clothsTop - (frames.isEmpty ? 0 : L.underPill) - $0.height }
+            ceiling = L.question
+        } else {
+            // Look back up (F6): the pill's top at 110, the cloths from 6 under it, year first, 4 apart;
+            // with no area (the flags with none), the cloths from the pill's place. Nothing rises into
+            // the header, nor into the hint under it while there are side posts.
+            pillTop = pill.map { _ in L.lookBackPill }
+            var y = pill.map { L.lookBackPill + $0.height + L.underPill } ?? L.lookBackPill
+            for piece in pieces {
+                frames.append(CGRect(x: L.centreX - piece.size.width / 2, y: y, width: piece.size.width, height: piece.size.height))
+                y += piece.size.height + L.clothGap
+            }
+            ceiling = sides.contains { $0.area != nil } ? L.lookBackWordsFoot : L.lookBackHeader
         }
-        let clothsTop = frames.first?.minY ?? L.standingFoot - L.barePole
-        let pillTop = pill.map { clothsTop - (frames.isEmpty ? 0 : L.underPill) - $0.height }
         // The caret stands over the pill only where it is clear of the question; the stack is never
         // made shorter for it (F34). Ruled, so the hand does not decide it: the hand keeps under it.
-        let caret = pillTop.map { $0 - L.caretGap - L.caretSize.height >= L.question } ?? false
+        let caret = pillTop.map { $0 - L.caretGap - L.caretSize.height >= ceiling } ?? false
 
-        let hand = self.hand(frames: frames, who: pieces.map(\.who), pillTop: pillTop, pill: pill, caret: caret, sides: sides)
+        let hand = self.hand(frames: frames, who: pieces.map(\.who), pillTop: pillTop, pill: pill, caret: caret,
+                             sides: sides, ceiling: ceiling)
         let base = CGPoint(x: L.centreX, y: L.standingFoot)
         let banners = zip(pieces, frames).enumerated().map { i, pair -> L.Banner in
             let (piece, ruled) = pair
             var b = L.Banner(id: piece.id, itemId: piece.item?.id, level: piece.level, kind: piece.kind,
                              frame: ruled.offsetBy(dx: 0, dy: -hand.lift), lines: piece.lines, text: piece.text,
                              words: piece.words, tag: piece.tag, glows: piece.glows, label: piece.label, taps: piece.taps)
+            b.more = piece.more
             b.tilt = hand.tilts[i]
             b.shift = hand.shifts[i]
             // The cloth goes with its leaning pole, sits its shift off it, and turns about where it meets it.
@@ -196,11 +217,14 @@ struct WalkStanding {
             b.turn = hand.lean + b.tilt
             return b
         }
+        let clothsTop = frames.first?.minY ?? L.standingFoot - L.barePole
         let top = (banners.first?.frame.minY ?? clothsTop - hand.lift)
-        var post = L.Post(id: postId, key: WalkPostKey(level: level, column: s.standing), base: base, top: top,
+        var post = L.Post(id: postId, key: WalkPostKey(level: level ?? .year, column: s.standing), base: base, top: top,
                           pale: !pieces.isEmpty && pieces.allSatisfy { $0.kind == .ghost }, banners: banners)
         post.lean = hand.lean
-        post.pole = (frames.isEmpty ? L.barePole : L.pole) + hand.lift
+        // The bare pole under the lowest cloth: 24 on Year to Today (and the lift); looking back up, down to the foot.
+        post.pole = level == nil ? L.standingFoot - (frames.last.map { $0.maxY } ?? clothsTop) + hand.lift
+            : (frames.isEmpty ? L.barePole : L.pole) + hand.lift
         var name: L.Label?
         if let area, let pillTop {
             // The pill rides the pole's line, at its own height.
@@ -362,6 +386,41 @@ struct WalkStanding {
                      words: words, lines: lines, size: flagSize(lines: lines, tagged: true))
     }
 
+    /// Look back up (F6, F20): the area stood in, top to bottom, one cloth for each level holding a flag
+    /// there, year first; Today's are the week's tasks dated today. Each shows its level's newest flag
+    /// (Today's: the first thing, where it is one of them) and stands for the rest ("+n more"); Week's
+    /// shows the newest that Today's cloth does not, where there is another, so one task is not read twice.
+    func lookBackPieces() -> [Piece] {
+        let here = s.items.filter { s.column(of: $0) == s.standing }
+        let todays = here.filter { $0.level == .week && PlanCalendar.sameDay($0.day, today) }
+        let todayShown = todays.first { $0.id == s.firstThing } ?? todays.last
+        return WalkLevel.allCases.compactMap { level -> Piece? in
+            let flags = level == .today ? todays : here.filter { $0.level == level }
+            guard let newest = flags.last else { return nil }
+            let shown: WalkItem
+            switch level {
+            case .today: shown = todayShown ?? newest
+            case .week: shown = flags.last { $0.id != todayShown?.id } ?? newest
+            default: shown = newest
+            }
+            return compactPiece(shown, level, more: flags.count - 1)
+        }
+    }
+
+    /// A Look back up cloth: up to three lines of the flag's words at DM Sans SemiBold 12 in the cloth
+    /// less 12, and "+n more" on a line of its own; a tap opens the level's paper (F21).
+    func compactPiece(_ item: WalkItem, _ level: WalkLevel, more: Int) -> Piece {
+        let words = L.setLines(item.title, face: .lookBack, width: width - L.Face.lookBack.inset, limit: L.lookBackLines)
+        let lines = max(1, words.count)
+        let height = L.lookBackFirstLine + L.lookBackLine * CGFloat(lines - 1) + (more > 0 ? L.tagLine : 0)
+        var piece = Piece(id: "\(postId)-lookback-\(level.rawValue)", who: "\(level.rawValue)-\(item.id.uuidString)", kind: .compact,
+                          item: item, level: level, text: L.normalised(item.title), tag: nil, glows: false,
+                          label: WalkCopy.bannerLabel(item.title, level: level, tag: nil, role: .opensPaper(more)), taps: true,
+                          words: words, lines: lines, size: CGSize(width: width, height: height))
+        piece.more = more > 0 ? more : nil
+        return piece
+    }
+
     func morePiece(_ hidden: Int, _ level: WalkLevel) -> Piece {
         Piece(id: "\(postId)-more", who: "\(postId)-more", kind: .more(hidden), item: nil, level: level == .today ? .week : level,
               text: WalkCopy.more(hidden), tag: nil, glows: false, label: WalkCopy.moreLabel(hidden), taps: true,
@@ -387,7 +446,10 @@ struct WalkStanding {
     func sides() -> [L.Side] {
         let kept = s.keptAreas
         let at = kept.firstIndex { $0.id == s.standing } ?? kept.count
-        let walkable = { (area: WalkArea) in self.s.walksThere(area.id) }
+        // Looking back up an area stands at the side only while it holds a flag (F6).
+        let walkable = { (area: WalkArea) in
+            self.s.walksThere(area.id) && (self.s.level != nil || self.s.items.contains { self.s.column(of: $0) == area.id })
+        }
         var left = kept[..<at].reversed().filter(walkable).map { Optional($0) }
         var right = kept.dropFirst(at + 1).filter(walkable).map { Optional($0) }
         if left.count > 4 { right += left[4...]; left = Array(left.prefix(4)) }
@@ -476,10 +538,14 @@ struct WalkStanding {
             CGRect(x: poleX + L.pennantOut, y: top + L.pennantDrop + CGFloat(i) * L.pennantPitch,
                    width: L.pennantSize.width, height: L.pennantSize.height)
         }
-        let pennants = flags.reversed().prefix(shown).enumerated().map { i, flag in L.Pennant(frame: place(i), level: flag.level) }
+        // Newest first; looking back up, year first (each level newest first).
+        let ordered = s.level != nil ? Array(flags.reversed())
+            : flags.enumerated().sorted { ($0.element.level.rawValue, -$0.offset) < ($1.element.level.rawValue, -$1.offset) }.map(\.element)
+        let pennants = ordered.prefix(shown).enumerated().map { i, flag in L.Pennant(frame: place(i), level: flag.level) }
         let name = area?.name ?? ""
         let words = s.level.map { WalkCopy.sideLabel(name: area?.name ?? WalkCopy.noArea, count: flags.count, level: $0, periods: periods) }
-            ?? WalkCopy.sideLabelWholePlan(name: area?.name ?? WalkCopy.noArea, count: flags.count)
+            ?? WalkCopy.sideLabelWholePlan(name: area?.name ?? WalkCopy.noArea, goals: flags.filter { $0.level != .week }.count,
+                                           tasks: flags.filter { $0.level == .week }.count)
         return L.Side(id: area?.id.uuidString ?? "nameless", area: area?.id, name: name, pill: pill, poleX: poleX,
                       poleTop: top, poleFoot: foot, pennants: pennants, extra: flags.count - shown, count: flags.count,
                       label: words, lean: 0, extraFrame: flags.count > shown ? place(shown) : nil,
@@ -492,7 +558,8 @@ struct WalkStanding {
     /// bare pole), the pole's lean, and each cloth's tilt and shift.
     ///
     /// All of it is given only the room there is, worked out once from the ruled frames:
-    /// - The lift and the turning take the room between the stack's top and the question. With
+    /// - The lift and the turning take the room between the stack's top and the question (looking
+    ///   back up, the header, or the hint under it while there are side posts). With
     ///   2 points or more the stack rises at least 2, which is as far as a turned cloth's corner
     ///   dips, so the lowest cloth never sinks below its place; with less, the turning shrinks with it.
     /// - A wider cloth turns less, so its corners move no further than a phone's: two cloths 4
@@ -500,14 +567,14 @@ struct WalkStanding {
     /// - Across, a cloth keeps only as much lean, shift and tilt as the gap to the side post
     ///   beside it allows (the board leaves 1 point beside a side pill at its widest).
     func hand(frames: [CGRect], who: [String], pillTop: CGFloat?, pill: (lines: Int, width: CGFloat, height: CGFloat)?,
-              caret: Bool, sides: [L.Side]) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
+              caret: Bool, sides: [L.Side], ceiling: CGFloat) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
         let none = (lift: CGFloat(0), lean: 0.0, tilts: [Double](repeating: 0, count: frames.count),
                     shifts: [CGFloat](repeating: 0, count: frames.count))
         guard footing == .natural else { return none }
         // The stack's top: the caret's where there is one, else the pill's, else the top cloth's.
         let top = (pillTop ?? frames.first?.minY ?? L.standingFoot - L.barePole)
             - (caret ? L.caretGap + L.caretSize.height : 0)
-        let room = max(0, top - L.question)
+        let room = max(0, top - ceiling)
         // With no pill the top cloth's own corner needs room above it too.
         let above: CGFloat = pillTop == nil && !frames.isEmpty ? WalkFooting.turnRoom : 0
         let u = CGFloat(WalkFooting.hand(postId, "pole") + 1) / 2

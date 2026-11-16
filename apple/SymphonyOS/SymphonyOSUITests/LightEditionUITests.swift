@@ -153,10 +153,10 @@ final class LightEditionUITests: XCTestCase {
         let field = any["daily.bar.field"]
         let handle = any["daily.lookBack"]
         XCTAssertTrue(handle.exists && field.exists, "no handle or no bar")
-        // The week's rows, and a year goal, which on Week only a row's "for" line names: once the rows
-        // are gone, only the whole plan's own flag can carry it.
+        // The week's rows, and a year goal of the area the whole plan stands in (Health, the first kept
+        // area with a flag, F6), which Week's rows never name: only the whole plan's own cloth can carry it.
         let passport = any.matching(NSPredicate(format: "label CONTAINS %@", "Renew the passport")).firstMatch
-        let yearGoal = any.matching(NSPredicate(format: "label CONTAINS %@", "More slow weekends together")).firstMatch
+        let yearGoal = any.matching(NSPredicate(format: "label CONTAINS %@", "Feel strong again")).firstMatch
         XCTAssertTrue(passport.exists, "the week's rows are not there")
         // What the week holds, leaving out the panel's own chips (the panel goes as the task is let go).
         let chips = Set(rows(panel))

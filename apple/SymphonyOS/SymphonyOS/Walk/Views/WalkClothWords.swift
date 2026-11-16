@@ -15,11 +15,10 @@ enum WalkClothFace {
         switch face {
         case .flag: WalkLayout.flagLine
         case .parent: WalkLayout.parentLine
-        case .lookBack: lookBackLine
+        case .lookBack: WalkLayout.lookBackLine
         case .tag: WalkLayout.tagLine
         }
     }
-    static let lookBackLine: CGFloat = 13
 }
 
 /// A cloth's words: the lines the layout broke them into (`Banner.words`, F39), each drawn as given

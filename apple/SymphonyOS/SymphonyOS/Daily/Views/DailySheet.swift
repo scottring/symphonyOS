@@ -104,7 +104,9 @@ struct DailyPaperFade: View {
 }
 
 /// Behind Today's or Week's lowered sheet (`DailyLookBack`), in place of the band: the walk's own
-/// top-to-bottom plan over the whole window, read only; a post's "+n" opens it.
+/// Look back up over the whole window: one area read top to bottom, the others as side posts (F6). A
+/// side post stands in its area; a cloth opens its level's paper (F21); every other flag is read.
+/// Its words stop growing at extra large, as the walk's stage does.
 struct DailyWholePlan: View {
     @Binding var lookBack: DailyLookBack
     let goals: [Goal]
@@ -117,10 +119,47 @@ struct DailyWholePlan: View {
     var body: some View {
         MountainStage(state: lookBack.plan(goals: goals, tasks: tasks, periods: periods, me: me),
                       today: today, onLabel: { _ in },
-                      onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) }) {
+                      onBanner: { banner, post in lookBack.tap(WalkLayout.tapEvent(banner, on: post)) },
+                      onSide: { side in lookBack.tap(WalkLayout.tapEvent(side)) }) {
             EmptyView()
         }
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .frame(width: size.width, height: size.height)
+    }
+}
+
+/// The paper a Look back up cloth opened behind Today's or Week's lowered sheet (F21), over it, from
+/// 72 under the row of words: Task 7's `PlanPaperView`, its words in the reading column of the stage
+/// the whole plan stands on (`WalkLayout.column(wing:)`), following the person's text size. A row
+/// stands the plan in its area and closes it; "Show the mountain" closes it, and the handle then
+/// raises the sheet as before. It rises in 0.3 s; with Reduce Motion it fades.
+struct DailyWholePlanPaper: View {
+    @Binding var lookBack: DailyLookBack
+    let paper: PlanPaper?
+    let size: CGSize
+    let navTop: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The paper's top: 72 under the row of words' top (the walk's 116 on the phone board).
+    static let belowWords: CGFloat = 72
+
+    var body: some View {
+        let stage = WalkStage(device: size, stage: WalkArt.overlookSquare.stage)
+        let column = WalkLayout.column(wing: stage.wing)
+        let left = stage.toDevice(CGPoint(x: column.lowerBound, y: 0)).x
+        let right = stage.toDevice(CGPoint(x: column.upperBound, y: 0)).x
+        ZStack(alignment: .topLeading) {
+            if let paper {
+                PlanPaperView(paper: paper, column: max(0, left)...min(size.width, right), top: navTop + Self.belowWords,
+                              touch: max(DailyMetrics.minTouch, stage.touch * stage.scale),
+                              inset: WalkLayout.paperInset * min(1, stage.scale),
+                              onRow: { lookBack.rowTapped($0, on: paper) }, onClose: { lookBack.tap(.paperClosed) })
+                    .frame(width: size.width, height: size.height)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom))
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .animation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.3), value: paper != nil)
     }
 }
 

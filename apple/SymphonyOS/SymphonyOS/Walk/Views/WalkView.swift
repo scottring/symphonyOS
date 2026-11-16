@@ -76,7 +76,8 @@ struct WalkView: View {
                 // light, then the hint row.
                 ZStack(alignment: .topLeading) {
                     WalkSceneView(model: model)
-                        // Under the raised sheet the mountain is covered: VoiceOver skips it too.
+                        // Under the raised sheet the mountain is covered: it takes no touch, and VoiceOver skips it too.
+                        .allowsHitTesting(!(model.state.step > 5 && model.state.sheetRaised))
                         .accessibilityHidden(model.state.step > 5 && model.state.sheetRaised)
                         .accessibilitySortPriority(2)
                     if model.state.step <= 5 {

@@ -49,6 +49,9 @@ struct WalkState: Equatable {
     /// The paper is raised over the mountain (F7): the whole level as a plain list by area. Belongs to
     /// the step it was opened on (`settle` closes it); never saved.
     var paperOpen = false
+    /// Look back up (F21): the level whose paper a cloth opened; nil while the paper is shut, and on
+    /// steps 1 to 5, where the paper reads the step's own level. Never saved.
+    var paperLevel: WalkLevel?
     /// Set when the walk ends (Not now, Go to Today): no later event or point changes anything.
     var ended = false
 
@@ -141,8 +144,15 @@ struct WalkState: Equatable {
             return []
         case .paperClosed:
             paperOpen = false
+            paperLevel = nil
             return []
         case .paperRow(let id): return walkToRow(id)
+        // Look back up (F21): a cloth raises the paper for its level, while the sheet is down.
+        case .lookBackPaper(let level):
+            guard step == 6, !ground, !sheetRaised else { return [] }
+            paperOpen = true
+            paperLevel = level
+            return []
         // A tap on the veil around the open compass closes it; on Welcome the choices stay. While typing
         // it closes an empty field and leaves one holding words as it is.
         case .veilTapped:
@@ -357,6 +367,7 @@ struct WalkState: Equatable {
         sheetOpen = false
         teaching = false
         paperOpen = false
+        paperLevel = nil
     }
 
     // MARK: Where the walk stands
@@ -457,8 +468,9 @@ struct WalkState: Equatable {
     /// Year: in a kept area. Steps 2 to 5: in the focused goal's area; with no focused goal,
     /// on the area's remembered or newest goal above; an area with nothing above but a flag
     /// on this step stays as it is; otherwise the newest goal above anywhere, and the walk
-    /// goes to its area; with none at all, no goal and a kept area. Look back up: a kept
-    /// area, or the first one holding a flag.
+    /// goes to its area; with none at all, no goal and a kept area. Look back up: the area
+    /// stood in while it holds a flag, else the first kept area holding one (F6); with none, the
+    /// flags with no area (F12), else a kept area.
     private mutating func settleStanding() {
         guard !ground else { return }
         let stands = focusArea.map(kept.contains) ?? false
@@ -487,8 +499,18 @@ struct WalkState: Equatable {
             }
             if !stands { focusArea = kept.first }
         case 6:
-            guard !stands else { return }
-            focusArea = kept.first { id in items.contains { column(of: $0) == id } } ?? kept.first
+            // Where the walk last stood while that area holds a flag; else the first kept area with one;
+            // with none holding any, the flags with no area, on the post with no name (F12); else a kept area.
+            let held = Set(items.compactMap { column(of: $0) })
+            let holds = { (id: UUID) in held.contains(id) }
+            if stands, let here = focusArea, holds(here) { return }
+            if let first = kept.first(where: holds) {
+                focusArea = first
+            } else if items.contains(where: { column(of: $0) == nil }) {
+                focusArea = nil
+            } else if !stands {
+                focusArea = kept.first
+            }
         default:
             return
         }
@@ -563,6 +585,13 @@ struct WalkState: Equatable {
     /// shows. A flag with no kept area leaves the walk standing where it was (it is chosen if it may be).
     private mutating func walkToRow(_ id: UUID) -> [WalkEffect] {
         paperOpen = false
+        paperLevel = nil
+        // Look back up: the walk stands in that flag's area and chooses nothing.
+        if step == 6 {
+            guard let row = item(id), let column = column(of: row) else { return [] }
+            focusArea = column
+            return [.save]
+        }
         guard let row = item(id), let level else { return [] }
         var effects: [WalkEffect] = []
         if let column = column(of: row) {
@@ -612,6 +641,8 @@ enum WalkEvent: Equatable {
     case nextTapped, veilTapped, moreTapped, backTapped, leaveTapped
     /// The paper (F7): raised ("+n more", the nameless post), lowered ("Show the mountain", Escape), a row tapped.
     case paperOpened, paperClosed, paperRow(UUID)
+    /// Look back up (F21): a cloth raises the paper for its level (a touch on what the paper covers).
+    case lookBackPaper(WalkLevel)
 }
 
 enum WalkTimer: Equatable { case hold, undo, note, finish }

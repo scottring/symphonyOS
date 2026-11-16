@@ -285,17 +285,25 @@ struct WalkWorldView: View {
                     .accessibilityHidden(true)
                     .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
                                 camera)
-                ForEach(post.banners) { banner in
+                // Each cloth takes its tap in its own touch frame (`Post.touchFrames`): the cloth as drawn,
+                // grown to a touch where its neighbours leave room, and never over another cloth.
+                let touches = post.touchFrames(touch: stage.touch)
+                ForEach(Array(zip(post.banners, touches)), id: \.0.id) { banner, box in
                     Button { onBanner(banner, post) } label: {
                         WalkBannerView(banner: banner, dropsIn: dropsIn && arrived, veiled: veilsWords)
+                            .frame(width: banner.frame.width, height: banner.frame.height)
+                            .offset(x: banner.frame.minX - box.minX, y: banner.frame.minY - box.minY)
+                            .frame(width: box.width, height: box.height, alignment: .topLeading)
+                            .contentShape(Rectangle())
                     }
                         .buttonStyle(.plain)
                         .accessibilityLabel(banner.label)
                         .walkReadOnly(!banner.taps)
                         .walkActions(actions(banner))
+                        .walkLookBackIdentifier(banner)
                         .accessibilityHidden(veilsWords)
                         .accessibilitySortPriority(2)
-                        .walkPlaced(banner.frame, camera)
+                        .walkPlaced(box, camera)
                 }
             }
 
@@ -330,11 +338,13 @@ struct WalkWorldView: View {
     private var bandTop: Double { art.topShade(step: step, stage: stage) ?? 0.55 }
 
     /// A faint dark band at the top, so white words read over a pale sky (contract §14); where the
-    /// step's painting behind the words is bright, a held shade to the question's foot (`WalkBackdrop.shade`,
-    /// or the step's `stretchedShade` on a stage with wings).
+    /// step's painting behind the words is bright, a held shade to the question's foot, or on Look back
+    /// up to its header's, then faded out (`WalkBackdrop.shadeReach`; `WalkBackdrop.shade`, or the step's
+    /// `stretchedShade` on a stage with wings).
     @ViewBuilder private var band: some View {
         if let strength = art.topShade(step: step, stage: stage) {
-            let held = WalkLayout.question, length = WalkLayout.question + WalkBackdrop.shadeFade
+            let reach = WalkBackdrop.shadeReach(step: step)
+            let held = reach.held, length = reach.held + reach.fade
             LinearGradient(stops: [.init(color: WalkPalette.navyBand.opacity(strength), location: 0),
                                    .init(color: WalkPalette.navyBand.opacity(strength), location: held / length),
                                    .init(color: WalkPalette.navyBand.opacity(0), location: 1)],
@@ -405,6 +415,11 @@ private extension View {
     /// The standing pill is `walk.standing`; a ground chip keeps no identifier (it is found by its name).
     @ViewBuilder func walkStandingIdentifier(_ standing: Bool) -> some View {
         if standing { accessibilityIdentifier("walk.standing") } else { self }
+    }
+
+    /// A Look back up cloth is `walk.lookback.<level>` (year, season, month, week, today).
+    @ViewBuilder func walkLookBackIdentifier(_ banner: WalkLayout.Banner) -> some View {
+        if banner.kind == .compact { accessibilityIdentifier("walk.lookback.\(banner.level)") } else { self }
     }
 
     /// VoiceOver's custom actions, only when there are some: none leaves the view as it was.
