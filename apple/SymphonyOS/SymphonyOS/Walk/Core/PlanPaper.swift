@@ -7,7 +7,7 @@ import Foundation
 /// Rows are in planting order. A week task carries its day; nothing else carries a tag. Today reads
 /// the week's tasks dated today.
 struct PlanPaper: Equatable {
-    struct Row: Equatable, Identifiable { let id: UUID; let title: String; let tag: String? }
+    struct Row: Equatable, Identifiable { let id: UUID; let title: String; let tag: String?; var hint: String? = nil }
     /// `area` is nil for the flags with no kept area.
     struct Section: Equatable, Identifiable { let id: String; let area: UUID?; let name: String; let rows: [Row] }
     let title: String; let count: String; let sections: [Section]
@@ -40,6 +40,15 @@ struct PlanPaper: Equatable {
         return PlanPaper(title: title, count: WalkCopy.paperCount(total, level: level), sections: sections, level: level)
     }
 
+    /// The same paper with each row's words to VoiceOver for what its tap does (`Row.hint`).
+    func hinted(_ hint: (UUID) -> String?) -> PlanPaper {
+        let sections = self.sections.map { section in
+            Section(id: section.id, area: section.area, name: section.name,
+                    rows: section.rows.map { Row(id: $0.id, title: $0.title, tag: $0.tag, hint: hint($0.id)) })
+        }
+        return PlanPaper(title: title, count: count, sections: sections, level: level)
+    }
+
     /// Each row in reading order with its place on the paper (`walk.paper.row.<n>`).
     var numberedRows: [(index: Int, row: Row)] {
         sections.flatMap(\.rows).enumerated().map { ($0.offset, $0.element) }
@@ -53,5 +62,9 @@ extension WalkState {
         guard paperOpen, let level = paperLevel ?? level else { return nil }
         return PlanPaper.make(level: level, items: items, areas: areas, kept: kept,
                               title: WalkCopy.paperTitle(level, p), today: p.today)
+            .hinted { id in
+                let does = paperRowTap(id)
+                return WalkCopy.paperRowHint(walks: does.walks, chooses: does.chooses, lookingBack: step == 6)
+            }
     }
 }

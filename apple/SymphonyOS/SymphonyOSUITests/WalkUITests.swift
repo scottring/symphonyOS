@@ -156,11 +156,17 @@ final class WalkUITests: XCTestCase {
         let close = app.buttons["walk.paper.close"]
         XCTAssertTrue(close.exists && close.isHittable, "no Show the mountain")
         XCTAssertGreaterThanOrEqual(close.frame.height, 44, "Show the mountain is less than a touch high")
-        let row = app.buttons["walk.paper.row.0"]
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "no first row")
+        // The walk stands in Health, which now holds five (rows 0 to 4); row 5 is Home's first goal.
+        let row = app.buttons["walk.paper.row.5"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no row in Home")
+        var swipes = 0
+        while !row.isHittable && swipes < 4 { paper.swipeUp(); swipes += 1 }
         XCTAssertGreaterThanOrEqual(row.frame.height, 44, "a row is less than a touch high")
+        let standing = app.descendants(matching: .any)["walk.standing"]
         row.tap()
         XCTAssertTrue(paper.waitForNonExistence(timeout: 15), "a row did not lower the paper")
+        XCTAssertTrue(standing.waitForExistence(timeout: 15), "no standing pill")
+        XCTAssertEqual(standing.label, "Home", "a row in Home did not walk there")
         XCTAssertTrue(app.buttons["walk.remove"].waitForExistence(timeout: 15), "the row's flag was not chosen: no Move row")
         XCTAssertTrue(app.buttons["walk.next"].exists, "Next did not come back")
     }
@@ -173,10 +179,18 @@ final class WalkUITests: XCTestCase {
             let app = walk(step: step, ["-SymphonyWalkSeed", seed, "-SymphonyWalkOrb", "paper"])
             let paper = app.descendants(matching: .any)["walk.paper"]
             XCTAssertTrue(paper.waitForExistence(timeout: 15), "\(seed): the paper did not rise")
+            XCTAssertTrue(paper.scrollViews.firstMatch.exists, "\(seed): the paper's list is not a scrolling list")
             let end = app.buttons["walk.paper.row.\(last)"]
             XCTAssertTrue(end.waitForExistence(timeout: 15), "\(seed): no row \(last)")
-            // Whole on the screen, clear of the home indicator: the list's end, not a row half under the edge.
-            func inView() -> Bool { end.isHittable && end.frame.maxY <= app.frame.maxY - 34 }
+            // Whole inside the list's own scrolling frame, which the app keeps above its window's foot (the
+            // window's safe area: the home indicator), and inside the window: the list's end, not a row
+            // half under the edge.
+            let list = paper.scrollViews.firstMatch
+            let window = app.windows.firstMatch.frame
+            func inView() -> Bool {
+                end.isHittable && list.frame.minY <= end.frame.minY && end.frame.maxY <= list.frame.maxY
+                    && list.frame.maxY <= window.maxY
+            }
             var swipes = 0
             while !inView() && swipes < 10 {
                 paper.swipeUp()

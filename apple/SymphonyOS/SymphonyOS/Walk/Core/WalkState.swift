@@ -172,6 +172,9 @@ struct WalkState: Equatable {
     /// A waiting flag is planted first, as for an event (a point chosen through VoiceOver).
     mutating func act(_ action: WalkAction, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        // The paper is lowered first: an action never leaves it up over another step or another stop of a tour.
+        paperOpen = false
+        paperLevel = nil
         teaching = false                    // a compass point chosen through VoiceOver puts the lesson away
         let place = placeForExamples
         let planted = plantWaitingFlag(env)
@@ -583,7 +586,13 @@ struct WalkState: Equatable {
     /// the goal above is its own (the goal it hangs under, where that stands with it); on Today the
     /// task itself is the one the step is about. A flag this walk may choose is chosen, so the Move row
     /// shows. A flag with no kept area leaves the walk standing where it was (it is chosen if it may be).
+    ///
+    /// Only while the paper is up, never on the ground. A row in the area already stood in keeps the goal
+    /// above the person chose (it only chooses). On a walk down the goal above changes only to one on the
+    /// walked line (on Today, only to a task on it), so what is said next still hangs on that line.
     private mutating func walkToRow(_ id: UUID) -> [WalkEffect] {
+        guard paperOpen, !ground else { return [] }
+        let does = paperRowTap(id)
         paperOpen = false
         paperLevel = nil
         // Look back up: the walk stands in that flag's area and chooses nothing.
@@ -594,12 +603,12 @@ struct WalkState: Equatable {
         }
         guard let row = item(id), let level else { return [] }
         var effects: [WalkEffect] = []
-        if let column = column(of: row) {
-            if level == .today {
+        if does.walks, let column = column(of: row) {
+            if level == .today, onWalkedLine(row) {
                 focusArea = column
                 focus[.today] = row.id
-            } else if level != .year, let parent = item(row.parentId), parent.level.rawValue == level.rawValue - 1,
-                      self.column(of: parent) == column {
+            } else if level != .year, level != .today, let parent = item(row.parentId),
+                      parent.level.rawValue == level.rawValue - 1, self.column(of: parent) == column, onWalkedLine(parent) {
                 focusArea = column
                 focus[level] = parent.id
                 follow(parent.id)
@@ -608,12 +617,21 @@ struct WalkState: Equatable {
             }
             effects.append(.save)
         }
-        if selects(id), row.mine, selected != id {
+        if does.chooses, selected != id {
             selected = id
             undoShowing = false
             effects.append(.sound(.tick, afterMs: 0))
         }
         return effects
+    }
+
+    /// What a row's tap does here (`walkToRow`, and each row's words to VoiceOver): whether the walk goes
+    /// to stand in another area (on Look back up, in that flag's area), and whether the flag is chosen.
+    func paperRowTap(_ id: UUID) -> (walks: Bool, chooses: Bool) {
+        guard let row = item(id) else { return (false, false) }
+        let column = column(of: row)
+        if step == 6 { return (column != nil, false) }
+        return (column != nil && column != standing, selects(id) && row.mine)
     }
 
     /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with

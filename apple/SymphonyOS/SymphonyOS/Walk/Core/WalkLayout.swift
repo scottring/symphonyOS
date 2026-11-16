@@ -157,6 +157,13 @@ struct WalkLayout: Equatable {
     /// The paper (F7): its top on the board while raised, and how far its words stand in from the
     /// reading column's edges (`column(wing:)`).
     static let paperTop: CGFloat = 116, paperInset: CGFloat = 24
+    /// P35: the chosen flag when the standing post does not draw it (one chosen from the paper under no area,
+    /// or in another area): the why line then names it (`WalkCopy.chosenNote`). Nil otherwise.
+    static func unseenChoice(_ state: WalkState) -> WalkItem? {
+        let s = state.settled
+        guard !s.ground, s.level != nil, let item = s.item(s.selected), s.column(of: item) != s.standing else { return nil }
+        return item
+    }
     /// The spoken flag: one line of the newest words, above the light.
     static let spokenFlagRect = CGRect(x: 120, y: 560, width: 150, height: 36)
 

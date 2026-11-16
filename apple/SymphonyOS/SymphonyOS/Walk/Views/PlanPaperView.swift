@@ -21,12 +21,16 @@ struct PlanPaperView: View {
     let touch: CGFloat
     /// How far in from the column's edges the words stand.
     var inset: CGFloat = 24
+    /// The room the window keeps at its foot (the home indicator), from the window's own safe area: the
+    /// list scrolls above it, so its last row is never under it. 28 where the caller does not know it.
+    var bottomInset: CGFloat = 28
     let onRow: (UUID) -> Void
     let onClose: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    /// The row's 27-point line at DM Sans 16: the gap between lines grows with the text.
-    @ScaledMetric(relativeTo: .body) private var rowLineGap: CGFloat = 6
+    /// The row's 27-point line at DM Sans 16. It does not grow with the text, so at the largest sizes the
+    /// gap inside a wrapped title stays well under the gap between two rows (`rowPad`, which does grow).
+    private let rowLineGap: CGFloat = 6
     /// The room above and below a row's words: half of what a touch leaves round a 27-point line, growing
     /// with the text as the line gap does, so the gap between two rows stays wider than between two lines.
     @ScaledMetric(relativeTo: .body) private var rowPad: CGFloat = 8.5
@@ -50,8 +54,9 @@ struct PlanPaperView: View {
                     .frame(width: column.upperBound - column.lowerBound, alignment: .leading)
                     .padding(.leading, column.lowerBound)
                     .frame(width: room.size.width, alignment: .leading)
-                    .padding(.bottom, 44)
+                    .padding(.bottom, 16)
                 }
+                .padding(.bottom, bottomInset)
             }
             .frame(width: room.size.width, height: max(0, room.size.height - top), alignment: .top)
             .background(sheet)
@@ -97,16 +102,27 @@ struct PlanPaperView: View {
 
     // MARK: The heading and its count
 
-    private var heading: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(paper.title)
-                .font(DailyPalette.crimson(30, relativeTo: .title))
-                .foregroundStyle(DailyPalette.ink)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            Text(paper.count)
-                .font(DailyPalette.sans(13, relativeTo: .footnote))
-                .foregroundStyle(DailyPalette.muted)
+    /// The heading with its count beside it on its baseline; at the accessibility sizes the count goes
+    /// under it, so a long heading ("December") is never broken inside a word.
+    @ViewBuilder private var heading: some View {
+        let title = Text(paper.title)
+            .font(DailyPalette.crimson(30, relativeTo: .title))
+            .foregroundStyle(DailyPalette.ink)
+            .accessibilityAddTraits(.isHeader)
+        let count = Text(paper.count)
+            .font(DailyPalette.sans(13, relativeTo: .footnote))
+            .foregroundStyle(DailyPalette.muted)
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 2) {
+                title
+                count
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                title
+                Spacer(minLength: 0)
+                count
+            }
         }
     }
 
@@ -148,7 +164,7 @@ struct PlanPaperView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(WalkCopy.paperRowLabel(row.title, tag: row.tag))
-        .accessibilityHint(WalkCopy.areaHint(ground: false, kept: true, focused: false))
+        .walkAccessibilityHint(row.hint)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("walk.paper.row.\(index)")
     }

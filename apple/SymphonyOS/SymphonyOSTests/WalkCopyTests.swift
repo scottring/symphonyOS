@@ -451,6 +451,10 @@ struct WalkCopyTests {
                  WalkCopy.showMountain, WalkCopy.paperNoArea, WalkCopy.readTheList, WalkCopy.paperCount(1, level: .year),
                  WalkCopy.paperCount(12, level: .week), WalkCopy.paperSection("Work", count: 3, level: .month),
                  WalkCopy.paperRowLabel("Tour the gym", tag: "WEDNESDAY"),
+                 WalkCopy.chosenNote("Call Mum"), WalkCopy.paperRowHint(walks: true, chooses: true, lookingBack: false),
+                 WalkCopy.paperRowHint(walks: false, chooses: true, lookingBack: false),
+                 WalkCopy.paperRowHint(walks: false, chooses: false, lookingBack: false),
+                 WalkCopy.paperRowHint(walks: true, chooses: false, lookingBack: true),
                  WalkCopy.exampleTag, WalkCopy.exampleTagShort, WalkCopy.groundWhy, WalkCopy.focusAbove,
                  WalkCopy.heresToday, WalkCopy.showMyDay, WalkCopy.lookBackHandle, WalkCopy.todayEyebrow,
                  WalkCopy.walkAnother, WalkCopy.goToToday, WalkCopy.thatsTheDay, WalkCopy.nothingToday,
@@ -549,6 +553,15 @@ struct WalkCopyTests {
         #expect(WalkCopy.typePlaceholder == "Type it, then tap Add"); #expect(WalkCopy.firstThingTag == "FIRST THING")
         #expect(WalkCopy.typeAdd == "Add"); #expect(WalkCopy.typeClose == "Close without adding")
         #expect(WalkCopy.finish == "Finish the walk")
+        #expect(WalkCopy.chosenNote("Call Mum") == "“Call Mum” is chosen. Move it to an area, or remove it.")
+        #expect(WalkCopy.chosenNote(String(repeating: "Tile the bathroom wall ", count: 4))
+                == "“\(WalkCopy.short(String(repeating: "Tile the bathroom wall ", count: 4), length: WalkCopy.chosenLength))” is chosen. Move it to an area, or remove it.")
+        #expect(WalkCopy.paperRowHint(walks: true, chooses: true, lookingBack: false) == "Tap to walk there and choose it")
+        #expect(WalkCopy.paperRowHint(walks: true, chooses: false, lookingBack: false) == "Tap to walk there")
+        #expect(WalkCopy.paperRowHint(walks: false, chooses: true, lookingBack: false) == "Tap to choose it")
+        #expect(WalkCopy.paperRowHint(walks: false, chooses: false, lookingBack: false) == "Tap to close the list")
+        #expect(WalkCopy.paperRowHint(walks: true, chooses: false, lookingBack: true) == "Tap to see that area")
+        #expect(WalkCopy.paperRowHint(walks: false, chooses: false, lookingBack: true) == "Tap to close the list")
         #expect(WalkCopy.more(2) == "+2 more"); #expect(WalkCopy.moreLabel(2) == "2 more, tap to read the list"); #expect(WalkCopy.noArea == "No area")
         #expect(WalkCopy.exampleTag == "EXAMPLE · TAP TO USE"); #expect(WalkCopy.exampleTagShort == "TAP TO USE")
         #expect(WalkLayout.exampleTag(forWidth: 150) == "EXAMPLE · TAP TO USE")

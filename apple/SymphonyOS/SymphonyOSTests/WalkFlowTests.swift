@@ -1140,5 +1140,149 @@ final class WalkFlowTests {
         }
         #expect(open.standing == health)
     }
+
+    // MARK: The paper, fix round 1
+
+    /// A walk down "Finish the bathroom" on Month, in Home; Home also holds another year goal's season
+    /// goal and a month goal under it, off the walked line.
+    private func walkDownMonth() -> (s: WalkState, walkedSeason: WalkItem, offLine: WalkItem) {
+        let home = WalkArea(id: UUID(), name: "Home"), health = WalkArea(id: UUID(), name: "Health")
+        var s = WalkState()
+        s.areas = [home, health]
+        s.kept = [home.id, health.id]
+        s.step = 3
+        let walked = WalkItem(id: UUID(), level: .year, title: "Finish the bathroom", areaId: home.id)
+        let other = WalkItem(id: UUID(), level: .year, title: "Clear out the garage", areaId: home.id)
+        let tiled = WalkItem(id: UUID(), level: .season, title: "Bathroom tiled", areaId: home.id, parentId: walked.id)
+        let empty = WalkItem(id: UUID(), level: .season, title: "Garage half empty", areaId: home.id, parentId: other.id)
+        let skip = WalkItem(id: UUID(), level: .month, title: "Hire a skip", areaId: home.id, parentId: empty.id)
+        s.items = [walked, other, tiled, empty, skip]
+        s.walkingDown = [walked.id]
+        s.focusArea = home.id
+        s.focus[.month] = tiled.id
+        return (s.settled, tiled, skip)
+    }
+
+    /// Fix round 1 (A): on a walk down, a row of another goal in the same area chooses that flag but keeps
+    /// the walked goal above, so what is said next hangs on the walked line and is the goal above on Week.
+    @Test func aRowOnAWalkDownKeepsItsLine() throws {
+        var (s, tiled, skip) = walkDownMonth()
+        #expect(s.focus[.month] == tiled.id)
+        _ = s.apply(.paperOpened, paperEnv)
+        _ = s.apply(.paperRow(skip.id), paperEnv)
+        #expect(!s.paperOpen && s.selected == skip.id)
+        #expect(s.focus[.month] == tiled.id, "the row took the walk off its line")
+        _ = s.plant("Pick the tile", paperEnv)
+        let planted = try #require(s.items.last)
+        #expect(planted.title == "Pick the tile" && planted.parentId == tiled.id)
+        _ = s.act(.next, paperEnv)
+        #expect(s.step == 4 && s.focus[.week] == planted.id, "the planted goal is not the goal above on Week")
+        // On Today a row off the walked line does not become the task the step is about.
+        var (today, lineSeason, offMonth) = walkDownMonth()
+        let off = WalkItem(id: UUID(), level: .week, title: "Book the skip lorry", areaId: today.kept[1], parentId: offMonth.id, day: now)
+        let on = WalkItem(id: UUID(), level: .week, title: "Call the tiler", areaId: today.kept[0], parentId: lineSeason.id, day: now)
+        today.items += [off, on]
+        today.step = 5
+        today.focusArea = today.kept[1]
+        today = today.settled
+        #expect(today.focus[.today] == on.id)
+        _ = today.apply(.paperOpened, paperEnv)
+        _ = today.apply(.paperRow(off.id), paperEnv)
+        #expect(!today.paperOpen && today.focus[.today] == on.id, "a row off the line became the task Today is about")
+    }
+
+    /// Fix round 1 (1): a compass action while the paper is up closes the paper first, then acts, so the
+    /// paper never stays up over another step or another stop of a tour.
+    @Test func anActionClosesThePaperFirst() {
+        let a = WalkArea(id: UUID(), name: "Health"), b = WalkArea(id: UUID(), name: "Work")
+        var s = WalkState()
+        s.areas = [a, b]
+        s.kept = [a.id, b.id]
+        s.depth = .full
+        s.step = 1
+        s.items = (1...6).map { WalkItem(id: UUID(), level: .year, title: "Goal \($0)", areaId: a.id) }
+        s.focusArea = a.id
+        s.tour = [b.id]
+        s = s.settled
+        _ = s.apply(.paperOpened, paperEnv)
+        #expect(s.paperOpen)
+        _ = s.act(.next, paperEnv)
+        #expect(s.step == 1 && s.standing == b.id && !s.paperOpen, "a tour's Next left the paper up over another stop")
+        #expect(s.paper(paperEnv.periods) == nil)
+    }
+
+    /// Fix round 1 (2): a row does nothing unless the paper is up, and never on the ground.
+    @Test func aRowIsNothingWithoutThePaper() {
+        let (s, health, _, goals) = paperMonth()
+        var shut = s
+        #expect(shut.apply(.paperRow(goals[0].id), paperEnv).isEmpty && shut == s && shut.standing == health)
+        var ground = s
+        ground.step = 1
+        ground.ground = true
+        let before = ground
+        ground.paperOpen = true
+        _ = ground.apply(.paperRow(ground.items[0].id), paperEnv)
+        #expect(ground.focusArea == before.focusArea && ground.selected == nil)
+    }
+
+    /// Fix round 1 (3): a row in the area already stood in keeps the goal above the person chose, and only
+    /// chooses the flag.
+    @Test func aRowHereKeepsTheGoalAbove() throws {
+        var (s, _, work, goals) = paperMonth()
+        _ = s.apply(.areaTapped(work), paperEnv)
+        // Work has a second season goal; the person switches to it.
+        let second = WalkItem(id: UUID(), level: .season, title: "Ship the proposal", areaId: work)
+        s.items.append(second)
+        s.focus[.month] = second.id
+        s = s.settled
+        #expect(s.standing == work && s.focus[.month] == second.id)
+        _ = s.apply(.paperOpened, paperEnv)
+        let effects = s.apply(.paperRow(goals[2].id), paperEnv)
+        #expect(!s.paperOpen && s.focus[.month] == second.id && s.standing == work)
+        #expect(s.selected == goals[2].id && !effects.contains(.save))
+    }
+
+    /// Fix round 1 (4, P35): a flag chosen from the paper that its post does not show (it is under no area)
+    /// is named where the why line stands, so the Move row never acts on something unnamed.
+    @Test func aChosenFlagOffThePostIsNamed() throws {
+        var (s, _, _, _) = paperMonth(loose: true)
+        let loose = try #require(s.items.first { $0.areaId == nil })
+        #expect(WalkLayout.unseenChoice(s) == nil)
+        _ = s.apply(.paperOpened, paperEnv)
+        _ = s.apply(.paperRow(loose.id), paperEnv)
+        #expect(s.selected == loose.id && WalkLayout.unseenChoice(s)?.id == loose.id)
+        let layout = WalkLayout.make(s, today: now, footing: .level)
+        #expect(!layout.posts.flatMap(\.banners).contains { $0.itemId == loose.id } && layout.moveRow != nil)
+        let note = WalkCopy.chosenNote(loose.title)
+        #expect(WalkCopy.why(s, paperEnv.periods) == note)
+        #expect(WalkLayout.words(s, paperEnv.periods, wing: 0).showsWhy)
+        // Chosen on its own post, the step's own why line stands.
+        var here = paperMonth().s
+        _ = here.apply(.paperOpened, paperEnv)
+        _ = here.apply(.paperRow(here.items.first { $0.title == "Find a gym that fits" }!.id), paperEnv)
+        #expect(here.selected != nil && WalkLayout.unseenChoice(here) == nil && WalkCopy.why(here, paperEnv.periods) != note)
+    }
+
+    /// Fix round 1 (5): each row says to VoiceOver what its tap does here.
+    @Test func eachRowSaysWhatItsTapDoes() throws {
+        var (s, _, _, goals) = paperMonth(theirs: true, loose: true)
+        _ = s.apply(.paperOpened, paperEnv)
+        let rows = try #require(s.paper(paperEnv.periods)).sections.flatMap(\.rows)
+        func hint(_ id: UUID) -> String? { rows.first { $0.id == id }?.hint }
+        let gym = s.items.first { $0.title == "Find a gym that fits" }!
+        let loose = s.items.first { $0.areaId == nil }!
+        #expect(hint(gym.id) == WalkCopy.paperRowHint(walks: false, chooses: true, lookingBack: false))
+        #expect(hint(goals[1].id) == WalkCopy.paperRowHint(walks: true, chooses: true, lookingBack: false))
+        #expect(hint(goals[0].id) == WalkCopy.paperRowHint(walks: true, chooses: false, lookingBack: false))
+        #expect(hint(loose.id) == WalkCopy.paperRowHint(walks: false, chooses: true, lookingBack: false))
+        #expect(rows.allSatisfy { $0.hint != nil })
+        // Look back up: an area's row shows that area; a row under no area only closes the list.
+        var back = lookBack().s
+        back.items.append(WalkItem(id: UUID(), level: .year, title: "No area yet", areaId: nil))
+        _ = back.apply(.lookBackPaper(.year), paperEnv)
+        let backRows = try #require(back.paper(paperEnv.periods)).sections.flatMap(\.rows)
+        #expect(backRows.dropLast().allSatisfy { $0.hint == WalkCopy.paperRowHint(walks: true, chooses: false, lookingBack: true) })
+        #expect(backRows.last?.hint == WalkCopy.paperRowHint(walks: false, chooses: false, lookingBack: true))
+    }
 }
 #endif

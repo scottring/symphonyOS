@@ -71,6 +71,7 @@ enum WalkCopy {
         if s.step == 0 { return welcomeSub }
         guard let level = s.level else { return "" }
         if level == .year, s.ground { return groundWhy }
+        if let chosen = WalkLayout.unseenChoice(s) { return chosenNote(chosen.title) }
         var line: String
         switch level {
         case .year: return "Something that would feel true twelve months from now. Big or small."
@@ -421,6 +422,26 @@ enum WalkCopy {
         case .today: return todayEyebrow
         }
     }
+
+    /// P35: in the why line's place, while the chosen flag is one its post does not draw (`WalkLayout.unseenChoice`:
+    /// one chosen from the paper under no area), so the Move row never acts on something unnamed.
+    static let chosenLength = 40
+    static func chosenNote(_ title: String) -> String {
+        "“\(short(title, length: chosenLength))” is chosen. Move it to an area, or remove it."
+    }
+
+    /// A row on the paper to VoiceOver: what its tap does here (`WalkState.paperRowTap`). On Look back up a
+    /// row shows its area and chooses nothing; a row that neither walks nor chooses only closes the list.
+    static func paperRowHint(walks: Bool, chooses: Bool, lookingBack: Bool) -> String {
+        if lookingBack { return walks ? "Tap to see that area" : closeTheList }
+        switch (walks, chooses) {
+        case (true, true): return "Tap to walk there and choose it"
+        case (true, false): return areaHint(ground: false, kept: true, focused: false)
+        case (false, true): return "Tap to choose it"
+        case (false, false): return closeTheList
+        }
+    }
+    static let closeTheList = "Tap to close the list"
 
     /// A section's heading to VoiceOver: "Work, 3 goals".
     static func paperSection(_ name: String, count: Int, level: WalkLevel) -> String {

@@ -162,6 +162,34 @@ struct PlanPaperTests {
         #expect(checked > 3000)
     }
 
+    /// Fix round 1 (4): `WalkLayout.unseenChoice` is exactly a chosen flag its post does not draw, over every
+    /// generated state (each one's chosen flag stands on its post) and the same states with a flag chosen
+    /// in another area or under none.
+    @Test func anUnseenChoiceIsExactlyOneThePostDoesNotDraw() {
+        let states = Generated.all, layouts = Generated.levelLayouts
+        var checked = 0, unseen = 0
+        var problems: [String] = []
+        for (s, layout) in zip(states, layouts) where s.level != nil && !s.ground {
+            var cases = [(s, layout)]
+            if let level = s.level, let other = s.items(on: level == .today ? .week : level).first(where: { s.column(of: $0) != s.standing }) {
+                var moved = s
+                moved.selected = other.id
+                cases.append((moved, WalkLayout.make(moved, today: today, footing: .level)))
+            }
+            for (c, l) in cases {
+                guard let chosen = c.selected else { continue }
+                let drawn = l.posts.flatMap(\.banners).contains { $0.itemId == chosen }
+                if (WalkLayout.unseenChoice(c) == nil) != drawn {
+                    problems.append("\(Generated.describe(c)): drawn \(drawn), unseen \(WalkLayout.unseenChoice(c) != nil)")
+                }
+                checked += 1
+                if !drawn { unseen += 1 }
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.count): \(problems.prefix(5))")
+        #expect(checked > 1000 && unseen > 100, "checked \(checked), unseen \(unseen)")
+    }
+
     /// The same over the demo's full and long plans, standing in each of their areas on each step.
     @Test func theDemoPlansCountTheSame() {
         for plan in [DemoStress.full, DemoStress.long] {

@@ -14,8 +14,9 @@ struct WalkView: View {
     let model: WalkModel
     /// The keyboard's top edge in screen points, while it is up.
     @State private var keyboardTop: CGFloat?
-    /// The window's own safe-area insets (`WindowInsetsReader`). Only the sides are read: the
-    /// board stands clear of a system column (the Duo's outside screen) and the painting runs under it.
+    /// The window's own safe-area insets (`WindowInsetsReader`). The sides: the board stands clear of a
+    /// system column (the Duo's outside screen) and the painting runs under it. The foot: the paper's list
+    /// stays above the home indicator.
     @State private var insets = UIEdgeInsets.zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -46,7 +47,7 @@ struct WalkView: View {
         if let pinned = Self.pinnedSize {
             GeometryReader { room in
                 let k = min(1, room.size.width / pinned.width, room.size.height / pinned.height)
-                walkBody(left: Self.pinnedSafe.left, right: Self.pinnedSafe.right)
+                walkBody(left: Self.pinnedSafe.left, right: Self.pinnedSafe.right, bottom: 0)
                     .frame(width: pinned.width, height: pinned.height)
                     .scaleEffect(k, anchor: .topLeading)
                     .offset(x: (room.size.width - pinned.width * k) / 2, y: (room.size.height - pinned.height * k) / 2)
@@ -63,12 +64,12 @@ struct WalkView: View {
 
     /// The walk on the real window, between that window's own side insets.
     private var inTheWindow: some View {
-        walkBody(left: insets.left, right: insets.right)
+        walkBody(left: insets.left, right: insets.right, bottom: insets.bottom)
             .background { WindowInsetsReader { insets = $0 } }
     }
 
-    /// `left`, `right`: the window's side insets, in its own points.
-    private func walkBody(left: CGFloat, right: CGFloat) -> some View {
+    /// `left`, `right`: the window's side insets, in its own points; `bottom`, the room at its foot (the paper's list stays above it).
+    private func walkBody(left: CGFloat, right: CGFloat, bottom: CGFloat) -> some View {
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: model.art.stage, left: left, right: right)
             ZStack(alignment: .topLeading) {
@@ -105,7 +106,7 @@ struct WalkView: View {
                 // Under the raised paper nothing takes a touch and VoiceOver skips it all (the paper is modal).
                 .allowsHitTesting(!model.state.paperOpen)
                 .accessibilityHidden(model.state.paperOpen)
-                paper(stage, window: geo.size)
+                paper(stage, window: geo.size, bottom: bottom)
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .clipped()                                   // at the window: nothing is clipped at the board
@@ -125,7 +126,7 @@ struct WalkView: View {
     /// bleed) from stage y 116 down, its words in the reading column (`WalkLayout.column(wing:)`), 24 in.
     /// It is drawn in the window's own points, outside the stage's fixed sizes, so its words follow the
     /// person's text size. It rises in 0.3 s; with Reduce Motion it fades.
-    private func paper(_ stage: WalkStage, window: CGSize) -> some View {
+    private func paper(_ stage: WalkStage, window: CGSize, bottom: CGFloat) -> some View {
         let column = WalkLayout.column(wing: stage.wing)
         let left = stage.toDevice(CGPoint(x: column.lowerBound, y: 0)).x
         let right = stage.toDevice(CGPoint(x: column.upperBound, y: 0)).x
@@ -133,7 +134,7 @@ struct WalkView: View {
             if let paper = model.state.paper(model.periods) {
                 PlanPaperView(paper: paper, column: left...right,
                               top: stage.toDevice(CGPoint(x: 0, y: WalkLayout.paperTop)).y,
-                              touch: stage.touch * stage.scale, inset: WalkLayout.paperInset * stage.scale,
+                              touch: stage.touch * stage.scale, inset: WalkLayout.paperInset * stage.scale, bottomInset: bottom,
                               onRow: { model.send(.paperRow($0)) }, onClose: { model.send(.paperClosed) })
                     .frame(width: window.width, height: window.height)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom))
