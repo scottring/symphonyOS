@@ -143,6 +143,20 @@ final class AppState {
     /// Stops sync and waits for it to finish; set by `ContentView` so the
     /// delete-account flow can wipe without the engine re-inserting rows.
     var stopSync: (() async -> Void)?
+    /// Stops sync and waits for a push or pull under way to finish (`SyncEngine.stopAndSettle`);
+    /// false if it would not. Set by `ContentView` beside `stopSync`, for a demo started over.
+    var pauseSync: (() async -> Bool)?
+    /// Starts sync again for the signed-in person with a fresh engine and a fresh first pull.
+    /// Set by `ContentView`, for a demo started over (and after one that failed).
+    var restartSync: (() -> Void)?
+    /// "Start this demo over" (`DemoReset`): the Settings row's state, kept here so the row
+    /// reads it however often Settings is opened.
+    var demoReset: DemoReset.Phase = .idle
+    /// While a demo is being started over the main view is taken down (`ContentView` draws the
+    /// launch screen), so no screen holds a row that is being cleared; it comes back fresh, as
+    /// after a sign-in. `demoResetCovered` says the launch screen is up.
+    var demoResetting = false
+    var demoResetCovered = false
     /// The signed-in account's first pull has finished: households, life
     /// areas, tasks and goals all came back from the server. Until then an
     /// empty store means nothing (a new phone, or offline). Set by
@@ -190,10 +204,26 @@ final class AppState {
         walkPaused = false
         walkResumeRequested = false
         walkDown = nil
+        demoReset = .idle               // a failed "Start this demo over" line is not the next person's
         leaveDaily()                    // the dock flag, Inbox or More, the last light day, a handover
         horizon = .today
         selectedDate = .now
         edition = .full                 // unknown until the next sign-in reads it (`Edition.current`)
+    }
+
+    /// A demo was started over (`DemoReset`): nothing of the session before is left on screen or
+    /// waiting, and the walk starts from the top (as "Walk the mountain again" asks: Welcome, as a
+    /// first run opens it). Called while the main view is down; it reads the request as it comes back.
+    func startedOver() {
+        tellRequested = false
+        walkResumeRequested = false
+        walkPaused = false
+        walkDown = nil
+        leaveDaily()
+        activeTab = .planner
+        horizon = .today
+        selectedDate = DailyClock.launchDay(arguments: ProcessInfo.processInfo.arguments, real: .now)
+        walkReplayRequested = true
     }
 
     /// Whether a Tell still waiting is dropped as its person goes (signed out, or someone else

@@ -24,8 +24,14 @@ enum AccountDeletion {
 
     /// Deletes every row of every model the app stores.
     static func wipe(_ container: ModelContainer) throws {
+        try wipe(container, types: SymphonyApp.modelTypes)
+    }
+
+    /// Deletes every row of the models named (a demo started over keeps the household:
+    /// `DemoResetService.clearedTypes`).
+    static func wipe(_ container: ModelContainer, types: [any PersistentModel.Type]) throws {
         let context = ModelContext(container)
-        for type in SymphonyApp.modelTypes {
+        for type in types {
             try context.delete(model: type)
         }
         try context.save()

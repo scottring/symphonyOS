@@ -150,4 +150,7 @@ struct HandoverMemory {
     func seen(for userId: UUID?) -> Bool { defaults.bool(forKey: key(userId)) }
 
     func markSeen(for userId: UUID?) { defaults.set(true, forKey: key(userId)) }
+
+    /// Unseen again (a demo started over: `DemoReset`).
+    func forget(for userId: UUID?) { defaults.removeObject(forKey: key(userId)) }
 }

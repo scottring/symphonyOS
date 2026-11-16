@@ -538,4 +538,69 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertFalse(any["daily.handover"].waitForExistence(timeout: 3), "the handover's line in a full household")
         XCTAssertFalse(any["daily.bar.halo"].exists, "a handover in a full household")
     }
+
+    // MARK: Start this demo over
+
+    /// A screenshot kept with the test's result, for the report (`xcresulttool export attachments`).
+    private func keep(_ app: XCUIApplication, _ name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Settings, reached from More.
+    private func openSettings(_ app: XCUIApplication, more: XCUIElement) {
+        XCTAssertTrue(more.waitForExistence(timeout: 30), "no More")
+        more.tap()
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "no Settings in More")
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10), "Settings did not open")
+    }
+
+    /// A demo launch stands in for a test account in a light household: Settings offers "Start this
+    /// demo over"; confirmed, the demo's plan is cleared on the phone (no server is called) and the
+    /// walk's Welcome opens. Not now there leaves Today with the line offered only to someone with
+    /// no goals, so the plan is empty.
+    @MainActor func testStartingTheDemoOverLandsOnWelcomeWithAnEmptyPlan() throws {
+        let app = launch(light: true)
+        let any = app.descendants(matching: .any)
+        let whenReady = any.matching(NSPredicate(format: "label == %@", "Walk down from the year when you’re ready.")).firstMatch
+        XCTAssertFalse(whenReady.exists, "the seeded plan already reads as empty")
+        openSettings(app, more: any["daily.bar.more"])
+        let row = app.buttons["settings.demoReset"]
+        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "no Start this demo over")
+        XCTAssertTrue(row.label.contains("Start this demo over"), "the row reads \(row.label)")
+        keep(app, "owner-phone-demo-reset-row")
+        row.tap()
+        let alert = app.alerts["Start this demo over?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "no confirmation")
+        XCTAssertTrue(alert.staticTexts["Everything in this demo account is removed. This can’t be undone."].exists, "the confirmation's words")
+        XCTAssertTrue(alert.buttons["Cancel"].exists, "no Cancel")
+        keep(app, "owner-phone-demo-reset-confirm")
+        alert.buttons["Start over"].tap()
+
+        XCTAssertTrue(app.staticTexts["Let’s start up high and walk down to today."].waitForExistence(timeout: 30),
+                      "the walk's Welcome did not open")
+        XCTAssertFalse(app.navigationBars["Settings"].exists, "Settings is still up over the walk")
+        Thread.sleep(forTimeInterval: 3)   // the Welcome's words fade in: the shot waits for them
+        keep(app, "owner-phone-demo-reset-after")
+        let notNow = app.buttons["Not now"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 10), "no Not now on Welcome")
+        notNow.tap()
+        XCTAssertTrue(app.buttons["walk.orb"].waitForNonExistence(timeout: 30), "Not now did not leave the walk")
+        XCTAssertTrue(any["daily.today"].waitForExistence(timeout: 30), "not back on light Today")
+        XCTAssertTrue(whenReady.waitForExistence(timeout: 15), "Today does not read as an empty plan")
+    }
+
+    /// A full household is never offered it.
+    @MainActor func testAFullHouseholdIsNotOfferedTheDemoReset() throws {
+        let app = launch(light: false)
+        openSettings(app, more: app.buttons["More"])
+        XCTAssertTrue(app.buttons["Delete account"].waitForExistence(timeout: 10) || app.staticTexts["Delete account"].exists,
+                      "Settings' Account section is not there")
+        XCTAssertFalse(app.buttons["settings.demoReset"].waitForExistence(timeout: 3), "a full household is offered the demo reset")
+    }
 }

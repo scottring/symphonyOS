@@ -20,7 +20,15 @@ struct ContentView: View {
             if auth.isLoading {
                 LaunchScreen()
             } else if auth.isAuthenticated {
-                MainView()
+                if appState.demoResetting {
+                    // A demo being started over (`DemoReset`): the main view is down while the
+                    // phone's copy is cleared, and comes back fresh.
+                    LaunchScreen()
+                        .onAppear { appState.demoResetCovered = true }
+                        .onDisappear { appState.demoResetCovered = false }
+                } else {
+                    MainView()
+                }
             } else {
                 AuthView()
             }
@@ -81,6 +89,13 @@ struct ContentView: View {
         syncEngine = engine
         // Lets account deletion stop sync and wait for it before wiping.
         appState.stopSync = { [weak engine] in await engine?.stop() }
+        // A demo started over (`DemoReset`): stop and let what is under way finish, then sync again
+        // from fresh for the same person.
+        appState.pauseSync = { [weak engine] in await engine?.stopAndSettle() ?? true }
+        appState.restartSync = { [self] in
+            syncedUserId = nil
+            startSync(userId: userId)
+        }
         Task {
             await previous?.stop()   // never leave two engines on one socket
             // Reported as soon as the pull is in, not after realtime has joined:
@@ -112,6 +127,8 @@ struct ContentView: View {
 
     private func stopSync() {
         syncedUserId = nil
+        appState.pauseSync = nil
+        appState.restartSync = nil
         appState.signedOut()
         if let engine = syncEngine {
             Task {

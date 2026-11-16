@@ -5,6 +5,11 @@ struct SettingsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
+    #if os(iOS)
+    /// The signed-in person is a test account (`DemoResetService.isTestAccount`); asked only in a
+    /// light household, so a full one makes no new read.
+    @State private var isTestAccount = false
+    #endif
 
     var body: some View {
         Form {
@@ -25,6 +30,15 @@ struct SettingsView: View {
                         .foregroundStyle(Color.feedbackRed)
                 }
             }
+
+            // A test account in a light household can start its demo over (`DemoReset`).
+            #if os(iOS)
+            if DemoReset.offered(isTestAccount: isTestAccount, edition: appState.edition) {
+                Section {
+                    DemoResetRow()
+                }
+            }
+            #endif
 
             // Integrations
             if appState.edition.allows(.googleCalendar) {
@@ -101,7 +115,24 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        #if os(iOS)
+        .task(id: appState.edition) { await readTestAccount() }
+        #endif
     }
+
+    #if os(iOS)
+    private func readTestAccount() async {
+        guard appState.edition == .light, let userId = auth.currentUser?.id else {
+            isTestAccount = false
+            return
+        }
+        #if DEBUG
+        // A demo launch stands in for a test account and never asks the server.
+        if DemoMode.isOn { isTestAccount = true; return }
+        #endif
+        isTestAccount = await DemoResetService.isTestAccount(userId)
+    }
+    #endif
 }
 
 // MARK: - Color from hex

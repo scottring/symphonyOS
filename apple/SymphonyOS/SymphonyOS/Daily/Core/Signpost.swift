@@ -207,4 +207,7 @@ struct SignpostMemory {
                       Self.kindsKey: Signpost.Kind.allCases.filter(kinds.contains).map(\.rawValue)],
                      forKey: key(userId))
     }
+
+    /// Nothing put away (a demo started over: `DemoReset`).
+    func forget(for userId: UUID?) { defaults.removeObject(forKey: key(userId)) }
 }

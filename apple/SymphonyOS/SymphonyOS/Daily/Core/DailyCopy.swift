@@ -316,6 +316,18 @@ enum DailyCopy {
     }
 }
 
+// MARK: Start this demo over (Settings, a test account in a light household: `DemoReset`)
+
+extension DailyCopy {
+    static let demoResetRow = "Start this demo over"
+    static let demoResetLine = "Clears everything in this demo account and starts the walk again."
+    static let demoResetRunning = "Starting over…"
+    static let demoResetConfirmTitle = "Start this demo over?"
+    static let demoResetConfirmBody = "Everything in this demo account is removed. This can’t be undone."
+    static let demoResetConfirm = "Start over", demoResetCancel = "Cancel"
+    static let demoResetFailed = "Couldn’t start over. Check the connection and try again."
+}
+
 // MARK: Half open
 
 extension DailyCopy {

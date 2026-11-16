@@ -149,6 +149,21 @@ actor SyncEngine {
         networkMonitor = nil
     }
 
+    /// Stops, then waits for a push or pull already under way to finish (`stop` does not: the actor
+    /// lets one carry on across its awaits), so nothing it sends or brings in lands after the
+    /// caller's next step. Used only by a demo started over (`DemoReset`), before the server is
+    /// emptied. False when it is still busy after `timeout`.
+    func stopAndSettle(timeout: Duration = .seconds(15)) async -> Bool {
+        await stop()
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while isSyncing {
+            guard clock.now < deadline else { return false }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return true
+    }
+
     /// Push all pending local changes to Supabase.
     func pushPendingChanges() async {
         guard isOnline, !isSyncing else { return }
