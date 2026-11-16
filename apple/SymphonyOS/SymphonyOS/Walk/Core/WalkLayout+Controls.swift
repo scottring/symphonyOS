@@ -174,8 +174,6 @@ extension WalkLayout {
     static let labelLine: CGFloat = 16, detailLine: CGFloat = 17
     static let wordsGap: CGFloat = 4, detailGap: CGFloat = 2
     static let labelWidth: CGFloat = 132, detailWidth: CGFloat = 152, wordsMargin: CGFloat = 12
-    /// The bottom point's label stands alone between the ring and its disc: one line, at most this wide.
-    static let southLabelWidth: CGFloat = 112
 
     /// Greedy wrapping by words at `width`, by the character estimate.
     static func wrap(_ text: String, width: CGFloat, char: CGFloat) -> [String] {
@@ -202,10 +200,10 @@ extension WalkLayout {
     static func pointWords(_ p: WalkCopy.Point, among offered: [CompassPoint]) -> [PointLine] {
         let disc = WalkOrb.position(of: p.at)
         // The right point's words sit beside the ring's widest part: they wrap narrower.
-        let labels = p.at == .s ? [p.label] : wrap(p.label, width: p.at == .e ? 120 : labelWidth, char: labelChar)
+        let labels = wrap(p.label, width: p.at == .e ? 120 : labelWidth, char: labelChar)
         let details = p.detail.map { wrap($0, width: detailWidth, char: detailChar) } ?? []
         let rows: [(text: String, detail: Bool, width: CGFloat)] =
-            labels.map { ($0, false, min(CGFloat($0.count) * labelChar + 4, p.at == .s ? southLabelWidth : .infinity)) }
+            labels.map { ($0, false, CGFloat($0.count) * labelChar + 4) }
             + details.map { ($0, true, CGFloat($0.count) * detailChar + 4) }
         let height = CGFloat(labels.count) * labelLine + (details.isEmpty ? 0 : detailGap + CGFloat(details.count) * detailLine)
         let top = WalkOrb.wordsAbove(p.at) ? disc.y - WalkOrb.pointDisc / 2 - wordsGap - height

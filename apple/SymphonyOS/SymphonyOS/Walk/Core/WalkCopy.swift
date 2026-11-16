@@ -82,8 +82,9 @@ enum WalkCopy {
         return line
     }
 
-    /// The line at the foot of the stage: the two things a person can do, said plainly
-    /// (hold the light to speak, tap it for other choices), or what to do now.
+    /// The hint: one line saying what to do now (hold the light to speak, tap a choice, a note). At rest
+    /// it stands above the light, while the light is busy at the foot, while typing just above the
+    /// field, and on Welcome under its line (`WalkLayout.hintFrame`).
     static func hint(_ s: WalkState) -> String {
         if s.step == 0 { return hintChoose }                // Welcome: the choices are always open
         if s.teaching { return "" }                         // the light is being taught, in its own two lines
@@ -121,8 +122,12 @@ enum WalkCopy {
     static let hintSpeechOff = "Tap the light and type."
     /// The longest a hint or note may be: every one fits on one line at 15 pt (48 by estimate).
     static let hintMaxLength = 46
-    /// Beside the Next line while the compass is closed: the way to the other choices, as a tap on the light.
+    /// The top row's More, in its middle: it opens the choices on the light and closes them again.
+    /// `moreLabel` is what VoiceOver calls it, with `choicesOpen` or `choicesClosed` as its value.
     static let more = "More", moreLabel = "More choices"
+    static let choicesOpen = "open", choicesClosed = "closed"
+    /// The eyebrow's count (`eyebrowCount`) as it follows the eyebrow: " · 1 of 3" (drawn in capitals, in gold).
+    static func afterEyebrow(_ count: String) -> String { " · \(count)" }
 
     /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`).
     static let teachHold = "Press and hold the light, and say it out loud."
@@ -308,6 +313,12 @@ enum WalkCopy {
         case .pullUp(let item, _, _, _): return "Undo removing “\(short(item.title))”"
         case .firstThing: return "Undo the first thing"
         }
+    }
+
+    /// A point as VoiceOver reads it (the disc and the light's custom action): Undo says what it undoes
+    /// (F23); every other point, its own label.
+    static func pointLabel(_ point: Point, _ s: WalkState) -> String {
+        point.action == .undo ? undoLabel(s) ?? point.label : point.label
     }
 
     /// The Move row's chip and Remove, for VoiceOver (F24): what they do to which flag.

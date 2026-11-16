@@ -5,9 +5,10 @@ import UIKit
 /// The walk's one control, drawn on the stage (contract §7): the 300 × 300 dial
 /// around the light with its ring, ticks and needle; the breathing light at
 /// (195, 678) with what holding it does at its centre; the compass points while the
-/// light is held or open (the veil behind them is the scene's); and the flag that rises
-/// out of it while speaking. Touches go to the model as stage
-/// points; the reducer decides what they mean.
+/// light is held or open (at most three: `WalkCopy.points`; the veil behind them is the
+/// scene's); and the flag that rises out of it while speaking. Touches go to the model as
+/// stage points; the reducer decides what they mean. While the field is open the light
+/// stands aside (`WalkState.showsLight`): nothing of it is drawn, read or touched.
 struct WalkOrbView: View {
     let model: WalkModel
     @Environment(\.walkStage) private var stage
@@ -60,7 +61,7 @@ struct WalkOrbView: View {
 
             if showsPoints {
                 ForEach(points, id: \.at) { point in
-                    WalkPointView(point: point, hot: s.orb == .holding(hover: point.at)) {
+                    WalkPointView(point: point, label: WalkCopy.pointLabel(point, s), hot: s.orb == .holding(hover: point.at)) {
                         model.send(.point(point.at))
                     }
                     .position(WalkOrb.position(of: point.at))
@@ -83,6 +84,9 @@ struct WalkOrbView: View {
         }
         .frame(width: WalkArt.stageSize.width, height: WalkArt.stageSize.height,
                alignment: .topLeading)
+        .opacity(s.showsLight ? 1 : 0)
+        .allowsHitTesting(s.showsLight)
+        .accessibilityHidden(!s.showsLight)
         .onDisappear {
             // Gone mid-press: the release will never come, so the hold must not start listening.
             guard pressStart != nil else { return }
@@ -111,7 +115,8 @@ struct WalkOrbView: View {
     // MARK: VoiceOver
 
     /// The light as one button: a double-tap is a tap (it opens the points, or closes them),
-    /// and each compass point is one of its actions, so nothing needs a press and hold.
+    /// and each compass point is one of its actions (no more than the points offer: Back, Next and
+    /// Leave for now are the top row's and the foot's own buttons), so nothing needs a press and hold.
     private func orbForVoiceOver(_ s: WalkState, _ points: [WalkCopy.Point]) -> some View {
         Button {
             model.send(.orbDown)
@@ -129,7 +134,7 @@ struct WalkOrbView: View {
         .walkAccessibilityHint(WalkCopy.hint(s))
         .accessibilityActions {
             ForEach(points, id: \.at) { point in
-                Button(point.label) {
+                Button(WalkCopy.pointLabel(point, s)) {
                     // With the points out, choosing one is a tap on it, which also puts them away.
                     if model.state.orb == .open {
                         model.send(.point(point.at))
@@ -320,6 +325,8 @@ struct WalkNeedle: Shape {
 /// apart (`WalkPointLine`), where `WalkLayout.pointWords` puts them. The hovered one grows.
 struct WalkPointView: View {
     let point: WalkCopy.Point
+    /// What VoiceOver calls it (`WalkCopy.pointLabel`: Undo says what it undoes).
+    let label: String
     let hot: Bool
     let action: () -> Void
 
@@ -344,8 +351,9 @@ struct WalkPointView: View {
             .animation(.easeOut(duration: 0.16), value: hot)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(point.label)
+        .accessibilityLabel(label)
         .walkAccessibilityHint(point.detail)
+        .accessibilityIdentifier("walk.point.\(point.at.rawValue)")
     }
 }
 

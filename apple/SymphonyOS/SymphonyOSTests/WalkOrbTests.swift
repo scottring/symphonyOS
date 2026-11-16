@@ -29,6 +29,28 @@ private func polar(_ degrees: CGFloat, _ distance: CGFloat) -> CGPoint {
 }
 
 struct WalkOrbTests {
+    /// While the field is open the light stands aside (the note above the field, top 724, lies inside
+    /// its ring): it is not drawn and takes no touch, and it is back once the field closes. Open, held
+    /// or speaking, and on Welcome, it is drawn.
+    @Test func theLightStandsAsideWhileTyping() {
+        var s = state(step: 3)
+        #expect(s.showsLight)
+        s.orb = .open
+        _ = s.apply(.point(.w), env)
+        #expect(s.typing != nil)
+        #expect(!s.showsLight)
+        _ = s.apply(.typeChanged("Book the plumber"), env)
+        #expect(!s.showsLight)
+        _ = s.apply(.typeDismissed, env)
+        #expect(s.showsLight)
+        for orb in [WalkState.Orb.open, .holding(hover: nil), .speaking(live: "x"), .finishing(live: "x")] {
+            var o = state(step: 3)
+            o.orb = orb
+            #expect(o.showsLight, "\(orb)")
+        }
+        #expect(WalkState().showsLight)
+    }
+
     /// Open, the points show; held, only once the press began with them open or slid out of the light.
     @Test func thePointsShowWhileOpenOrSlidOut() {
         var s = state(step: 1)

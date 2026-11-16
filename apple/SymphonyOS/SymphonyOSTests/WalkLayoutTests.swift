@@ -911,8 +911,6 @@ struct WalkLayoutTests {
                 problems.append("\(at) “\(line.text)” meets \(other) “\(o.text)”")
             }
             if let hint, Invariants.overlap(f, hint) { problems.append("\(at) “\(line.text)” meets the hint") }
-            if line.text.count > 0, !line.detail, s.step > 0, at == .s, CGFloat(line.text.count) * WalkLayout.labelChar + 4
-                > WalkLayout.southLabelWidth / 0.8 { problems.append("the bottom label “\(line.text)” is too long to shrink") }
         }
         return problems
     }
@@ -976,6 +974,16 @@ struct WalkLayoutTests {
          ("hint", WalkLayout.hintFrame(s)), ("undo", WalkLayout.undoFrame(s)), ("lesson", WalkLayout.teachFrame(s)),
          ("move row", WalkLayout.moveRowFrame(s))]
             .compactMap { name, f in f.map { (name, $0) } }
+    }
+
+    /// The question block stands at 96, under the top row, 334 wide on a phone (the board less 28 each
+    /// side), and widens with a wider window's wing, by at most 166 ("On a wider window").
+    @Test func theQuestionBlockWidensWithTheWing() {
+        #expect(WalkLayout.wordsTop == 96)
+        #expect(WalkLayout.wordsWidth(wing: 0) == 334)
+        #expect(WalkLayout.wordsWidth(wing: 40) == 414)
+        #expect(WalkLayout.wordsWidth(wing: 83) == 500)
+        #expect(WalkLayout.wordsWidth(wing: 110.3) == 500)
     }
 
     /// Back, More and Leave for now on every step after Welcome (the ground too), each a full touch,

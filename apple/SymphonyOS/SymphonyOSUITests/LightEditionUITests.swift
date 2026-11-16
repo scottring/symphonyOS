@@ -94,8 +94,7 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
             .waitForExistence(timeout: 15), "not the Season question about the flag")
 
-        orb.tap()
-        let leave = app.buttons["Leave for now"]
+        let leave = app.buttons["walk.leave"]
         XCTAssertTrue(leave.waitForExistence(timeout: 15), "no Leave for now")
         leave.tap()
         XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not close it")
@@ -230,8 +229,7 @@ final class LightEditionUITests: XCTestCase {
         XCTAssertTrue(orb.waitForExistence(timeout: 30), "the sign did not open the walk")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What part of “")).firstMatch
             .waitForExistence(timeout: 15), "not the Season question about the goal")
-        orb.tap()
-        let leave = app.buttons["Leave for now"]
+        let leave = app.buttons["walk.leave"]
         XCTAssertTrue(leave.waitForExistence(timeout: 15), "no Leave for now")
         leave.tap()
         XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not close it")

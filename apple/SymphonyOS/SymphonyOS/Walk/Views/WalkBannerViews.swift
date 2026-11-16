@@ -81,21 +81,26 @@ struct WalkPennant: Shape {
 /// One banner of any kind, at its layout frame's size in stage points. A banner
 /// that arrives after the scene is up drops in, as a flag being planted does.
 /// With Reduce Motion it does not flutter, and it fades in where it stands.
+/// Under the veil on words (`veiled`, F22) its cloth stays and its words are not drawn.
 struct WalkBannerView: View {
     let banner: WalkLayout.Banner
     /// The stage x of the post's pole where the banner meets it; a small flag hangs from it.
     let poleX: CGFloat
+    let veiled: Bool
     @State private var fluttering = false
     @State private var landed: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(banner: WalkLayout.Banner, poleX: CGFloat, dropsIn: Bool) {
+    init(banner: WalkLayout.Banner, poleX: CGFloat, dropsIn: Bool, veiled: Bool = false) {
         self.banner = banner
         self.poleX = poleX
+        self.veiled = veiled
         _landed = State(initialValue: !dropsIn)
     }
 
     private var colour: Color { WalkPalette.level(banner.level) }
+    /// The words' opacity: none under the veil on words.
+    private var words: Double { veiled ? 0 : 1 }
 
     var body: some View {
         cloth
@@ -150,6 +155,7 @@ struct WalkBannerView: View {
                 .padding(.horizontal, 3)
                 .padding(.vertical, 1)
                 .walkGlow()
+                .opacity(words)
         }
     }
 
@@ -169,6 +175,7 @@ struct WalkBannerView: View {
                     .lineLimit(1)
             }
         }
+        .opacity(words)
         .multilineTextAlignment(.center)
         .padding(EdgeInsets(top: 6, leading: 8, bottom: 13, trailing: 8))
         .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
@@ -195,6 +202,7 @@ struct WalkBannerView: View {
                 .minimumScaleFactor(0.7)
                 .frame(height: 10)
         }
+        .opacity(words)
         .multilineTextAlignment(.center)
         .padding(EdgeInsets(top: 3, leading: 8, bottom: 6, trailing: 8))
         .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
@@ -226,6 +234,7 @@ struct WalkBannerView: View {
                     .fixedSize()
             }
         }
+        .opacity(words)
         .padding(EdgeInsets(top: 3, leading: 6, bottom: 6, trailing: 6))
         .frame(width: banner.frame.width, height: banner.frame.height)
         .background(WalkNotchedCloth(notch: 5).fill(colour))
@@ -254,6 +263,7 @@ struct WalkBannerView: View {
             .foregroundStyle(.white)
             .lineLimit(1)
             .minimumScaleFactor(0.6)
+            .opacity(words)
             .padding(.bottom, 4)
             .frame(width: banner.frame.width, height: banner.frame.height)
             .background(WalkNotchedCloth(notch: 4).fill(colour))
@@ -328,9 +338,11 @@ struct WalkPoleView: View {
     }
 }
 
-/// A peak's label: a small marker above a pill (contract §4, lines 274-281).
+/// A peak's label: a small marker above a pill (contract §4, lines 274-281). Under the veil on words
+/// (`veiled`, F22) the pill stays and its name and mark are not drawn.
 struct WalkLabelView: View {
     let label: WalkLayout.Label
+    var veiled = false
 
     var body: some View {
         // The layout's frame includes the label's scale: 30 points tall at full size.
@@ -353,6 +365,7 @@ struct WalkLabelView: View {
                     .minimumScaleFactor(0.7)
             }
                 .foregroundStyle(ink)
+                .opacity(veiled ? 0 : 1)
                 .padding(.horizontal, 9)
                 .frame(height: 23)
                 // Offered the label's width and no more: a long name scales down, then truncates,

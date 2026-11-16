@@ -302,8 +302,8 @@ struct WalkBackdropTests {
     }
 
     #if os(iOS)
-    /// The words above the flags (the eyebrow, the question and its line, stage y 64 to 248, x 40 to 350)
-    /// read at 4.5:1 or better, white over the painting under the step's shade, on 98 % of what lies
+    /// The words above the flags (the eyebrow, the question and its line, stage y 64 to 248, across the
+    /// question block's width, `WalkLayout.wordsWidth(wing:)`, centred on x 195) read at 4.5:1 or better, white over the painting under the step's shade, on 98 % of what lies
     /// behind them, at every step's stop and zoomed into every column of one to three areas, on each
     /// of the six windows (a wider one enlarges the picture, so other paint stands behind them). The
     /// words' own glow is not counted.
@@ -339,6 +339,7 @@ struct WalkBackdropTests {
                         }
                     }
                 }
+                let words = WalkLayout.wordsWidth(wing: stage.wing)
                 for camera in cameras {
                     let c = art.backdropCamera(step: step, layout: camera, stage: stage)!
                     var behind: [Double] = []
@@ -349,7 +350,7 @@ struct WalkBackdropTests {
                         } else {            // the faint band: 0.55 at the top, 0.25 at 156, gone by 260
                             a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : 0.25 * Double(1 - (y - 156) / 104)
                         }
-                        for x in stride(from: CGFloat(40), through: 350, by: 5) {
+                        for x in stride(from: WalkLayout.centreX - words / 2, through: WalkLayout.centreX + words / 2, by: 5) {
                             let px = min(w - 1, Int((c.x + x / c.k) / backdrop.size.width * CGFloat(w)))
                             let py = min(h - 1, Int((c.y + y / c.k) / backdrop.size.height * CGFloat(h)))
                             let i = (py * w + px) * 4

@@ -18,6 +18,7 @@ struct WalkSceneView: View {
         let art = model.art
         ZStack(alignment: .topLeading) {
             WalkWorldView(layout: model.layout(wing: stage.wing), art: art, step: model.state.step, stage: stage,
+                          veilsWords: model.state.veilsWords,
                           onLabel: { model.send(.areaTapped($0.id)) },
                           onBanner: { banner, post in
                               if let event = WalkLayout.tapEvent(banner, on: post) { model.send(event) }
@@ -71,12 +72,13 @@ struct WalkSceneView: View {
             .padding(.top, 140)
             .allowsHitTesting(false)
         } else if !question.isEmpty {
+            // Under the top row, as wide as the board's words (wider on a wider window), centred on x 195.
             VStack(spacing: 8) {
-                Text(eyebrow.uppercased())
+                eyebrowLine(eyebrow, count: WalkCopy.eyebrowCount(s))
                     .font(.custom("DMSans-SemiBold", size: 12))
                     .tracking(1.2)
-                    .foregroundStyle(.white)
                     .walkGlow()
+                    .accessibilityIdentifier("walk.eyebrow")
                     .modifier(WalkEntrance())
                     .id(eyebrow)
                 Text(question)
@@ -92,11 +94,21 @@ struct WalkSceneView: View {
                     .id(why)
             }
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 28)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 64)
+            .frame(width: WalkLayout.wordsWidth(wing: stage.wing))
+            // Centred on the board, taking only the board's width: a block wider than the board runs past
+            // both its edges and moves nothing else in the scene.
+            .frame(width: WalkArt.stageSize.width)
+            .padding(.top, WalkLayout.wordsTop)
             .allowsHitTesting(false)
         }
+    }
+
+    /// The eyebrow in capitals; on the whole-year walk's Year step the count follows it in gold
+    /// (" · 1 OF 3", F1).
+    private func eyebrowLine(_ eyebrow: String, count: String?) -> Text {
+        let head = Text(eyebrow.uppercased()).foregroundStyle(.white)
+        guard let count else { return head }
+        return head + Text(WalkCopy.afterEyebrow(count).uppercased()).foregroundStyle(WalkPalette.gold)
     }
 }
 
@@ -123,6 +135,9 @@ struct WalkWorldView: View {
     let stage: WalkStage
     /// Whether banners that arrive after the world first draws drop in; those present at first stand still.
     let dropsIn: Bool
+    /// F22: the words on the mountain are not drawn and not read (the cloths, poles and pills stay under
+    /// the veil) while the choices are open, the light is taught, or something is typed.
+    let veilsWords: Bool
     /// VoiceOver's custom actions on a banner (none by default).
     let actions: (WalkLayout.Banner) -> [(name: String, run: () -> Void)]
     let onLabel: (WalkLayout.Label) -> Void
@@ -135,7 +150,7 @@ struct WalkWorldView: View {
     /// With Reduce Motion the camera does not glide: the whole view cross-fades to its new framing.
     static let crossFade = Animation.easeInOut(duration: 0.25)
 
-    init(layout: WalkLayout, art: WalkArt, step: Int, stage: WalkStage, dropsIn: Bool = true,
+    init(layout: WalkLayout, art: WalkArt, step: Int, stage: WalkStage, dropsIn: Bool = true, veilsWords: Bool = false,
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void) {
@@ -144,6 +159,7 @@ struct WalkWorldView: View {
         self.step = step
         self.stage = stage
         self.dropsIn = dropsIn
+        self.veilsWords = veilsWords
         self.actions = actions
         self.onLabel = onLabel
         self.onBanner = onBanner
@@ -217,13 +233,14 @@ struct WalkWorldView: View {
         let camera = layout.camera
         return ZStack(alignment: .topLeading) {
             ForEach(layout.labels) { label in
-                Button { onLabel(label) } label: { WalkLabelView(label: label) }
+                Button { onLabel(label) } label: { WalkLabelView(label: label, veiled: veilsWords) }
                     .buttonStyle(.plain)
                     .allowsHitTesting(label.tappable)
                     .accessibilityLabel(label.name)
                     .walkAccessibilityHint(label.hint)
                     .walkReadOnly(!label.tappable)
                     .accessibilityAddTraits(label.selected ? .isSelected : [])
+                    .accessibilityHidden(veilsWords)
                     .walkPlaced(label.frame, camera)
             }
 
@@ -238,7 +255,7 @@ struct WalkWorldView: View {
                                 camera)
                 ForEach(post.banners) { banner in
                     Button { onBanner(banner, post) } label: {
-                        WalkBannerView(banner: banner, poleX: banner.pivot.x, dropsIn: dropsIn && arrived)
+                        WalkBannerView(banner: banner, poleX: banner.pivot.x, dropsIn: dropsIn && arrived, veiled: veilsWords)
                     }
                         .buttonStyle(.plain)
                         .saturation(post.saturation)
@@ -246,6 +263,7 @@ struct WalkWorldView: View {
                         .accessibilityLabel(banner.label)
                         .walkReadOnly(!banner.taps)
                         .walkActions(actions(banner))
+                        .accessibilityHidden(veilsWords)
                         .walkPlaced(banner.frame, camera)
                 }
             }

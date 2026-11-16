@@ -49,6 +49,11 @@ extension WalkState {
     /// The choices on the light are open (More is drawn gold then).
     var choicesOpen: Bool { orb == .open }
 
+    /// The light (its dial, its touch and its points) is drawn. Not while the field is open on steps 1
+    /// to 5: the note above the field (top 724) lies inside the light's ring, and the field has its own
+    /// way out (its X) and in (Add), so the light stands aside and a tap where it was is the veil's.
+    var showsLight: Bool { !((1...5).contains(step) && typing != nil) }
+
     /// The quiet Undo pill above the light, where the hint was; it gives way while the points show,
     /// where Undo is the top point instead.
     var showsUndoPill: Bool { undoShowing && !showsPoints }

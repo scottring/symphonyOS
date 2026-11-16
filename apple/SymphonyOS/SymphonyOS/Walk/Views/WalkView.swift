@@ -5,9 +5,9 @@ import UIKit
 /// The walk, full screen: the 390 × 844 board scaled to fit the window between
 /// its side insets and centred there, over the safe areas (D21). The painting,
 /// the shades, the veil and the sheets run past the board to the window's edges
-/// (`WalkStage.bleed`); the window clips them, the board clips nothing. The orb
-/// and the hint row sit on the board, over the scene, on every step but Look
-/// back up, where the header and the ending sheet take their place.
+/// (`WalkStage.bleed`); the window clips them, the board clips nothing. The orb,
+/// the hint row and the top row sit on the board, over the scene, on every step but
+/// Look back up, where the header and the ending sheet take their place.
 /// The full-bleed root is the `"walk.device"` coordinate space every touch is
 /// measured in before `WalkStage` turns it into stage points.
 struct WalkView: View {
@@ -71,7 +71,8 @@ struct WalkView: View {
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: model.art.stage, left: left, right: right)
             ZStack(alignment: .topLeading) {
-                // VoiceOver reads the scene (the words, then the peaks and flags), then the light, then the hint row.
+                // VoiceOver reads the top row, the scene (the words, then the peaks and flags), then the
+                // light, then the hint row.
                 ZStack(alignment: .topLeading) {
                     WalkSceneView(model: model)
                         // Under the raised sheet the mountain is covered: VoiceOver skips it too.
@@ -82,6 +83,10 @@ struct WalkView: View {
                         WalkOrbView(model: model)
                             .accessibilitySortPriority(1)
                         WalkHintRow(model: model)
+                        // Over everything, and past the board's edges on a wider window (Back and Leave for
+                        // now stand in its corners): nothing here clips or stops a touch at the board.
+                        WalkTopRow(model: model)
+                            .accessibilitySortPriority(3)
                     } else {
                         WalkEndingView(model: model)        // Look back up, and Today as a sheet
                     }

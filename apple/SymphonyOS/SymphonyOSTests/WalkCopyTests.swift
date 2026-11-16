@@ -483,6 +483,8 @@ struct WalkCopyTests {
         #expect(WalkCopy.todayEyebrow == "Today"); #expect(WalkCopy.walkAnother == "Plan another goal down to today")
         #expect(WalkCopy.goToToday == "Open Today")
         #expect(WalkCopy.more == "More"); #expect(WalkCopy.moreLabel == "More choices")
+        #expect(WalkCopy.choicesOpen == "open"); #expect(WalkCopy.choicesClosed == "closed")
+        #expect(WalkCopy.afterEyebrow("1 of 3") == " · 1 of 3")
         #expect(WalkCopy.thatsTheDay == "That’s the day."); #expect(WalkCopy.nothingToday == "Nothing for today yet.")
         #expect(WalkCopy.nextFlag("Finish the bathroom") == "Next: Finish the bathroom")
         #expect(WalkCopy.forGoal("Feel strong again") == "for Feel strong again")
@@ -580,6 +582,19 @@ struct WalkCopyTests {
             s.undo = [.keep(side.id), entry]                   // the newest is the one undone
             #expect(WalkCopy.undoLabel(s) == words, "\(entry)")
         }
+    }
+
+    /// F23: VoiceOver reads the light's Undo point (and its custom action) as what it undoes; every other
+    /// point by its own label.
+    @Test func theUndoPointSaysWhatItUndoes() throws {
+        let health = WalkArea(id: UUID(), name: "Health")
+        let run = WalkItem(id: UUID(), level: .year, title: "Run a 5K", areaId: health.id)
+        var s = state(step: 1); s.areas = [health]; s.kept = [health.id]; s.focusArea = health.id
+        s.items = [run]; s.undo = [.plant(run.id)]
+        let points = WalkCopy.points(s, nov13)
+        let undo = try #require(points.first { $0.action == .undo })
+        #expect(WalkCopy.pointLabel(undo, s) == "Undo adding “Run a 5K”")
+        for point in points where point.action != .undo { #expect(WalkCopy.pointLabel(point, s) == point.label) }
     }
 
     /// F24: the Move row's chips and Remove say what they do to which flag, its title as the question quotes it.

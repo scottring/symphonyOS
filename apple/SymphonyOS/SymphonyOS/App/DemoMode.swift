@@ -26,7 +26,12 @@ enum DemoMode {
     static var walkOrb: [String] {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "-SymphonyWalkOrb"), i + 1 < args.count else { return [] }
-        return args[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        // The step's name is read in any case; the words after a `name:` or `draft:` keep theirs.
+        return args[i + 1].split(separator: ",").map { part in
+            let step = part.trimmingCharacters(in: .whitespaces)
+            guard let colon = step.firstIndex(of: ":") else { return step.lowercased() }
+            return step[..<colon].lowercased() + step[colon...]
+        }
     }
 
     /// Where a demo walk saves its place: a store of its own, emptied once per launch, so a
@@ -200,13 +205,15 @@ enum DemoMode {
     /// or a compass action, as a person's touch would send:
     /// - `ground`: back up from Year onto the ground (the kept peaks).
     /// - `open`: a tap on the light, so the compass points open.
-    /// - `hold`: a press held and slid onto the point below (the Next line's point), hovered.
+    /// - `hold`: a press held and slid out onto the left point (Type it), hovered.
     /// - `speak`: a hold that reaches speaking; the words come through the model's real
     ///   listening path from `walkListener`, which hears them as soon as it starts.
     /// - `type`: the Type it point: the one-line field, empty.
     /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
-    /// - `next`: the Next line, so a step is entered as a person arrives on it (Today's calendar line).
+    /// - `draft:<words>`: the Type it field open holding those words, not sent.
+    /// - `next`: Next at the foot, so a step is entered as a person arrives on it.
+    /// - `back`: the top row's Back.
     /// - `leave`: Leave for now: the walk closes onto Today with its waiting line.
     /// - `quick`: Quick start on Welcome; `quick,next` then reaches Year, where the light is taught.
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
@@ -222,7 +229,7 @@ enum DemoMode {
                 model.send(.orbUp(heldMs: 0))
             case "hold":
                 model.send(.orbDown)
-                model.send(.orbMoved(WalkOrb.position(of: .s)))
+                model.send(.orbMoved(WalkOrb.position(of: .w)))
             case "speak":
                 model.send(.orbDown)
                 model.send(.orbHeld)
@@ -239,6 +246,8 @@ enum DemoMode {
                 model.send(.typeSubmitted("Two early nights a week"))
             case "next":
                 model.choose(.next)
+            case "back":
+                model.send(.backTapped)
             case "leave":
                 model.choose(.leave)
             case "quick":
@@ -251,6 +260,9 @@ enum DemoMode {
                     model.choose(.type)
                     model.send(.typeChanged(words))
                     model.send(.typeSubmitted(words))
+                } else if step.hasPrefix("draft:") {
+                    model.choose(.type)
+                    model.send(.typeChanged(String(step.dropFirst(6))))
                 }
             }
         }

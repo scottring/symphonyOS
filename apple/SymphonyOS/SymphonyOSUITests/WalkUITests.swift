@@ -2,10 +2,14 @@
 import XCTest
 
 /// The walk, tapped through the real app on the demo store. Taps only: nothing is
-/// typed or spoken (text entry stalls this simulator). This target cannot see
-/// `WalkCopy`, so the strings below are spelled out once and cross-check it.
+/// typed or spoken (text entry stalls this simulator); words a state needs come from
+/// `-SymphonyWalkOrb`. This target cannot see `WalkCopy`, so the strings below are
+/// spelled out once and cross-check it.
 final class WalkUITests: XCTestCase {
     private let welcome = "Let’s start up high and walk down to today."
+    /// A season's eyebrow, in capitals: "THIS SEASON · TO DEC 20" or "WINTER · DEC 1 TO FEB 28".
+    private let seasonEyebrow = NSPredicate(format: "label MATCHES %@",
+        "^(THIS SEASON · TO [A-Z]{3} [0-9]+|[A-Z]+ · [A-Z]{3} [0-9]+ TO [A-Z]{3} [0-9]+)$")
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -26,6 +30,97 @@ final class WalkUITests: XCTestCase {
         XCTAssertTrue(lesson.waitForNonExistence(timeout: 15), "a tap did not put the lesson away", file: file, line: line)
     }
 
+    /// The demo walk opened on `step` (1 Year … 5 Today), with `more` launch arguments after.
+    @MainActor private func walk(step: Int, _ more: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk", "-SymphonyWalkStep", "\(step)"] + more
+        app.launchDemo()
+        XCTAssertTrue(app.buttons["walk.orb"].waitForExistence(timeout: 60), "the walk never opened on step \(step)")
+        return app
+    }
+
+    /// Back, More and Leave for now on every step from Year to Today, each a tap; Next at the foot, a
+    /// tap, clear of the home indicator (its foot at least 34 points above the window's).
+    @MainActor func testTheTopRowIsOnEveryStep() throws {
+        for step in 1...5 {
+            let app = walk(step: step)
+            for id in ["walk.back", "walk.more", "walk.leave"] {
+                let control = app.buttons[id]
+                XCTAssertTrue(control.waitForExistence(timeout: 15), "step \(step): no \(id)")
+                XCTAssertTrue(control.isHittable, "step \(step): \(id) takes no tap")
+            }
+            let next = app.buttons["walk.next"]
+            XCTAssertTrue(next.waitForExistence(timeout: 15), "step \(step): no Next")
+            XCTAssertTrue(next.isHittable, "step \(step): Next takes no tap")
+            XCTAssertLessThanOrEqual(next.frame.maxY, app.frame.maxY - 34, "step \(step): Next is in the home indicator")
+            app.terminate()
+        }
+    }
+
+    /// More opens at most three choices on the light, and none of them is Back, Next or Leave for now.
+    @MainActor func testTheLightOffersThree() throws {
+        let app = walk(step: 3)
+        tap(app.buttons["walk.more"], "More")
+        let points = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'walk.point.'"))
+        XCTAssertTrue(points.firstMatch.waitForExistence(timeout: 15), "More opened no choices")
+        XCTAssertLessThanOrEqual(points.count, 3, "more than three choices on the light")
+        for i in 0..<points.count {
+            let label = points.element(boundBy: i).label
+            XCTAssertFalse(label.hasPrefix("Back") || label.hasPrefix("Next") || label == "Leave for now" || label == "Finish the walk",
+                           "a choice on the light is \(label)")
+        }
+        XCTAssertEqual(app.buttons["walk.more"].value as? String, "open", "More does not say the choices are open")
+    }
+
+    /// Back on Month goes up to the season.
+    @MainActor func testBackGoesBack() throws {
+        let app = walk(step: 3)
+        tap(app.buttons["walk.back"], "Back")
+        XCTAssertTrue(app.staticTexts.matching(seasonEyebrow).firstMatch.waitForExistence(timeout: 15),
+                      "Back did not reach the season: \(app.staticTexts["walk.eyebrow"].label)")
+    }
+
+    /// On the half window (wider than the board for its height) Back and Leave for now stand past the
+    /// board's edges, in the window's corners, and still take a tap there.
+    @MainActor func testTheTopRowWorksInTheWings() throws {
+        let app = walk(step: 3, ["-WalkSize", "484x669"])
+        let back = app.buttons["walk.back"], leave = app.buttons["walk.leave"]
+        XCTAssertTrue(back.waitForExistence(timeout: 15) && leave.waitForExistence(timeout: 15), "no top row")
+        XCTAssertTrue(back.isHittable, "Back takes no tap in the wing")
+        XCTAssertTrue(leave.isHittable, "Leave for now takes no tap in the wing")
+        back.tap()
+        XCTAssertTrue(app.staticTexts.matching(seasonEyebrow).firstMatch.waitForExistence(timeout: 15),
+                      "Back in the wing did not reach the season")
+    }
+
+    /// The field's X closes it and plants nothing.
+    @MainActor func testTheFieldCloses() throws {
+        let app = walk(step: 3, ["-SymphonyWalkOrb", "type"])
+        tap(app.buttons["walk.type.close"], "the field's X")
+        XCTAssertTrue(app.buttons["walk.type.close"].waitForNonExistence(timeout: 15), "the field did not close")
+        XCTAssertFalse(app.textFields["walk.type.field"].exists, "the field is still there")
+        XCTAssertFalse(app.buttons["walk.undo"].waitForExistence(timeout: 3), "closing the field planted something")
+    }
+
+    /// The field's gold Add plants what it holds.
+    @MainActor func testAddPlants() throws {
+        let app = walk(step: 3, ["-SymphonyWalkOrb", "draft:Book the plumber"])
+        let add = app.buttons["walk.type.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 15), "no Add")
+        XCTAssertTrue(add.isEnabled, "Add is not lit with words in the field")
+        add.tap()
+        XCTAssertTrue(add.waitForNonExistence(timeout: 15), "the field did not close")
+        XCTAssertTrue(app.buttons["walk.undo"].waitForExistence(timeout: 5), "Add planted nothing")
+    }
+
+    /// With the full plan and a flag chosen, Remove is in sight without scrolling.
+    @MainActor func testRemoveIsInSight() throws {
+        let app = walk(step: 3, ["-SymphonyWalkSeed", "full", "-SymphonyWalkOrb", "select"])
+        let remove = app.buttons["walk.remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 15), "no Remove")
+        XCTAssertTrue(remove.isHittable, "Remove is out of reach")
+    }
+
     @MainActor func testAQuickStartPlantsAFlag() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]
@@ -39,18 +134,19 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")
         dismissTheLesson(app)
-        tap(app.buttons["More choices"], "More")
+        tap(app.buttons["walk.more"], "More")
         tap(app.buttons["Show examples"], "Show examples")
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
 
         let planted = app.buttons["Year: Run a 5K, tap to move or remove"]
         XCTAssertTrue(planted.waitForExistence(timeout: 15), "the example was not planted")
-        XCTAssertTrue(app.buttons["Undo"].exists, "no Undo after planting")
+        XCTAssertTrue(app.buttons["walk.undo"].exists, "no Undo after planting")
+        XCTAssertEqual(app.buttons["walk.undo"].label, "Undo adding “Run a 5K”", "Undo does not say what it undoes")
         // Once something is added the line under the light names where it goes: "Next: this <season>".
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Next: this ")).firstMatch.exists,
                       "no Next line once something was added")
         planted.tap()
-        XCTAssertTrue(app.buttons["Remove"].waitForExistence(timeout: 15), "selecting the flag offered no Remove")
+        XCTAssertTrue(app.buttons["walk.remove"].waitForExistence(timeout: 15), "selecting the flag offered no Remove")
     }
 
     @MainActor func testAFullHouseholdSeesNoWalkUntilItAsks() throws {
@@ -89,8 +185,7 @@ final class WalkUITests: XCTestCase {
         tap(app.buttons["Example: Run a 5K, tap to make it yours"], "the Run a 5K example")
         XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15))
 
-        tap(orb, "the light")
-        tap(app.buttons["Leave for now"], "Leave for now")
+        tap(app.buttons["walk.leave"], "Leave for now")
         XCTAssertTrue(orb.waitForNonExistence(timeout: 30), "Leave for now did not leave the walk")
         // A light household's Today is the light page.
         XCTAssertTrue(app.descendants(matching: .any)["daily.today"].waitForExistence(timeout: 30), "Today is not back")

@@ -1,21 +1,25 @@
 #if os(iOS)
 import SwiftUI
 
-/// The foot of the stage (contract §14, §10), over the scrim (`WalkUnderlay`): the Next
-/// line under the light, the hint line under it (or, with the compass open, above the
-/// compass), and the quiet Undo pill beside the Next line, each where `WalkLayout` puts
-/// it; the Move row while a flag is selected; the one-line field while typing, the hint
-/// (a note) kept as a line above it. While the keyboard is up the field rises to sit just above it.
+/// The foot of the stage and the line above the light, each where `WalkLayout` puts it ("The board as
+/// numbers"): Next at the foot (the gold button, or its outlined skip; on Welcome the quick start's
+/// glowing line under the light), the hint (above the light at rest, at the foot while the light is
+/// busy), the quiet Undo pill and the Move row above the light in the hint's place, the lesson's two
+/// lines, and the typing field with its X and its gold Add. While the keyboard is up the field and its
+/// note rise to sit just above it. Every control takes a touch `stage.touch` high.
 struct WalkHintRow: View {
     let model: WalkModel
-    @Environment(\.walkStage) private var device
+    @Environment(\.walkStage) private var stage
     @Environment(\.walkKeyboardLift) private var lift
     @FocusState private var fieldFocused: Bool
-    /// Return was pressed: the reducer's submit closes the field, so the blur that follows is not a dismiss.
+    /// The field was closed by Return, Add or its X: the reducer already closed it, so the blur that
+    /// follows is not a dismiss.
     @State private var submitted = false
-    /// The field's own words. Return sends them with the submit, so a blur that reached the
+    /// The field's own words. Return and Add send them with the submit, so a blur that reached the
     /// walk first (and closed the field there) cannot lose them.
     @State private var text = ""
+    /// The Move row's chips run past their room: they scroll, and fade at their right edge.
+    @State private var chipsOverflow = false
 
     init(model: WalkModel) {
         self.model = model
@@ -23,61 +27,47 @@ struct WalkHintRow: View {
 
     var body: some View {
         let s = model.state
-        let layout = model.layout(wing: device.wing)
         let stage = WalkArt.stageSize
         ZStack(alignment: .topLeading) {
             // The lesson: two lines above the light, on the veil (any tap puts it away; they take none).
-            if let frame = layout.lesson {
+            if let frame = WalkLayout.teachFrame(s) {
                 teachingLines(WalkCopy.teaching(s))
                     .frame(width: frame.width, height: frame.height, alignment: .bottom)
                     .position(x: frame.midX, y: frame.midY)
             }
             if s.typing != nil {
-                bottom(typingRow(hint: WalkCopy.hint(s)))
+                typingRow(s)
             } else {
-                if let frame = layout.nextLine, let line = WalkCopy.nextLine(s, model.periods) {
-                    nextLine(line)
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
+                if let frame = WalkLayout.nextFrame(s), let line = WalkCopy.nextLine(s, model.periods) {
+                    if s.step == 0 {
+                        welcomeLine(line)
+                            .frame(width: frame.width, height: frame.height)
+                            .position(x: frame.midX, y: frame.midY)
+                    } else {
+                        nextButton(line, frame)
+                    }
                 }
-                if s.selected != nil {
-                    bottom(moveRow(s.moveTargets))
-                } else if let frame = layout.hintLine {
+                if let frame = WalkLayout.hintFrame(s) {
                     hintText(WalkCopy.hint(s))
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }
-                if let frame = layout.more {
-                    moreButton
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
+                if let frame = WalkLayout.undoFrame(s) {
+                    undoPill(s, frame)
                 }
-                if let frame = layout.undoPill {
-                    undoPill
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
+                if WalkLayout.moveRowFrame(s) != nil {
+                    moveRow(s)
                 }
             }
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
     }
 
-    /// A row anchored at the foot of the stage, lifted above the keyboard.
-    private func bottom(_ row: some View) -> some View {
-        row
-            .frame(maxWidth: .infinity, minHeight: 38)
-            .padding(.horizontal, 10)
-            .padding(.bottom, 8 + lift)
-            .frame(width: WalkArt.stageSize.width, height: WalkArt.stageSize.height,
-                   alignment: .bottom)
-    }
+    // MARK: Next, the hint and Undo
 
-    // MARK: The Next line, the hint and Undo
-
-    /// Glowing words and a small chevron, never a button's fill or outline; quieter when it skips.
-    /// Glowing words with the light's gold arrow after them, never a button's fill or outline;
-    /// quieter when it skips. On Welcome a second line under it says what the quick start is.
-    private func nextLine(_ line: WalkCopy.NextLine) -> some View {
+    /// Welcome's quick start under the light (F8, unchanged): glowing words with the light's gold arrow
+    /// after them, and a second line under them saying what it is.
+    private func welcomeLine(_ line: WalkCopy.NextLine) -> some View {
         Button { model.send(.nextTapped) } label: {
             VStack(spacing: 1) {
                 HStack(spacing: 6) {
@@ -108,28 +98,64 @@ struct WalkHintRow: View {
         .accessibilityLabel(line.text)
         .accessibilityIdentifier("walk.next")
         // On Welcome the light itself reads the quick start (`WalkCopy.orbLabelWelcome`): the line is not read twice.
-        .accessibilityHidden(model.state.step == 0)
+        .accessibilityHidden(true)
     }
 
-    /// "More": the other choices, as a tap on the light opens them. Words and a symbol, no box.
-    private var moreButton: some View {
-        Button { model.send(.moreTapped) } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 15, weight: .regular))
-                Text(WalkCopy.more)
-                    .font(.custom("DMSans-SemiBold", size: 14))
+    /// Next on steps 1 to 5: a gold button 50 high, its words plus 56 wide (160 to 280), with the light's
+    /// glow, ink words and a down arrow. When it skips: only a white outline, quieter white words, no
+    /// arrow and no glow. It is drawn inside its frame, centred; the frame (or more) takes the touch.
+    private func nextButton(_ line: WalkCopy.NextLine, _ frame: CGRect) -> some View {
+        Button { model.send(.nextTapped) } label: {
+            Group {
+                if line.skip {
+                    Text(line.text)
+                        .font(.custom("DMSans-SemiBold", size: 16))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.horizontal, 28)
+                } else {
+                    HStack(spacing: 8) {
+                        Text(line.text)
+                            .font(.custom("DMSans-SemiBold", size: 17))
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+                    .foregroundStyle(WalkPalette.ink)
+                    .padding(.leading, 30)
+                    .padding(.trailing, 26)
+                }
             }
-            .foregroundStyle(.white.opacity(0.9))
-            .walkGlow()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
+            .lineLimit(1)
+            .frame(height: frame.height)
+            .frame(minWidth: Self.nextMinWidth)
+            .fixedSize()
+            .background { nextFace(skip: line.skip) }
+            .walkTouch(frame.size, stage.touch)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(WalkCopy.moreLabel)
+        .accessibilityLabel(line.text)
+        .accessibilityIdentifier("walk.next")
+        .position(x: frame.midX, y: frame.midY)
     }
 
-    private var undoPill: some View {
+    /// The narrowest Next is drawn ("The foot": its words plus 56, at least 160, at most its frame's 280).
+    static let nextMinWidth: CGFloat = 160
+
+    @ViewBuilder private func nextFace(skip: Bool) -> some View {
+        if skip {
+            Capsule().strokeBorder(.white.opacity(0.7), lineWidth: 1.5)
+        } else {
+            Capsule()
+                .fill(LinearGradient(stops: [.init(color: Color(hex: 0xFFF7E0), location: 0),
+                                             .init(color: Color(hex: 0xF8E2AD), location: 0.46),
+                                             .init(color: Color(hex: 0xEBBF72), location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .shadow(color: WalkPalette.orbGlow.opacity(0.8), radius: 16)
+                .shadow(color: WalkPalette.orbGlow.opacity(0.45), radius: 42)
+        }
+    }
+
+    /// The quiet Undo pill above the light, 86 × 36; VoiceOver hears what it undoes (F23).
+    private func undoPill(_ s: WalkState, _ frame: CGRect) -> some View {
         Button { model.send(.undo) } label: {
             HStack(spacing: 5) {
                 Image(systemName: "arrow.uturn.backward")
@@ -138,14 +164,14 @@ struct WalkHintRow: View {
                     .font(.custom("DMSans-SemiBold", size: 13))     // the contract's 700: no Bold face is bundled
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 34)
+            .frame(width: frame.width, height: frame.height)
             .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.6), border: .white.opacity(0.55)))
-            .contentShape(Capsule())
+            .walkTouch(frame.size, stage.touch)
         }
         .buttonStyle(.plain)
-        .fixedSize()
-        .accessibilityLabel(WalkCopy.undo)
+        .accessibilityLabel(WalkCopy.undoLabel(s) ?? WalkCopy.undo)
+        .accessibilityIdentifier("walk.undo")
+        .position(x: frame.midX, y: frame.midY)
     }
 
     /// The 20-point serif line, then the 15-point line (none with speech off), as the walk's other words.
@@ -181,55 +207,98 @@ struct WalkHintRow: View {
 
     // MARK: Move to
 
-    /// "Move to", a chip for every area the flag could move to, then "Pull it up";
-    /// sideways if it runs past the edge. On Today there is nowhere to move: only "Pull it up".
-    private func moveRow(_ targets: [WalkArea]) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                if !targets.isEmpty {
+    /// While a flag is chosen (F11, F24): "Move to" and a chip for each area it can move to, scrolling
+    /// sideways in their room when they run past it (with a fade at its right edge only then), and
+    /// Remove alone at its own place, never scrolled. On Today there is nowhere to move: Remove only.
+    @ViewBuilder private func moveRow(_ s: WalkState) -> some View {
+        let title = s.item(s.selected)?.title ?? ""
+        let targets = s.moveTargets
+        if let frame = WalkLayout.moveChipsFrame(s), !targets.isEmpty {
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) {
                     Text(WalkCopy.moveTo)
                         .font(.custom("DMSans-SemiBold", size: 12))     // the contract's 700: no Bold face is bundled
                         .foregroundStyle(.white)
                         .walkGlow()
                         .fixedSize()
+                        .accessibilityHidden(true)                      // each chip says it ("Move … to …")
+                    ForEach(targets) { area in
+                        chip(area.name, height: frame.height, colour: .white, border: .white.opacity(0.55)) {
+                            model.send(.moveTo(area.id))
+                        }
+                        .accessibilityLabel(WalkCopy.moveLabel(title, to: area.name))
+                        .accessibilityIdentifier("walk.move.\(area.name.lowercased())")
+                    }
                 }
-                ForEach(targets) { area in
-                    chip(area.name, colour: .white, border: .white.opacity(0.55)) { model.send(.moveTo(area.id)) }
-                }
-                chip(WalkCopy.pullUp, colour: WalkPalette.pullUp, border: WalkPalette.pullUpBorder) { model.send(.pullUp) }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chipsOverflow = $0 > frame.width + 0.5 }
             }
-            .padding(2)
-            .frame(minWidth: WalkArt.stageSize.width - 20)       // centred while it fits
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .frame(width: frame.width, height: max(frame.height, stage.touch), alignment: .leading)
+            .mask {
+                HStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: chipsOverflow ? Self.chipsFade : 0)
+                }
+            }
+            .position(x: frame.midX, y: frame.midY)
         }
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        if let frame = WalkLayout.removeFrame(s) {
+            chip(WalkCopy.pullUp, width: frame.width, height: frame.height,
+                 colour: WalkPalette.pullUp, border: WalkPalette.pullUpBorder) { model.send(.pullUp) }
+                .accessibilityLabel(WalkCopy.removeLabel(title))
+                .accessibilityIdentifier("walk.remove")
+                .position(x: frame.midX, y: frame.midY)
+        }
     }
 
-    private func chip(_ label: String, colour: Color, border: Color, _ action: @escaping () -> Void) -> some View {
+    /// The fade at the chips' right edge while they overflow.
+    static let chipsFade: CGFloat = 24
+
+    /// A chip: capitals on a navy pill with a thin edge, never shrunk; `width` when the layout gives one,
+    /// else as wide as its words. It takes a touch `stage.touch` high.
+    private func chip(_ label: String, width: CGFloat? = nil, height: CGFloat, colour: Color, border: Color,
+                      _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 11))     // the contract's 700: no Bold face is bundled
                 .tracking(0.66)
                 .foregroundStyle(colour)
                 .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 12)
-                .frame(minHeight: 34)
+                .frame(width: width, height: height)
                 .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.62), border: border))
-                .contentShape(Capsule())
+                .frame(height: max(height, stage.touch))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .accessibilityLabel(label)          // drawn in capitals, read as written
     }
 
     // MARK: Type it
 
-    /// One line, focused at once; return plants it, and losing focus closes it.
-    private func typingRow(hint: String) -> some View {
-        VStack(spacing: 8) {
-            if !hint.isEmpty {
-                hintText(hint)
-            }
+    /// The field across the foot (F22): its X at the left closes it and plants nothing, the words in
+    /// the middle (return plants them), the gold Add at the right plants them (quiet while the field is
+    /// blank), and a note just above it. All rise by the keyboard's lift. Focused at once; losing focus
+    /// with no return closes it.
+    @ViewBuilder private func typingRow(_ s: WalkState) -> some View {
+        let up = { (frame: CGRect) in frame.offsetBy(dx: 0, dy: -lift) }
+        if let note = WalkLayout.hintFrame(s).map(up) {
+            hintText(WalkCopy.hint(s))
+                .frame(width: note.width, height: note.height)
+                .position(x: note.midX, y: note.midY)
+        }
+        if let field = WalkLayout.typeFieldFrame(s).map(up) {
+            WalkPillBackground(fill: WalkPalette.navy.opacity(0.72), border: .white.opacity(0.55))
+                .frame(width: field.width, height: field.height)
+                .contentShape(Capsule())
+                .onTapGesture { fieldFocused = true }
+                .accessibilityHidden(true)
+                .position(x: field.midX, y: field.midY)
+        }
+        if let words = WalkLayout.typeWordsFrame(s).map(up) {
             TextField("", text: Binding(get: { text },
                                         set: { text = $0; model.send(.typeChanged($0)) }),
                       prompt: Text(WalkCopy.typePlaceholder).foregroundStyle(.white.opacity(0.7)))
@@ -240,65 +309,108 @@ struct WalkHintRow: View {
                 .submitLabel(.done)
                 .focused($fieldFocused)
                 .accessibilityLabel(WalkCopy.typeFieldLabel)
+                .accessibilityIdentifier("walk.type.field")
                 .onSubmit {
                     submitted = true
                     model.send(.typeSubmitted(text))
                 }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 44)
-                .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.72), border: .white.opacity(0.55)))
+                .onAppear {
+                    submitted = false
+                    text = model.state.typing ?? ""
+                    fieldFocused = true
+                }
+                .onChange(of: fieldFocused) { _, focused in
+                    // Only a blur with no return, Add or X before it dismisses: after one of those it
+                    // would close nothing (the reducer already closed the field). If the blur arrives
+                    // first, the submit that follows still plants: it carries the words.
+                    guard !focused else { return }
+                    if submitted {
+                        submitted = false
+                    } else {
+                        model.send(.typeDismissed)
+                    }
+                }
+                .frame(width: words.width, height: words.height)
+                .position(x: words.midX, y: words.midY)
         }
-        .onAppear {
-            submitted = false
-            text = model.state.typing ?? ""
-            fieldFocused = true
-        }
-        .onChange(of: fieldFocused) { _, focused in
-            // Only a blur with no return before it dismisses: after a submit it would close
-            // nothing (the submit already planted and closed). If the blur arrives first, the
-            // submit that follows still plants: it carries the words (`.typeSubmitted(text)`).
-            guard !focused else { return }
-            if submitted {
-                submitted = false
-            } else {
+        if let close = WalkLayout.typeCloseFrame(s).map(up) {
+            Button {
+                submitted = true
                 model.send(.typeDismissed)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .walkTouch(close.size, stage.touch)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(WalkCopy.typeClose)
+            .accessibilityIdentifier("walk.type.close")
+            .position(x: close.midX, y: close.midY)
+        }
+        if let add = WalkLayout.typeAddFrame(s).map(up) {
+            Button {
+                submitted = true
+                model.send(.typeSubmitted(text))
+            } label: {
+                Text(WalkCopy.typeAdd)
+                    .font(.custom("DMSans-SemiBold", size: 15))
+                    .foregroundStyle(WalkPalette.ink)
+                    .padding(.horizontal, 14)
+                    .frame(height: Self.addHeight)
+                    .background(Capsule().fill(WalkPalette.gold))
+                    .opacity(s.typedHasWords ? 1 : 0.45)
+                    .walkTouch(add.size, stage.touch)
+            }
+            .buttonStyle(.plain)
+            .disabled(!s.typedHasWords)
+            .accessibilityLabel(WalkCopy.typeAdd)
+            .accessibilityIdentifier("walk.type.add")
+            .position(x: add.midX, y: add.midY)
         }
     }
+
+    /// The gold Add's capsule height inside its 44-high frame.
+    static let addHeight: CGFloat = 32
 }
 
-/// Under the light's own layer, so nothing on the compass is dimmed: the scrim at the foot of
-/// the stage (the ground colour from 0 to 80% over the board's last 120 points), and soft bands of the
-/// ground colour behind the open compass's hint, the points' words and the lines that teach
-/// the light, where they stand over the veiled mountain. The scrim and the bands run from side
-/// to side of the window (the board plus its bleed), and the scrim on down to the window's foot.
+/// Under the light's own layer, so nothing on the compass is dimmed: the foot's shade (from y 560 to
+/// the foot, "The foot's shade": the walk's dark navy from nothing to 0.55 at 45% and 0.86 at the
+/// foot), and soft bands of the ground colour behind the open compass's hint, the points' words and
+/// the lines that teach the light, where they stand over the veiled mountain. The shade and the bands
+/// run from side to side of the window (the board plus its bleed), and the shade on down to the
+/// window's foot.
 struct WalkUnderlay: View {
     let model: WalkModel
     @Environment(\.walkStage) private var device
-    static let scrimHeight: CGFloat = 120
+    /// Where the foot's shade begins, in stage points.
+    static let shadeTop: CGFloat = 560
 
     var body: some View {
-        let layout = model.layout(wing: device.wing)
+        let s = model.state
         let stage = WalkArt.stageSize
         let window = device.window
+        let shade = WalkPalette.glowShadow          // rgba(0, 14, 70)
         ZStack(alignment: .topLeading) {
             VStack(spacing: 0) {
-                LinearGradient(colors: [WalkPalette.ground.opacity(0), WalkPalette.ground.opacity(0.8)],
+                LinearGradient(stops: [.init(color: shade.opacity(0), location: 0),
+                                       .init(color: shade.opacity(0.55), location: 0.45),
+                                       .init(color: shade.opacity(0.86), location: 1)],
                                startPoint: .top, endPoint: .bottom)
-                    .frame(height: Self.scrimHeight)
-                WalkPalette.ground.opacity(0.8)
+                    .frame(height: stage.height - Self.shadeTop)
+                shade.opacity(0.86)
                     .frame(height: device.bleed.bottom)
             }
             .frame(width: window.width)
-            .offset(x: window.minX, y: stage.height - Self.scrimHeight)
+            .offset(x: window.minX, y: Self.shadeTop)
             .frame(width: stage.width, height: stage.height, alignment: .topLeading)
-            if model.state.showsPoints, let hint = layout.hintLine {
+            if s.showsPoints, let hint = WalkLayout.hintFrame(s) {
                 band(height: hint.height + 20, width: window.width).position(x: window.midX, y: hint.midY)
             }
             // Behind each point's words, a soft blot of the ground colour (no edge, no panel): a
             // kept area's pill or a flag under the veil does not show through the words.
-            if model.state.showsPoints {
-                let points = WalkCopy.points(model.state, model.periods)
+            if s.showsPoints {
+                let points = WalkCopy.points(s, model.periods)
                 ForEach(points, id: \.at) { point in
                     let frame = WalkLayout.pointWords(point, among: points.map(\.at))
                         .map(\.frame).reduce(CGRect.null) { $0.union($1) }
@@ -312,7 +424,7 @@ struct WalkUnderlay: View {
                     }
                 }
             }
-            if let teach = layout.lesson {
+            if let teach = WalkLayout.teachFrame(s) {
                 band(height: teach.height + 40, width: window.width).position(x: window.midX, y: teach.midY)
             }
         }
