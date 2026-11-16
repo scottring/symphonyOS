@@ -22,6 +22,9 @@ struct WalkSceneView: View {
                           onLabel: { model.send(.areaTapped($0.id)) },
                           onBanner: { banner, post in
                               if let event = WalkLayout.tapEvent(banner, on: post) { model.send(event) }
+                          },
+                          onSide: { side in
+                              if let event = WalkLayout.tapEvent(side) { model.send(event) }
                           })
             // The open compass (and Welcome's choices): the mountain steps right back under a navy veil (80%),
             // so every point reads on an even dark ground; the words above stay bright. A tap on
@@ -73,24 +76,26 @@ struct WalkSceneView: View {
             .allowsHitTesting(false)
         } else if !question.isEmpty {
             // Under the top row, as wide as the board's words (wider on a wider window), centred on x 195,
-            // set as `WalkLayout.words` says (F30): a long question one size smaller, and its why line only
-            // where the block still ends above the flags.
+            // set as `WalkLayout.words` says (F30): a long question one size smaller, its why line only
+            // where the block still ends above the flags, and at the last its quote cut at a word.
+            // Its faces are fixed in size (as the cloths' are): the block's estimate assumes one size.
             let set = WalkLayout.words(s, p, wing: stage.wing)
             VStack(spacing: WalkLayout.blockGap) {
                 eyebrowLine(eyebrow, count: WalkCopy.eyebrowCount(s))
-                    .font(.custom("DMSans-SemiBold", size: 12))
+                    .font(.custom("DMSans-SemiBold", fixedSize: 12))
                     .tracking(1.2)
                     .walkGlow()
                     .accessibilityIdentifier("walk.eyebrow")
                     .modifier(WalkEntrance())
                     .id(eyebrow)
-                Text(question)
-                    .font(.custom("CrimsonPro-Regular", size: set.questionSize))
+                Text(set.question)
+                    .font(.custom("CrimsonPro-Regular", fixedSize: set.questionSize))
                     .foregroundStyle(.white)
                     .walkGlow()
+                    .accessibilityIdentifier("walk.question")
                 if set.showsWhy {
                     Text(why)
-                        .font(.custom("DMSans-Regular", size: 15))
+                        .font(.custom("DMSans-Regular", fixedSize: 15))
                         .lineSpacing(WalkLayout.whySpacing)
                         .foregroundStyle(.white)
                         .walkGlow()
@@ -147,6 +152,8 @@ struct WalkWorldView: View {
     let actions: (WalkLayout.Banner) -> [(name: String, run: () -> Void)]
     let onLabel: (WalkLayout.Label) -> Void
     let onBanner: (WalkLayout.Banner, WalkLayout.Post) -> Void
+    /// A tap on a side post (the walk sends `WalkLayout.tapEvent(side)`: a named one walks there).
+    let onSide: (WalkLayout.Side) -> Void
     /// Banners present when the world first draws stand still; later ones drop in.
     @State private var arrived = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -158,7 +165,8 @@ struct WalkWorldView: View {
     init(layout: WalkLayout, art: WalkArt, step: Int, stage: WalkStage, dropsIn: Bool = true, veilsWords: Bool = false,
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
-         onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void) {
+         onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void,
+         onSide: @escaping (WalkLayout.Side) -> Void) {
         self.layout = layout
         self.art = art
         self.step = step
@@ -168,6 +176,7 @@ struct WalkWorldView: View {
         self.actions = actions
         self.onLabel = onLabel
         self.onBanner = onBanner
+        self.onSide = onSide
     }
 
     var body: some View {
@@ -216,11 +225,12 @@ struct WalkWorldView: View {
         }
     }
 
-    /// The backdrop (`WalkBackdrop`): the tall painting by its own camera for this window, which
-    /// glides with the layout's. It glides when the walk moves (a step, a zoom), not when the
-    /// window changes (a turn, a fold): there it stands at once where the new window puts it.
+    /// The backdrop (`WalkBackdrop`): the tall painting by its own camera for this step and window.
+    /// It glides with the layout's camera from one step to the next (never inside a step: a tap on a
+    /// side post moves no camera), not when the window changes (a turn, a fold): there it stands at
+    /// once where the new window puts it.
     @ViewBuilder private var picture: some View {
-        if let backdrop = art.backdrop, let camera = art.backdropCamera(step: step, layout: layout.camera, stage: stage) {
+        if let backdrop = art.backdrop, let camera = art.backdropCamera(step: step, stage: stage) {
             Image(backdrop.imageName)
                 .resizable()
                 .interpolation(.high)
@@ -228,15 +238,49 @@ struct WalkWorldView: View {
                 .frame(width: backdrop.size.width, height: backdrop.size.height)
                 .scaleEffect(camera.k, anchor: .topLeading)
                 .offset(x: -camera.x * camera.k, y: -camera.y * camera.k)
-                .animation(reduceMotion ? nil : Self.glide, value: [CGFloat(step), layout.camera.x, layout.camera.y, layout.camera.k])
+                .animation(reduceMotion ? nil : Self.glide, value: [CGFloat(step), camera.x, camera.y, camera.k])
                 .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
                 .accessibilityHidden(true)
         }
     }
 
+    /// The side posts first, then the standing post (its pole, then its cloths), then the area's
+    /// pill and its caret over the pole's top: a cloth is never under a side post's touch shape.
     private var world: some View {
         let camera = layout.camera
         return ZStack(alignment: .topLeading) {
+            ForEach(layout.sides) { side in
+                let box = WalkSideView.box(side, touch: stage.touch)
+                Button { onSide(side) } label: { WalkSideView(side: side, box: box, veiled: veilsWords) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(side.label)
+                    .accessibilityIdentifier("walk.side.\(side.name.isEmpty ? "loose" : side.name.lowercased())")
+                    .walkAccessibilityHint(side.area == nil ? nil : WalkCopy.areaHint(ground: false, kept: true, focused: false))
+                    .walkReadOnly(WalkLayout.tapEvent(side) == nil)
+                    .accessibilityHidden(veilsWords)
+                    .walkPlaced(box, camera)
+            }
+
+            ForEach(layout.posts) { post in
+                // The pole leans about its foot as the layout says; its banners' frames already lean with it.
+                WalkPoleView(height: max(0, post.base.y - post.top), pale: post.pale)
+                    .rotationEffect(.degrees(post.lean), anchor: .bottom)
+                    .accessibilityHidden(true)
+                    .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
+                                camera)
+                ForEach(post.banners) { banner in
+                    Button { onBanner(banner, post) } label: {
+                        WalkBannerView(banner: banner, dropsIn: dropsIn && arrived, veiled: veilsWords)
+                    }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(banner.label)
+                        .walkReadOnly(!banner.taps)
+                        .walkActions(actions(banner))
+                        .accessibilityHidden(veilsWords)
+                        .walkPlaced(banner.frame, camera)
+                }
+            }
+
             ForEach(layout.labels) { label in
                 Button { onLabel(label) } label: { WalkLabelView(label: label, veiled: veilsWords) }
                     .buttonStyle(.plain)
@@ -245,31 +289,13 @@ struct WalkWorldView: View {
                     .walkAccessibilityHint(label.hint)
                     .walkReadOnly(!label.tappable)
                     .accessibilityAddTraits(label.selected ? .isSelected : [])
+                    .walkStandingIdentifier(label.standing)
                     .accessibilityHidden(veilsWords)
                     .walkPlaced(label.frame, camera)
-            }
-
-            ForEach(layout.posts) { post in
-                // The pole leans about its foot as the layout says; its banners' frames already lean with it.
-                WalkPoleView(height: max(0, post.base.y - post.top), pale: post.pale)
-                    .saturation(post.saturation)
-                    .opacity(post.opacity)
-                    .rotationEffect(.degrees(post.lean), anchor: .bottom)
-                    .accessibilityHidden(true)
-                    .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
-                                camera)
-                ForEach(post.banners) { banner in
-                    Button { onBanner(banner, post) } label: {
-                        WalkBannerView(banner: banner, poleX: banner.pivot.x, dropsIn: dropsIn && arrived, veiled: veilsWords)
-                    }
-                        .buttonStyle(.plain)
-                        .saturation(post.saturation)
-                        .opacity(post.opacity)
-                        .accessibilityLabel(banner.label)
-                        .walkReadOnly(!banner.taps)
-                        .walkActions(actions(banner))
-                        .accessibilityHidden(veilsWords)
-                        .walkPlaced(banner.frame, camera)
+                if let caret = label.caret {
+                    WalkCaret(colour: WalkPalette.gold)
+                        .accessibilityHidden(true)
+                        .walkPlaced(caret, camera)
                 }
             }
         }
@@ -355,6 +381,11 @@ private extension View {
         self.frame(width: frame.width, height: frame.height, alignment: .topLeading)
             .scaleEffect(1 / camera.k, anchor: .topLeading)
             .offset(x: frame.minX / camera.k + camera.x, y: frame.minY / camera.k + camera.y)
+    }
+
+    /// The standing pill is `walk.standing`; a ground chip keeps no identifier (it is found by its name).
+    @ViewBuilder func walkStandingIdentifier(_ standing: Bool) -> some View {
+        if standing { accessibilityIdentifier("walk.standing") } else { self }
     }
 
     /// VoiceOver's custom actions, only when there are some: none leaves the view as it was.

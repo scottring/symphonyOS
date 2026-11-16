@@ -41,7 +41,8 @@ extension WalkLayout {
             return abs(da - db) < 0.01 ? a < b : da < db
         } ?? 0
         let row = areas.indices.map { rows ? abs($0 - centre) % 2 : 0 }
-        let lines = areas.map { min(2, pillLines(for: $0.name, width: width - chipInset).count) }
+        let words = areas.map { Array(pillLines(for: $0.name, width: width - chipInset).prefix(2)) }
+        let lines = words.map(\.count)
         let heights = lines.map { $0 > 1 ? chipTallHeight : chipHeight }
         // Rows from the foot up: the lower row ends at the standing foot, each row as tall as its tallest chip.
         let lowest = row.max() ?? 0
@@ -62,7 +63,7 @@ extension WalkLayout {
             return Label(id: area.id, name: area.name,
                          frame: CGRect(x: x, y: bottom[row[i]]! - heights[i] + rise, width: width, height: heights[i]),
                          kept: kept, focused: false, opacity: 1, tappable: true, hint: WalkCopy.areaHint(s, area.id),
-                         selected: kept, footing: rise, ground: true, lines: lines[i])
+                         selected: kept, footing: rise, ground: true, lines: lines[i], words: words[i])
         }
     }
 }

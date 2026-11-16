@@ -196,7 +196,6 @@ struct WalkStanding {
         }
         let top = (banners.first?.frame.minY ?? clothsTop - hand.lift)
         var post = L.Post(id: postId, key: WalkPostKey(level: level, column: s.standing), base: base, top: top,
-                          opacity: 1, saturation: 1,
                           pale: !pieces.isEmpty && pieces.allSatisfy { $0.kind == .ghost }, banners: banners)
         post.lean = hand.lean
         post.pole = (frames.isEmpty ? L.barePole : L.pole) + hand.lift
@@ -212,11 +211,14 @@ struct WalkStanding {
     // MARK: The area's name
 
     func pillSize(_ area: WalkArea) -> (lines: Int, width: CGFloat, height: CGFloat) {
-        let lines = L.pillLines(for: area.name, width: width - L.pillInset)
+        let lines = pillWords(area)
         let widest = CGFloat(lines.map(\.count).max() ?? 0)
         return (lines.count, min(width, max(L.pillLeast, ceil(widest * L.pillChar + L.pillInset))),
                 lines.count > 1 ? L.pillTallHeight : L.pillHeight)
     }
+
+    /// The area's name as the standing pill draws it, a line each.
+    func pillWords(_ area: WalkArea) -> [String] { L.pillLines(for: area.name, width: width - L.pillInset) }
 
     func label(_ area: WalkArea, top: CGFloat, dx: CGFloat, caret: Bool) -> L.Label {
         let pill = pillSize(area)
@@ -225,7 +227,7 @@ struct WalkStanding {
         return L.Label(id: area.id, name: area.name,
                        frame: CGRect(x: L.centreX - pill.width / 2 + dx, y: top, width: pill.width, height: pill.height),
                        kept: true, focused: true, opacity: 1, tappable: false, hint: WalkCopy.areaHint(s, area.id),
-                       standing: true, lines: pill.lines, caret: caret ? mark : nil)
+                       standing: true, lines: pill.lines, caret: caret ? mark : nil, words: pillWords(area))
     }
 
     // MARK: Which cloths

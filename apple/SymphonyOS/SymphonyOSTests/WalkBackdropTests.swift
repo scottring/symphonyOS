@@ -7,7 +7,7 @@ import UIKit
 @testable import Symphony
 
 /// The tall painting behind the walk (`WalkBackdrop`): the layout stays in the square print's
-/// world, and the picture has a camera of its own for each step and each zoom.
+/// world, and the picture has a camera of its own for each step (the layout never zooms).
 struct WalkBackdropTests {
     private let art = WalkArt.overlookSquare
     private var backdrop: WalkBackdrop { art.backdrop! }
@@ -40,7 +40,7 @@ struct WalkBackdropTests {
         for level in WalkLevel.allCases {
             let step = level.rawValue, stop = art.stops[step]
             let stageY = (art.bandY(level) - stop.y) * stop.k
-            let picture = art.backdropCamera(step: step, layout: stop)!
+            let picture = art.backdropCamera(step: step)!
             let y = onPainting(CGPoint(x: 195, y: stageY), picture).y
             #expect(backdrop.land[level]!.contains(y), "\(level): band at \(y)")
             #expect(abs(y - backdrop.bands[level]!) < 0.0001, "\(level)")
@@ -59,7 +59,7 @@ struct WalkBackdropTests {
                 if level == .today { s.firstThing = s.items.first?.id }
                 let layout = WalkLayout.make(s, today: Self.today, art: art, footing: .level)
                 #expect(layout.camera == art.stops[level.rawValue], "\(level), \(count) areas: zoomed")
-                let picture = art.backdropCamera(step: level.rawValue, layout: layout.camera)!
+                let picture = art.backdropCamera(step: level.rawValue)!
                 #expect(layout.posts.contains { $0.key.level == level }, "\(level), \(count) areas: no post")
                 for post in layout.posts where post.key.level == level {
                     let x = onPainting(post.base, picture).x
@@ -71,10 +71,10 @@ struct WalkBackdropTests {
 
     /// Going down: from Year to Today the painting moves up the screen, step by step.
     @Test func thePaintingMovesUpStepByStep() {
-        let ys = (1...5).map { art.backdropCamera(step: $0, layout: art.stops[$0])!.y }
+        let ys = (1...5).map { art.backdropCamera(step: $0)!.y }
         #expect(zip(ys, ys.dropFirst()).allSatisfy { $0 < $1 }, "\(ys)")
         // Welcome shows the mountain from the sky down: the painting's top at the stage's top.
-        let welcome = art.backdropCamera(step: 0, layout: art.stops[0])!
+        let welcome = art.backdropCamera(step: 0)!
         #expect(welcome.y == 0 && welcome.x == 0)
     }
 
@@ -84,7 +84,8 @@ struct WalkBackdropTests {
         var checked = 0
         for (s, layout) in zip(Generated.all, Generated.naturalLayouts) where (1...5).contains(s.step) {
             let level = WalkLevel(rawValue: s.step)!
-            let picture = art.backdropCamera(step: s.step, layout: layout.camera)!
+            #expect(layout.camera == art.stops[s.step], "\(Generated.describe(s)): the layout left its stop")
+            let picture = art.backdropCamera(step: s.step)!
             for post in layout.posts where post.key.level == level {
                 checked += 1
                 let y = onPainting(post.base, picture).y
@@ -94,20 +95,16 @@ struct WalkBackdropTests {
         #expect(checked > 0)
     }
 
-    /// Never past the painting's edge, on any generated state, zoomed or not, and never enlarged
-    /// past 1.6 times at 3x (the bundled picture is 2048 pixels across 1300 points).
+    /// Never past the painting's edge at any step, and never enlarged past 1.6 times at 3x (the
+    /// bundled picture is 2048 pixels across 1300 points). Every generated state stands at its step's
+    /// stop (the layout's camera never leaves it), so the steps are every picture there is.
     @Test func thePictureNeverLeavesThePaintingNorBlursOnAnyState() {
-        let layouts = Generated.levelLayouts
+        #expect(zip(Generated.all, Generated.levelLayouts).allSatisfy { $1.camera == art.stops[$0.step] })
         var most: CGFloat = 0
-        for (s, layout) in zip(Generated.all, layouts) {
-            let c = art.backdropCamera(step: s.step, layout: layout.camera)!
-            let shown = CGRect(x: c.x, y: c.y, width: art.stage.width / c.k, height: art.stage.height / c.k)
-            #expect(CGRect(origin: .zero, size: backdrop.size).insetBy(dx: -0.001, dy: -0.001).contains(shown),
-                    "\(Generated.describe(s)): \(shown)")
-            most = max(most, 3 * c.k * backdrop.size.width / 2048)
-        }
         for step in 0...6 {
-            let c = art.backdropCamera(step: step, layout: art.stops[step])!
+            let c = art.backdropCamera(step: step)!
+            let shown = CGRect(x: c.x, y: c.y, width: art.stage.width / c.k, height: art.stage.height / c.k)
+            #expect(CGRect(origin: .zero, size: backdrop.size).insetBy(dx: -0.001, dy: -0.001).contains(shown), "step \(step): \(shown)")
             most = max(most, 3 * c.k * backdrop.size.width / 2048)
         }
         #expect(most <= 1.6, "the picture is enlarged \(most) times")
@@ -115,15 +112,32 @@ struct WalkBackdropTests {
 
     // MARK: A window wider than the board
 
-    /// The picture's camera as it was while the stage was only ever the 390 × 844 board (commit
-    /// 1f2b138d): the step's stop, moved as the layout's camera moved, held on the board.
-    private func cameraOnTheBoardAlone(step: Int, layout camera: WalkLayout.Camera) -> WalkLayout.Camera {
-        let stop = art.stops[step], b = backdrop.stops[step]
-        let k = b.k * camera.k / stop.k
-        let x = b.x - (stop.x - camera.x) * camera.k / k, y = b.y - (stop.y - camera.y) * camera.k / k
-        let held = max(k, 390 / backdrop.size.width, 844 / backdrop.size.height)
-        return WalkLayout.Camera(x: min(max(0, x), backdrop.size.width - 390 / held),
-                                 y: min(max(0, y), backdrop.size.height - 844 / held), k: held)
+    /// The picture's stops on the phone, as `(k, x)` for Year to Today: each stands the layout's own
+    /// band for the step on its level's band of the painting (`WalkBackdrop.tallOverlook`'s `step`).
+    /// `boardStops` are the ones the board was approved on (commit 1f2b138d); `movedStops` are the
+    /// steps Task 6 moved so that the side posts stand on land, not on sky or water (each one is in
+    /// the task's report with a before and after shot). Welcome and Look back up never moved.
+    private static let boardStops: [Int: (k: CGFloat, x: CGFloat)] = [1: (0.42, 340), 2: (0.45, 360), 3: (0.50, 370), 4: (0.50, 450), 5: (0.52, 300)]
+    private static let movedStops: [Int: (k: CGFloat, x: CGFloat)] = [1: (0.55, 464), 3: (0.50, 290)]
+
+    /// A level step's stop from its scale and left edge, as `WalkBackdrop.tallOverlook` makes it.
+    private func stop(step: Int, k: CGFloat, x: CGFloat) -> WalkLayout.Camera {
+        let level = WalkLevel(rawValue: step)!, square = WalkArt.squarePrint, at = square.stops[step]
+        let stageY = (square.bandY(level) - at.y) * at.k
+        return WalkLayout.Camera(x: x, y: backdrop.bands[level]! * backdrop.size.height - stageY / k, k: k)
+    }
+
+    /// The picture's camera on the phone: the step's stop (as the board had it, or as moved), held on the board.
+    private func cameraOnTheBoardAlone(step: Int) -> WalkLayout.Camera {
+        let b: WalkLayout.Camera
+        if let moved = Self.movedStops[step] ?? Self.boardStops[step] {
+            b = stop(step: step, k: moved.k, x: moved.x)
+        } else {
+            b = backdrop.stops[step]                       // Welcome and Look back up: never moved
+        }
+        let held = max(b.k, 390 / backdrop.size.width, 844 / backdrop.size.height)
+        return WalkLayout.Camera(x: min(max(0, b.x), backdrop.size.width - 390 / held),
+                                 y: min(max(0, b.y), backdrop.size.height - 844 / held), k: held)
     }
 
     /// The part of the painting a window shows: the board plus its bleed, under the picture's camera.
@@ -133,34 +147,29 @@ struct WalkBackdropTests {
                       width: window.width / c.k, height: window.height / c.k)
     }
 
-    /// On the board's own window the picture stands exactly where it did: at every step's stop and on
-    /// every generated state, ruled or planted by hand. A phone a little taller for its width (no
-    /// wings, a sliver above and below the board) has the same picture, the same size and the same
-    /// way across, slid up or down by no more than that sliver.
+    /// On the board's own window the picture stands exactly at the board's approved stops, but for
+    /// the steps listed in `movedStops` (moved where a side post would stand on sky or water), which
+    /// stand exactly at their new stops: the picture is a step's alone (no zoom inside a step), on
+    /// every step and every generated state. A phone a little taller for its width (no wings, a
+    /// sliver above and below the board) has the same picture, the same size and the same way
+    /// across, slid up or down by no more than that sliver.
     @Test func onThePhoneThePictureIsUnchanged() {
         let phone = WalkStage(device: CGSize(width: 390, height: 844))
         for step in 0...6 {
-            #expect(art.backdropCamera(step: step, layout: art.stops[step], stage: phone)
-                    == cameraOnTheBoardAlone(step: step, layout: art.stops[step]), "step \(step)")
-            #expect(art.backdropCamera(step: step, layout: art.stops[step])
-                    == cameraOnTheBoardAlone(step: step, layout: art.stops[step]), "step \(step), no stage named")
+            #expect(art.backdropCamera(step: step, stage: phone) == cameraOnTheBoardAlone(step: step), "step \(step)")
+            #expect(art.backdropCamera(step: step) == cameraOnTheBoardAlone(step: step), "step \(step), no stage named")
         }
         for layouts in [Generated.levelLayouts, Generated.naturalLayouts] {
-            for (s, layout) in zip(Generated.all, layouts) {
-                #expect(art.backdropCamera(step: s.step, layout: layout.camera, stage: phone)
-                        == cameraOnTheBoardAlone(step: s.step, layout: layout.camera), "\(Generated.describe(s))")
-            }
+            #expect(zip(Generated.all, layouts).allSatisfy { $1.camera == art.stops[$0.step] }, "a layout left its step's stop")
         }
         for device in [CGSize(width: 402, height: 874), CGSize(width: 430, height: 932)] {
             let taller = WalkStage(device: device)
             #expect(taller.wing == 0 && taller.bleed.top > 0)
-            var cameras = (0...6).map { (step: $0, layout: art.stops[$0]) }
-            cameras += zip(Generated.all, Generated.levelLayouts).map { (step: $0.step, layout: $1.camera) }
-            for (step, layout) in cameras {
-                let c = art.backdropCamera(step: step, layout: layout, stage: taller)!
-                let before = cameraOnTheBoardAlone(step: step, layout: layout)
+            for step in 0...6 {
+                let c = art.backdropCamera(step: step, stage: taller)!
+                let before = cameraOnTheBoardAlone(step: step)
                 #expect(c.k == before.k && c.x == before.x && abs(c.y - before.y) <= taller.bleed.top / c.k + 0.000001,
-                        "\(device), step \(step), \(layout): \(c) for \(before)")
+                        "\(device), step \(step): \(c) for \(before)")
             }
         }
     }
@@ -171,12 +180,8 @@ struct WalkBackdropTests {
         let painting = CGRect(origin: .zero, size: backdrop.size).insetBy(dx: -0.001, dy: -0.001)
         for (name, _, stage) in WalkWindows.all {
             for step in 0...6 {
-                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
+                let c = art.backdropCamera(step: step, stage: stage)!
                 #expect(painting.contains(shown(stage, c)), "\(name), step \(step): \(shown(stage, c))")
-            }
-            for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
-                let c = art.backdropCamera(step: s.step, layout: layout.camera, stage: stage)!
-                #expect(painting.contains(shown(stage, c)), "\(name), \(Generated.describe(s)): \(shown(stage, c))")
             }
         }
     }
@@ -188,11 +193,7 @@ struct WalkBackdropTests {
         for (name, _, stage) in WalkWindows.all {
             var most: CGFloat = 0
             for step in 0...6 {
-                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
-                most = max(most, 3 * stage.scale * c.k * 1300 / 2048)
-            }
-            for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
-                let c = art.backdropCamera(step: s.step, layout: layout.camera, stage: stage)!
+                let c = art.backdropCamera(step: step, stage: stage)!
                 most = max(most, 3 * stage.scale * c.k * 1300 / 2048)
             }
             #expect(most <= 1.6 + 1e-9, "\(name): the picture is enlarged \(most) times")
@@ -208,21 +209,50 @@ struct WalkBackdropTests {
         let foot = CGPoint(x: 195, y: 556)
         for step in 1...5 {
             let level = WalkLevel(rawValue: step)!
-            let phone = onPainting(foot, art.backdropCamera(step: step, layout: art.stops[step])!)
+            let phone = onPainting(foot, art.backdropCamera(step: step)!)
             for (name, stage) in [("375x667", WalkWindows.narrow), ("466x678", WalkWindows.outside),
                                   ("484x669", WalkWindows.half), ("669x951", WalkWindows.upright)] {
-                let c = art.backdropCamera(step: step, layout: art.stops[step], stage: stage)!
+                let c = art.backdropCamera(step: step, stage: stage)!
                 let p = onPainting(foot, c)
                 #expect(abs(p.x - phone.x) < 0.0001 && abs(p.y - phone.y) < 0.0001, "\(name), step \(step): \(p) for \(phone)")
-                #expect(c.k > art.backdropCamera(step: step, layout: art.stops[step])!.k, "\(name), step \(step): not enlarged")
+                #expect(c.k > art.backdropCamera(step: step)!.k, "\(name), step \(step): not enlarged")
             }
-            let c = art.backdropCamera(step: step, layout: art.stops[step], stage: WalkWindows.flat)!
+            let c = art.backdropCamera(step: step, stage: WalkWindows.flat)!
             let p = onPainting(foot, c)
             let slid = abs(p.x - phone.x) * backdrop.size.width * c.k
             #expect(slid <= 113, "951x669, step \(step): slid \(slid)")
             #expect(abs(p.y - phone.y) < 0.0001, "951x669, step \(step): moved up or down")
             #expect(backdrop.open[level]!.contains(p.x), "951x669, step \(step): the foot at x \(p.x)")
         }
+    }
+
+    /// On a wider window the side posts stand up to 1.5 times as far apart (F13) while the picture is
+    /// enlarged about the standing foot: wherever it is enlarged at least as much as the posts spread
+    /// and not slid sideways, every side pole stands on painting the phone's own side posts stand
+    /// between (from its left outer pole to its right outer pole), so no post is carried out past the
+    /// land the phone shows them on.
+    @Test func sidePostsStandWhereThePhonesDo() {
+        let foot = CGPoint(x: 195, y: 556)
+        var checked = 0
+        for (name, _, stage) in WalkWindows.all where stage.wing > 0 {
+            for step in 1...5 {
+                let phone = art.backdropCamera(step: step)!
+                let c = art.backdropCamera(step: step, stage: stage)!
+                let spread = WalkLayout.stretch(wing: stage.wing)
+                let slid = abs(onPainting(foot, c).x - onPainting(foot, phone).x) * backdrop.size.width > 0.001
+                guard c.k / phone.k >= spread - 1e-9, !slid else { continue }
+                let phonePoles = WalkLayout.sidePoles(wing: 0)
+                let left = onPainting(CGPoint(x: phonePoles.min()!, y: foot.y), phone).x
+                let right = onPainting(CGPoint(x: phonePoles.max()!, y: foot.y), phone).x
+                for x in WalkLayout.sidePoles(wing: stage.wing) {
+                    let p = onPainting(CGPoint(x: x, y: foot.y), c).x
+                    #expect(p >= left - 1e-9 && p <= right + 1e-9, "\(name), step \(step): a pole at \(x) stands at \(p), outside \(left)…\(right)")
+                    checked += 1
+                }
+            }
+        }
+        #expect(checked >= 4 * 4, "only \(checked) poles checked")
+        print("Side poles on wider windows: \(checked) checked")
     }
 
     @Test func theHeldShadeIsOnlyWhereThePaintingIsBright() {
@@ -240,12 +270,12 @@ struct WalkBackdropTests {
 
     #if os(iOS)
     /// The words above the flags read at 4.5:1 or better, white over the painting under the step's shade,
-    /// on 98 % of what lies behind them, at every step's stop and zoomed into every column of one to
-    /// three areas, on each of the six windows (a wider one enlarges the picture, so other paint stands
-    /// behind them). Steps 1 to 5 are sampled where the question block stands (P19): from its top
-    /// (`WalkLayout.wordsTop`) to the lowest it may end (`WalkLayout.wordsFootLimit`), across its width
-    /// (`WalkLayout.wordsWidth(wing:)`), centred on x 195. Welcome and Look back up keep their own words
-    /// where they were (stage y 64 to 248, x 40 to 350). The words' own glow is not counted.
+    /// on 98 % of what lies behind them, at every step on each of the six windows (a wider one enlarges
+    /// the picture, so other paint stands behind them). Steps 1 to 5 are sampled where the question
+    /// block stands (P19): from its top (`WalkLayout.wordsTop`) to the lowest it may end
+    /// (`WalkLayout.wordsFootLimit`), across its width (`WalkLayout.wordsWidth(wing:)`), centred on x 195.
+    /// Welcome and Look back up keep their own words where they were (stage y 64 to 248, x 40 to 350).
+    /// The words' own glow is not counted.
     @Test func theWordsReadOnThePaintingAtEveryStep() throws {
         let image = try #require(UIImage(named: backdrop.imageName)?.cgImage)
         let w = 520, h = 1560
@@ -258,31 +288,11 @@ struct WalkBackdropTests {
         let navy = (0.0, 18.0 / 255, 96.0 / 255)
         for (name, _, stage) in WalkWindows.all {
             for step in 0...6 {
-                var cameras = [art.stops[step]]
-                if (1...5).contains(step) {
-                    for count in 1...3 {
-                        for column in 0..<count {
-                            var s = WalkState()
-                            s.areas = ridge(count)
-                            s.kept = s.areas.map(\.id)
-                            s.step = step
-                            if step == 1 {
-                                s.focusArea = s.areas[column].id
-                            } else {
-                                let parent = WalkItem(id: UUID(), level: WalkLevel(rawValue: step - 1)!, title: "Parent",
-                                                      areaId: s.areas[column].id)
-                                s.items = [parent]
-                                s.focus[WalkLevel(rawValue: step)!] = parent.id
-                            }
-                            cameras.append(WalkLayout.make(s, today: Self.today, art: art, footing: .level).camera)
-                        }
-                    }
-                }
                 let block = (1...5).contains(step)
                 let words = block ? WalkLayout.wordsWidth(wing: stage.wing) : 310
                 let top = block ? WalkLayout.wordsTop : 64, foot = block ? WalkLayout.wordsFootLimit : 248
-                for camera in cameras {
-                    let c = art.backdropCamera(step: step, layout: camera, stage: stage)!
+                do {
+                    let c = art.backdropCamera(step: step, stage: stage)!
                     var behind: [Double] = []
                     for y in stride(from: top, through: foot, by: 4) {
                         let a: Double
@@ -302,7 +312,7 @@ struct WalkBackdropTests {
                     }
                     behind.sort()
                     let contrast = 1.05 / (behind[Int(Double(behind.count) * 0.98)] + 0.05)
-                    #expect(contrast >= 4.5, "\(name), step \(step), camera \(camera): \(contrast)")
+                    #expect(contrast >= 4.5, "\(name), step \(step): \(contrast)")
                 }
             }
         }

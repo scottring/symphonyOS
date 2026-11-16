@@ -1584,6 +1584,93 @@ struct WalkLayoutTests {
         }
     }
 
+    /// An ordinary goal of 42 letters keeps the why line under its question on every step that quotes
+    /// it: on the Season step its question takes four lines at 32 and three at 28 (TextKit, the
+    /// iPhone 17's 334), so the block ends by 278 with the why line. (The old estimate counted four
+    /// at 28, its m and w double, and lost the why line.)
+    @Test func anOrdinaryGoalKeepsItsWhyLine() {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        for title in ["Sleep seven hours on most weeknights again"] {
+            for step in 2...5 {
+                let words = WalkLayout.words(quoting(title, step: step), p, wing: 0)
+                #expect(words.showsWhy, "step \(step), “\(title)”: \(words)")
+                #expect(words.question == WalkCopy.question(quoting(title, step: step), p), "step \(step): the quote was cut")
+            }
+        }
+    }
+
+    /// The last resort (P20): a goal of 56 letters so wide that its question, at the smaller size and
+    /// with no why line, would still end below 278 has its quote cut at a word so the block fits.
+    /// The question says less; its flag and the paper still carry the goal whole.
+    @Test func aGoalTooWideForTheBlockIsCutAtAWord() throws {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        let wide = "MMMMMMM WWWWWWW MMMMMMM WWWWWWW MMMMMMM WWWWWWW MMMMMMMM"
+        #expect(wide.count == 56)
+        for step in 2...5 {
+            let s = quoting(wide, step: step)
+            let whole = WalkCopy.question(s, p)
+            #expect(whole.contains(wide))
+            let uncut = WalkLayout.words(question: whole, why: WalkCopy.why(s, p), wing: 0)
+            #expect(uncut.foot > WalkLayout.wordsFootLimit, "step \(step): the contrived goal fits uncut (\(uncut))")
+            let words = WalkLayout.words(s, p, wing: 0)
+            #expect(words.foot <= WalkLayout.wordsFootLimit, "step \(step): \(words)")
+            #expect(!words.showsWhy && words.questionSize == WalkLayout.questionSmallSize, "step \(step): \(words)")
+            // Cut at a word: what is quoted is the goal's first words, then the ellipsis.
+            let quoted = try #require(words.question.split(separator: "“").last?.split(separator: "”").first.map(String.init))
+            #expect(quoted.hasSuffix("…") && quoted.count < wide.count, "step \(step): \(quoted)")
+            let kept = String(quoted.dropLast())
+            #expect(wide.hasPrefix(kept + " "), "step \(step): not cut at a word: \(quoted)")
+            // The flag carries the goal whole.
+            let layout = ruled(s)
+            #expect(layout.banners(.parent).first?.label.contains(wide) == true)
+        }
+    }
+
+    #if canImport(UIKit)
+    /// The question's line estimate is never fewer lines than the text system sets it on: every step's
+    /// question quoting each goal of the demo's plans (the preview plan and both stress plans), at 32
+    /// and at 28 points, on a phone, the outside screen and the half window (`realLines` with Crimson
+    /// Pro, the block's width). For ordinary questions it is not more than one line over either.
+    @Test @MainActor func theQuestionsLinesAreTheRealFaces() throws {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        var goals: [(WalkLevel, String)] = []
+        for plan in [DemoStress.full, DemoStress.long] {
+            goals += plan.script.map { ($0.0, WalkWords.said($0.1, level: $0.0, today: today)?.title ?? $0.1) }
+        }
+        goals += [(.year, "Feel strong again"), (.year, "Finish the bathroom"), (.year, "More slow weekends together"),
+                  (.season, "Bathroom done by February"), (.season, "Lift twice a week"),
+                  (.month, "Pick the tile and pay the deposit"), (.week, "Send the contractor the deposit")]
+        var questions: [String] = []
+        for (level, title) in goals where level != .today {
+            let step = level.rawValue + 1
+            questions.append(WalkCopy.question(quoting(title, step: step), p))
+            if step == 5 { questions.append(WalkCopy.question(quoting(title, step: step, first: true), p)) }
+        }
+        questions += [1, 2, 3, 4, 5].map { WalkCopy.question(state($0, kept: ["Health"], standing: "Health"), p) }
+        questions = Array(Set(questions)).sorted()
+        var short: [String] = [], over: [String] = []
+        var checked = 0, more = 0
+        for size in [WalkLayout.questionSize, WalkLayout.questionSmallSize] {
+            let font = try #require(UIFont(name: "CrimsonPro-Regular", size: size), "the bundled face is not there")
+            for wing: CGFloat in [0, 42.3, 110.3] {
+                let width = WalkLayout.wordsWidth(wing: wing)
+                for q in questions {
+                    let real = Self.realLines(q, font: font, width: width)
+                    let counted = WalkLayout.questionLines(q, size: size, wing: wing)
+                    if counted < real { short.append("\(size) at \(width): “\(q)” counted \(counted), set on \(real)") }
+                    if counted > real + 1 { over.append("\(size) at \(width): “\(q)” counted \(counted), set on \(real)") }
+                    if counted > real { more += 1 }
+                    checked += 1
+                }
+            }
+        }
+        #expect(short.isEmpty, "counted on fewer lines than set: \(short.prefix(5))")
+        #expect(over.isEmpty, "counted two lines or more over: \(over.prefix(5))")
+        #expect(checked > 400)
+        print("The questions: \(questions.count) questions at 2 sizes on 3 widths, \(checked) counts; a line more than set on \(more)")
+    }
+    #endif
+
     /// Back, More and Leave for now on every step after Welcome (the ground too), each a full touch,
     /// apart, inside the row; none on Welcome or Look back up. Back and Leave for now go out to a wider
     /// window's corners; More stays in the middle.

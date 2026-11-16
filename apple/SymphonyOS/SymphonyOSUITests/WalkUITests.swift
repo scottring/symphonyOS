@@ -93,6 +93,26 @@ final class WalkUITests: XCTestCase {
                       "Back in the wing did not reach the season")
     }
 
+    /// A side post walks there: on Year with the full plan, a tap on Home's small post stands the walk in
+    /// Home, so the question asks about home and the standing pill names it.
+    @MainActor func testWalkingToAnotherArea() throws {
+        let app = walk(step: 1, ["-SymphonyWalkSeed", "full"])
+        let standing = app.descendants(matching: .any)["walk.standing"]
+        XCTAssertTrue(standing.waitForExistence(timeout: 15), "no standing pill")
+        XCTAssertEqual(standing.label, "Health", "the full plan's Year does not open in Health")
+        let home = app.buttons["walk.side.home"]
+        XCTAssertTrue(home.waitForExistence(timeout: 15), "no side post for Home")
+        XCTAssertTrue(home.isHittable, "Home's side post takes no tap")
+        home.tap()
+        let question = app.staticTexts["walk.question"]
+        XCTAssertTrue(question.waitForExistence(timeout: 15), "no question")
+        let asksAboutHome = NSPredicate(format: "label CONTAINS[c] %@", "home")
+        expectation(for: asksAboutHome, evaluatedWith: question)
+        waitForExpectations(timeout: 15)
+        XCTAssertEqual(standing.label, "Home", "the standing pill does not name Home")
+        XCTAssertTrue(app.buttons["walk.side.health"].exists, "Health is not a side post once the walk stands in Home")
+    }
+
     /// The field's X closes it and plants nothing.
     @MainActor func testTheFieldCloses() throws {
         let app = walk(step: 3, ["-SymphonyWalkOrb", "type"])

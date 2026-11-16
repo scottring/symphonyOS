@@ -43,7 +43,7 @@ struct WalkLayout: Equatable {
     /// The standing post. `base` is its foot; the pole rises `base.y − top` along a line leaning
     /// `lean` degrees clockwise about `base`; `pole` is the bare pole under its lowest cloth.
     struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
-        let opacity: Double; let saturation: Double; let pale: Bool; let banners: [Banner]
+        let pale: Bool; let banners: [Banner]
         var lean: Double = 0
         var pole: CGFloat = WalkLayout.pole }
     /// An area's name: a choice on the ground (`ground`), or the pill on the standing post
@@ -63,7 +63,9 @@ struct WalkLayout: Equatable {
         /// The standing pill's caret (10 × 7, 2 above the pill), where it stands clear of the question;
         /// nil where the pill reaches too near it (the pill's own outline still marks where you stand),
         /// and for a chip on the ground, whose mark is inside its frame.
-        var caret: CGRect? = nil }
+        var caret: CGRect? = nil
+        /// The name as its pill or chip draws it: in capitals, one line each (`pillLines`), at most two.
+        var words: [String] = [] }
     /// One wordless flag on a side post, in the colour of the level it stands for.
     struct Pennant: Equatable { let frame: CGRect; let level: WalkLevel }
     /// Another area, as a small post at the side: a name pill, a short pole, a pennant for each of

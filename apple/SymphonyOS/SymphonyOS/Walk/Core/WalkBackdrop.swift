@@ -2,12 +2,11 @@ import Foundation
 import CoreGraphics
 
 /// The picture behind the walk, with a camera of its own. The layout stays in its own art's world
-/// (the square print's numbers: bands, stops, zoom, every guarantee); the picture is the tall
-/// overlook painting (`WalkArt+Tall.swift`), drawn on the stage by its own camera: for each step a
-/// stop that stands the step's own band on that level's measured ground, and, when the layout's
-/// camera leaves its stop (zoomed into a column), the same move applied to the picture about the
-/// same stage point, held inside the painting. The step's own flags so stand on their level; the
-/// levels above stand a little up-slope of theirs.
+/// (the square print's numbers: bands, stops, every guarantee); the picture is the tall overlook
+/// painting (`WalkArt+Tall.swift`), drawn on the stage by its own camera: for each step a stop that
+/// stands the step's own band on that level's measured ground, and the standing post and the side
+/// posts on land. The layout's camera is always the step's stop (there is no zoom), so the picture
+/// moves only from one step to the next.
 ///
 /// On a window wider than the board the picture covers the whole window (the board plus its
 /// bleed, `WalkStage.window`) by three rules, in order: it is enlarged about the step's anchor
@@ -25,7 +24,7 @@ struct WalkBackdrop: Equatable {
     let land: [WalkLevel: ClosedRange<CGFloat>]
     /// Across each level's band, the open ground (fractions of the width) the step's columns stand on.
     let open: [WalkLevel: ClosedRange<CGFloat>]
-    /// Seven, Welcome … Look back up: the picture's camera while the layout's camera is at that step's stop.
+    /// Seven, Welcome … Look back up: the picture's camera on each step.
     let stops: [WalkLayout.Camera]
     /// Per step, the top shade's strength where the painting behind the words is bright (nil: the
     /// walk's own faint band). It holds from the top to the question's foot (`WalkLayout.question`)
@@ -104,15 +103,19 @@ struct WalkBackdrop: Equatable {
                    .week: 0.42...0.88, .today: 0.18...0.92],
             stops: [
                 WalkLayout.Camera(x: 0, y: 0, k: 0.30),        // Welcome: the sky down to the meadow, the whole width
-                step(.year, k: 0.42, x: 340),
+                // Year: closer than the board's 0.42 at x 340, so the side posts' high row stands on the
+                // peaks, not in the sky (Task 6).
+                step(.year, k: 0.55, x: 464),
                 step(.season, k: 0.45, x: 360),
-                step(.month, k: 0.50, x: 370),
+                // Month: further left than the board's x 370, so the side posts stand on the fields and
+                // the hill between the river's arms, not on the river (Task 6).
+                step(.month, k: 0.50, x: 290),
                 step(.week, k: 0.50, x: 450),
                 step(.today, k: 0.52, x: 300),
                 // Look back up: the whole width, the year flags on the high flats, the rest below them.
                 WalkLayout.Camera(x: 0, y: bands[.year]! * size.height - yearOnLookBack / 0.30, k: 0.30),
             ],
-            // Year and its zoom, Welcome and Look back up have dark sky behind the words; from Season
+            // Year, Welcome and Look back up have dark sky behind the words; from Season
             // down the snow, the braided flats, the river and the meadow stand behind them.
             shade: [nil, nil, 0.6, 0.6, 0.6, 0.5, nil],
             // Look back up, enlarged about the year's flats, has the peak's snow behind its heading.
@@ -122,23 +125,15 @@ struct WalkBackdrop: Equatable {
 }
 
 extension WalkArt {
-    /// Where the picture stands on `step` while the layout's camera is `camera`, on the window
-    /// `on` stands for: the step's backdrop stop, moved as the layout's camera moved from that
-    /// step's stop (scaled by the same ratio about the same stage point), then, on a window wider
-    /// than the board, enlarged about the step's anchor (`WalkBackdrop.widened`), then held so the
-    /// whole window is on the painting. On the board's own window (the default) that is the stop,
-    /// moved and held, exactly as before the stage had wings; on a taller phone the same, slid only
-    /// as far as the sliver above or below the board needs. Nil with no backdrop.
-    func backdropCamera(step: Int, layout camera: WalkLayout.Camera,
-                        stage on: WalkStage = WalkStage(device: WalkArt.stageSize)) -> WalkLayout.Camera? {
-        guard let backdrop, !stops.isEmpty, !backdrop.stops.isEmpty else { return nil }
-        let stop = stops[min(max(0, step), stops.count - 1)]
-        let b = backdrop.stops[min(max(0, step), backdrop.stops.count - 1)]
-        // stage under `camera` = stage under `stop` × r + (stop − camera) × camera.k
-        let k = b.k * camera.k / stop.k
-        let moved = WalkLayout.Camera(x: b.x - (stop.x - camera.x) * camera.k / k,
-                                      y: b.y - (stop.y - camera.y) * camera.k / k, k: k)
-        return backdrop.held(backdrop.widened(moved, about: WalkBackdrop.anchor(step: step), on: on), window: on.window)
+    /// Where the picture stands on `step`, on the window `on` stands for: the step's backdrop stop,
+    /// then, on a window wider than the board, enlarged about the step's anchor
+    /// (`WalkBackdrop.widened`), then held so the whole window is on the painting. On the board's own
+    /// window (the default) that is the stop, held; on a taller phone the same, slid only as far as
+    /// the sliver above or below the board needs. Nil with no backdrop.
+    func backdropCamera(step: Int, stage on: WalkStage = WalkStage(device: WalkArt.stageSize)) -> WalkLayout.Camera? {
+        guard let backdrop, !backdrop.stops.isEmpty else { return nil }
+        let stop = backdrop.stops[min(max(0, step), backdrop.stops.count - 1)]
+        return backdrop.held(backdrop.widened(stop, about: WalkBackdrop.anchor(step: step), on: on), window: on.window)
     }
 
     /// The top shade's strength on a step where the painting behind the words needs one; nil: the

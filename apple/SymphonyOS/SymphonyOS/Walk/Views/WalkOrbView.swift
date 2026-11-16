@@ -29,15 +29,18 @@ struct WalkOrbView: View {
         let s = model.state
         let points = WalkCopy.points(s, model.periods)
         let showsPoints = s.showsPoints
+        let layout = model.layout(wing: stage.wing)
         ZStack(alignment: .topLeading) {
-            dial(needleDown: model.layout(wing: stage.wing).needleDown, pulses: s.teaching && !reduceMotion)
+            dial(needleDown: layout.needleDown, pulses: s.teaching && !reduceMotion)
                 .frame(width: Self.dial.width, height: Self.dial.height)
                 .offset(x: Self.dial.minX, y: Self.dial.minY)
                 .allowsHitTesting(false)
 
-            if let live = liveWords(s.orb) {
+            // The spoken flag (S25) stands where the layout keeps it clear of every post, above the light.
+            if let live = liveWords(s.orb), let frame = layout.spokenFlag {
                 WalkLiveFlag(text: live, colour: WalkPalette.level(s.level ?? .year))
-                    .offset(x: WalkOrb.centre.x, y: Self.dial.minY + 18)
+                    .frame(width: frame.width, height: frame.height)
+                    .offset(x: frame.minX, y: frame.minY)
                     .allowsHitTesting(false)
             }
 
@@ -376,57 +379,32 @@ struct WalkPointLine: View {
     }
 }
 
-/// The flag rising out of the light while the person speaks (contract §7 "Live flag"):
-/// a pole 86 tall standing on the light, and a swallow-tailed cloth unfurling from
-/// its top with the words so far (no caret: that means typing). Its origin is the pole's top.
+/// The flag of the words being spoken (S25): one cloth in the step's level's colour at the layout's
+/// `spokenFlag` frame (150 × 36, above the light, clear of every post), holding one line of the
+/// newest words, cut at the head (no caret: that means typing). It unfurls from its left edge.
 struct WalkLiveFlag: View {
     let text: String
     let colour: Color
-    @State private var poleUp = false
     @State private var clothOut = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// 186, not the contract's 220: from x 197 a 220-wide cloth would run off the stage's right edge.
-    static let maxClothWidth: CGFloat = 186
-
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(LinearGradient(colors: [Color(hex: 0x4A3A2C), Color(hex: 0x2C2219)],
-                                     startPoint: .leading, endPoint: .trailing))
-                .frame(width: 3, height: 86)
-                .scaleEffect(x: 1, y: poleUp ? 1 : 0, anchor: .bottom)
-                .offset(x: -1.5)
-                .accessibilityHidden(true)
-            cloth
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(text)
-                .scaleEffect(x: clothOut ? 1 : 0, y: 1, anchor: .leading)
-                .shadow(color: WalkPalette.warmGlow.opacity(0.9), radius: 5)
-                .offset(x: 2, y: 2)
-        }
-        .frame(width: 0, height: 86, alignment: .topLeading)
-        .onAppear {
-            // With Reduce Motion both arrive together in the cross-fade's time.
-            withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.38)) { poleUp = true }
-            withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.5).delay(0.3)) { clothOut = true }
-        }
-    }
-
-    /// The words so far, with no caret: a caret means typing, and this is speaking.
-    private var cloth: some View {
         Text(text)
-            .font(.custom("DMSans-SemiBold", size: 14))
-            .lineSpacing(1)
+            .font(.custom("DMSans-SemiBold", fixedSize: 13))
             .foregroundStyle(.white)
-            .lineLimit(3)
+            .lineLimit(1)
             .truncationMode(.head)
-            .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 18))
-            .frame(minWidth: 40, alignment: .leading)
+            .padding(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 18))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(WalkSwallowtail().fill(colour))
-            .fixedSize(horizontal: false, vertical: true)
-            // Room for the widest cloth; the cloth itself hugs its words.
-            .frame(width: Self.maxClothWidth, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(text)
+            .scaleEffect(x: clothOut ? 1 : 0, y: 1, anchor: .leading)
+            .shadow(color: WalkPalette.warmGlow.opacity(0.9), radius: 5)
+            .onAppear {
+                // With Reduce Motion it arrives in the cross-fade's time.
+                withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.4)) { clothOut = true }
+            }
     }
 }
 

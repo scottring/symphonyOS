@@ -16,6 +16,8 @@ struct MountainStage<Over: View>: View {
     let actions: (WalkLayout.Banner) -> [(name: String, run: () -> Void)]
     let onLabel: (WalkLayout.Label) -> Void
     let onBanner: (WalkLayout.Banner, WalkLayout.Post) -> Void
+    /// A tap on a side post (the pages wire it later; until then it does nothing).
+    let onSide: (WalkLayout.Side) -> Void
     let over: Over
     /// The keyboard's top edge in screen points, while it is up.
     @State private var keyboardTop: CGFloat?
@@ -24,12 +26,14 @@ struct MountainStage<Over: View>: View {
          actions: @escaping (WalkLayout.Banner) -> [(name: String, run: () -> Void)] = { _ in [] },
          onLabel: @escaping (WalkLayout.Label) -> Void,
          onBanner: @escaping (WalkLayout.Banner, WalkLayout.Post) -> Void,
+         onSide: @escaping (WalkLayout.Side) -> Void = { _ in },
          @ViewBuilder over: () -> Over) {
         self.state = state
         self.today = today
         self.actions = actions
         self.onLabel = onLabel
         self.onBanner = onBanner
+        self.onSide = onSide
         self.over = over()
     }
 
@@ -40,7 +44,7 @@ struct MountainStage<Over: View>: View {
             let layout = WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing)
             ZStack(alignment: .topLeading) {
                 WalkWorldView(layout: layout, art: art, step: state.step, stage: stage, actions: actions,
-                              onLabel: onLabel, onBanner: onBanner)
+                              onLabel: onLabel, onBanner: onBanner, onSide: onSide)
                 over
             }
             .frame(width: art.stage.width, height: art.stage.height, alignment: .topLeading)
@@ -308,7 +312,8 @@ struct MountainPageView: View {
         if let page {
             MountainStage(state: page.walkState, today: model.today, actions: actions,
                           onLabel: { send(.areaTapped($0.id)) },
-                          onBanner: { banner, post in send(WalkLayout.tapEvent(banner, on: post)) }) {
+                          onBanner: { banner, post in send(WalkLayout.tapEvent(banner, on: post)) },
+                          onSide: { _ in }) {
                 EmptyView()
             }
             .frame(width: size.width, height: size.height)

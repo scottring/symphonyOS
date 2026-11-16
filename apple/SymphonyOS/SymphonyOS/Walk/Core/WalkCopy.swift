@@ -36,7 +36,10 @@ enum WalkCopy {
         return "\(index + 1) of \(s.kept.count)"
     }
 
-    static func question(_ s: WalkState, _ p: WalkPeriods) -> String {
+    /// `quoting`: the longest a quoted goal stands whole (`short`); the block cuts it shorter only as
+    /// its last resort (`WalkLayout.words`).
+    static func question(_ s: WalkState, _ p: WalkPeriods, quoting length: Int = shortLength) -> String {
+        func short(_ title: String) -> String { WalkCopy.short(title, length: length) }
         if s.step == 0 { return welcomeTitle }
         guard let level = s.level else { return "" }
         if level == .year, s.ground { return "First, your ground. Which parts of life matter most this year?" }
@@ -318,12 +321,12 @@ enum WalkCopy {
         ],
     ]
 
-    /// A title as the question quotes it (S33): whole up to `shortLength` characters; longer, cut at the
-    /// last space at or before the 55th character (trailing spaces trimmed), then "…"; a word of 56
-    /// letters or more with no space is cut at 55.
-    static func short(_ title: String) -> String {
-        guard title.count > shortLength else { return title }
-        let head = title.prefix(shortLength - 1)
+    /// A title as the question quotes it (S33): whole up to `length` characters (`shortLength`, 56, unless
+    /// the question's block must cut it shorter); longer, cut at the last space at or before character
+    /// `length − 1` (trailing spaces trimmed), then "…"; a word that long with no space is cut there.
+    static func short(_ title: String, length: Int = shortLength) -> String {
+        guard title.count > length else { return title }
+        let head = title.prefix(max(1, length - 1))
         let atWord = head.lastIndex(of: " ").map { String(head[..<$0]).trimmingCharacters(in: .whitespaces) } ?? ""
         return (atWord.isEmpty ? String(head) : atWord) + "…"
     }
@@ -374,9 +377,10 @@ enum WalkCopy {
     static let typePlaceholder = "Type it, then tap Add"; static let firstThingTag = "FIRST THING"
     /// How many more flags a banner on Look back up stands for: "+2 more".
     static func more(_ count: Int) -> String { "+\(count) more" }
-    /// What a folded stub says: the 26-point pennant has room for the count only ("+2").
     /// "+n more" to VoiceOver, while a tap on it does nothing yet (the paper it opens is Task 7's).
     static func moreLabel(_ count: Int) -> String { "\(count) more" }
+    /// A side post's fourth pennant place, when it stands for more than four flags: "+2".
+    static func sideExtra(_ count: Int) -> String { "+\(count)" }
     /// An example flag's tag, and the shorter one where the flag is too narrow for it.
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
