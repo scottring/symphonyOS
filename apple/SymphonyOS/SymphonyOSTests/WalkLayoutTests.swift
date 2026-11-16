@@ -986,6 +986,78 @@ struct WalkLayoutTests {
         #expect(WalkLayout.wordsWidth(wing: 110.3) == 500)
     }
 
+    /// Steps 2 to 5 standing in Health, the step's goal above titled `title` and another goal above
+    /// beside it (so the why line also says a tap switches: its longest form). On Today, `first` makes
+    /// the goal above the first thing (the question then says the day starts with it).
+    private func quoting(_ title: String, step: Int, first: Bool = false) -> WalkState {
+        let above = WalkLevel(rawValue: step - 1)!
+        let goal = flag(above, title, in: "Health"), other = flag(above, "Feel strong again", in: "Health")
+        var s = state(step, kept: ["Health", "Home"], items: [goal, other])
+        s.focusArea = area("Health").id
+        s.focus[WalkLevel(rawValue: step)!] = goal.id
+        if first { s.firstThing = goal.id }
+        return s
+    }
+
+    /// F30: whatever goal the question quotes (20, 44 and 56 characters, the longest it quotes whole),
+    /// on every step that quotes one and at every width, the block ends by 278, above the flags.
+    @Test func aLongGoalsQuestionStillEndsAboveTheFlags() throws {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        let titles = ["Book the plumber now", "Lift twice a week with the trainer at my gym",
+                      "Write the first chapter of the memoir I keep putting off"]
+        #expect(titles.map(\.count) == [20, 44, 56])
+        for title in titles {
+            for step in 2...5 {
+                for first in step == 5 ? [false, true] : [false] {
+                    let s = quoting(title, step: step, first: first)
+                    #expect(WalkCopy.question(s, p).contains(title), "step \(step): the quote is not whole")
+                    for wing in [CGFloat(0), 42.3, 110.3] {
+                        let words = WalkLayout.words(s, p, wing: wing)
+                        #expect(words.foot <= WalkLayout.wordsFootLimit,
+                                "step \(step), \(title.count) characters, wing \(wing): foot \(words.foot) (\(words))")
+                        #expect([WalkLayout.questionSize, WalkLayout.questionSmallSize].contains(words.questionSize))
+                    }
+                }
+            }
+        }
+    }
+
+    /// An ordinary question stands at the normal size with its why line.
+    @Test func aShortQuestionKeepsItsSizeAndItsWhy() {
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        for step in 2...5 {
+            let words = WalkLayout.words(quoting("Pay off the car", step: step), p, wing: 0)
+            #expect(words.questionSize == WalkLayout.questionSize, "step \(step)")
+            #expect(words.showsWhy && words.questionLines <= WalkLayout.questionMaxLines, "step \(step): \(words)")
+        }
+        var year = state(1, kept: ["Health"]); year.focusArea = area("Health").id
+        let words = WalkLayout.words(year, p, wing: 0)
+        #expect(words.questionSize == WalkLayout.questionSize && words.showsWhy)
+    }
+
+    /// The why line goes only when the smaller size alone would not end the block by 278: a question
+    /// set smaller that still has room keeps it, and wherever it is dropped, keeping it would not fit.
+    @Test func theWhyLineGivesWayOnlyWhenItMust() {
+        // More than three lines at 32 on the phone; at 28 there is room for a one-line why.
+        let kept = WalkLayout.words(question: "What part of “Lift twice a week with the trainer at my gym” belongs to December?",
+                                    why: "Small enough to finish by the 31st.", wing: 0)
+        #expect(kept.questionSize == WalkLayout.questionSmallSize && kept.showsWhy, "\(kept)")
+        let p = WalkPeriods.pick(now: today, weekStartsOn: 0)
+        for title in ["Book the plumber now", "Lift twice a week with the trainer at my gym",
+                      "Write the first chapter of the memoir I keep putting off"] {
+            for step in 2...5 {
+                let s = quoting(title, step: step)
+                for wing in [CGFloat(0), 42.3, 110.3] {
+                    let words = WalkLayout.words(s, p, wing: wing)
+                    guard !words.showsWhy else { continue }
+                    let withWhy = WalkLayout.wordsFoot(questionSize: words.questionSize, questionLines: words.questionLines,
+                                                       whyLines: WalkLayout.whyLines(WalkCopy.why(s, p), wing: wing))
+                    #expect(withWhy > WalkLayout.wordsFootLimit, "step \(step), wing \(wing): the why line went with room for it")
+                }
+            }
+        }
+    }
+
     /// Back, More and Leave for now on every step after Welcome (the ground too), each a full touch,
     /// apart, inside the row; none on Welcome or Look back up. Back and Leave for now go out to a wider
     /// window's corners; More stays in the middle.

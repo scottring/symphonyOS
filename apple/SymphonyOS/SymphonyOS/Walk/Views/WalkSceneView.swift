@@ -72,8 +72,11 @@ struct WalkSceneView: View {
             .padding(.top, 140)
             .allowsHitTesting(false)
         } else if !question.isEmpty {
-            // Under the top row, as wide as the board's words (wider on a wider window), centred on x 195.
-            VStack(spacing: 8) {
+            // Under the top row, as wide as the board's words (wider on a wider window), centred on x 195,
+            // set as `WalkLayout.words` says (F30): a long question one size smaller, and its why line only
+            // where the block still ends above the flags.
+            let set = WalkLayout.words(s, p, wing: stage.wing)
+            VStack(spacing: WalkLayout.blockGap) {
                 eyebrowLine(eyebrow, count: WalkCopy.eyebrowCount(s))
                     .font(.custom("DMSans-SemiBold", size: 12))
                     .tracking(1.2)
@@ -82,16 +85,18 @@ struct WalkSceneView: View {
                     .modifier(WalkEntrance())
                     .id(eyebrow)
                 Text(question)
-                    .font(.custom("CrimsonPro-Regular", size: 32))
+                    .font(.custom("CrimsonPro-Regular", size: set.questionSize))
                     .foregroundStyle(.white)
                     .walkGlow()
-                Text(why)
-                    .font(.custom("DMSans-Regular", size: 15))
-                    .lineSpacing(1.5)
-                    .foregroundStyle(.white)
-                    .walkGlow()
-                    .modifier(WalkEntrance())
-                    .id(why)
+                if set.showsWhy {
+                    Text(why)
+                        .font(.custom("DMSans-Regular", size: 15))
+                        .lineSpacing(WalkLayout.whySpacing)
+                        .foregroundStyle(.white)
+                        .walkGlow()
+                        .modifier(WalkEntrance())
+                        .id(why)
+                }
             }
             .multilineTextAlignment(.center)
             .frame(width: WalkLayout.wordsWidth(wing: stage.wing))

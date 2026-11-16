@@ -302,11 +302,13 @@ struct WalkBackdropTests {
     }
 
     #if os(iOS)
-    /// The words above the flags (the eyebrow, the question and its line, stage y 64 to 248, across the
-    /// question block's width, `WalkLayout.wordsWidth(wing:)`, centred on x 195) read at 4.5:1 or better, white over the painting under the step's shade, on 98 % of what lies
-    /// behind them, at every step's stop and zoomed into every column of one to three areas, on each
-    /// of the six windows (a wider one enlarges the picture, so other paint stands behind them). The
-    /// words' own glow is not counted.
+    /// The words above the flags read at 4.5:1 or better, white over the painting under the step's shade,
+    /// on 98 % of what lies behind them, at every step's stop and zoomed into every column of one to
+    /// three areas, on each of the six windows (a wider one enlarges the picture, so other paint stands
+    /// behind them). Steps 1 to 5 are sampled where the question block stands (P19): from its top
+    /// (`WalkLayout.wordsTop`) to the lowest it may end (`WalkLayout.wordsFootLimit`), across its width
+    /// (`WalkLayout.wordsWidth(wing:)`), centred on x 195. Welcome and Look back up keep their own words
+    /// where they were (stage y 64 to 248, x 40 to 350). The words' own glow is not counted.
     @Test func theWordsReadOnThePaintingAtEveryStep() throws {
         let image = try #require(UIImage(named: backdrop.imageName)?.cgImage)
         let w = 520, h = 1560
@@ -339,16 +341,18 @@ struct WalkBackdropTests {
                         }
                     }
                 }
-                let words = WalkLayout.wordsWidth(wing: stage.wing)
+                let block = (1...5).contains(step)
+                let words = block ? WalkLayout.wordsWidth(wing: stage.wing) : 310
+                let top = block ? WalkLayout.wordsTop : 64, foot = block ? WalkLayout.wordsFootLimit : 248
                 for camera in cameras {
                     let c = art.backdropCamera(step: step, layout: camera, stage: stage)!
                     var behind: [Double] = []
-                    for y in stride(from: CGFloat(64), through: 248, by: 4) {
+                    for y in stride(from: top, through: foot, by: 4) {
                         let a: Double
                         if let held = art.topShade(step: step, stage: stage) {
                             a = held
                         } else {            // the faint band: 0.55 at the top, 0.25 at 156, gone by 260
-                            a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : 0.25 * Double(1 - (y - 156) / 104)
+                            a = y <= 156 ? 0.55 - 0.30 * Double(y / 156) : max(0, 0.25 * Double(1 - (y - 156) / 104))
                         }
                         for x in stride(from: WalkLayout.centreX - words / 2, through: WalkLayout.centreX + words / 2, by: 5) {
                             let px = min(w - 1, Int((c.x + x / c.k) / backdrop.size.width * CGFloat(w)))

@@ -81,12 +81,6 @@ struct WalkLayout: Equatable {
     /// The ceiling this pass still keeps for the step's own level and for Year (the question's old
     /// foot), until the standing layout is planted under `question`.
     static let flagCeiling: CGFloat = 250
-    /// The question block's width (the eyebrow, the question and its line): the board less 28 each side,
-    /// and on a wider window up to 166 wider, centred on x 195 ("On a wider window").
-    static let wordsBoardWidth: CGFloat = 334, wordsMaxWiden: CGFloat = 166
-    /// The question block's top on steps 1 to 5, under the top row.
-    static let wordsTop: CGFloat = 96
-    static func wordsWidth(wing: CGFloat) -> CGFloat { wordsBoardWidth + min(2 * wing, wordsMaxWiden) }
     static let pole: CGFloat = 24               // bare pole under the lowest banner
     static let edges: ClosedRange<CGFloat> = 4...386
     static let narrowColumns: ClosedRange<CGFloat> = 87...302     // up to four columns off the ground
