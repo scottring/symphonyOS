@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { dueNow, flushAll } from './scheduler'
+import { dueNow, flushAll, flushSlot } from './scheduler'
 import { MessageBuffer } from './buffer'
 import { HighWaterStore } from './highWater'
 import type { Config, WatchedSource } from './types'
@@ -26,7 +26,21 @@ describe('dueNow', () => {
   })
 
   it('does not fire twice within the same hour', () => {
-    expect(dueNow(new Date('2026-08-25T21:30:00Z'), config.timezone, [17], 17)).toBe(false)
+    const fired = flushSlot(new Date('2026-08-25T21:05:00Z'), config.timezone)
+    expect(dueNow(new Date('2026-08-25T21:30:00Z'), config.timezone, [17], fired)).toBe(false)
+  })
+
+  // The worker now stays up for days. Remembering only "17" meant the day
+  // after a send looked already sent, and no digest went out 11-12 to 11-16.
+  it('fires again at the same hour the next day without a restart', () => {
+    const fired = flushSlot(new Date('2026-11-11T22:03:00Z'), config.timezone)
+    expect(fired).toBe('2026-11-11T17')
+    expect(dueNow(new Date('2026-11-12T22:00:00Z'), config.timezone, [17], fired)).toBe(true)
+  })
+
+  it('names the slot by the household day, not the UTC day', () => {
+    // 01:30Z on the 17th is still 20:30 on the 16th in New York.
+    expect(flushSlot(new Date('2026-11-17T01:30:00Z'), config.timezone)).toBe('2026-11-16T20')
   })
 })
 

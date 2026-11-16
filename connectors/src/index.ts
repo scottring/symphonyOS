@@ -3,7 +3,7 @@ import { MessageBuffer } from './buffer.ts'
 import { HighWaterStore } from './highWater.ts'
 import { loadWatchlist, registerDiscovered } from './watchlist.ts'
 import { attachReceiver, makeReceiveOnlySocket, setAsideUnlinkedAuth, superviseSocket } from './whatsapp/adapter.ts'
-import { dueNow, flushAll, localHour } from './scheduler.ts'
+import { dueNow, flushAll, flushSlot } from './scheduler.ts'
 import { recordHealth, touchHealth } from './health.ts'
 import { makeClassDojoClient } from './classdojo/client.ts'
 import { toConnectorMessages, discoverTargets } from './classdojo/map.ts'
@@ -58,14 +58,15 @@ async function main(): Promise<void> {
   const beat = () => { void touchHealth(config, 'whatsapp', { heartbeat_at: new Date().toISOString() }) }
   beat()
 
-  let lastFiredHour: number | null = null
+  // Day AND hour of the last digest sent — see flushSlot for why not the hour alone.
+  let lastFiredSlot: string | null = null
   setInterval(() => {
     beat()
     // Caught whole: an unhandled rejection here (a network blip reading the
     // watchlist) would crash the process, which is how the digest died before.
     void (async () => {
       const now = new Date()
-      if (!dueNow(now, config.timezone, config.flushHoursLocal, lastFiredHour)) return
+      if (!dueNow(now, config.timezone, config.flushHoursLocal, lastFiredSlot)) return
 
       // Re-read the allowlist each flush so adding a thread needs no restart.
       sources = await loadWatchlist(config)
@@ -128,13 +129,13 @@ async function main(): Promise<void> {
       console.log(`digest: ${r.delivered} source(s) sent, ${r.failed} failed`)
 
       if (r.failed > 0) {
-        // Leave lastFiredHour alone: the batches are back in the buffer and
+        // Leave lastFiredSlot alone: the batches are back in the buffer and
         // the next tick retries within the same hour.
         await recordHealth(config, 'whatsapp', { ok: false, error: 'digest send failed' })
         if (dojoOk) await recordHealth(config, 'classdojo', { ok: false, error: 'digest send failed' })
         return
       }
-      lastFiredHour = localHour(now, config.timezone)
+      lastFiredSlot = flushSlot(now, config.timezone)
       await touchHealth(config, 'whatsapp', { last_flush_at: new Date().toISOString() })
       await recordHealth(config, 'whatsapp', { ok: true })
       if (dojoOk && dojoSources.length > 0) await recordHealth(config, 'classdojo', { ok: true })

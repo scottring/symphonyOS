@@ -11,18 +11,26 @@ export function localHour(now: Date, timeZone: string): number {
   )
 }
 
+/** The local calendar day and hour, e.g. "2026-11-16T17". This is what a
+ * flush is remembered by. Remembering the bare hour (17) latched for good:
+ * 17 equals 17 again the next day, so a worker that stays up sent one digest
+ * and then skipped every day after it (2026-11-12 to 11-16). */
+export function flushSlot(now: Date, timeZone: string): string {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+  return `${day}T${String(localHour(now, timeZone)).padStart(2, '0')}`
+}
+
 /** True when `now` falls in a configured flush hour we have not already
- * fired for. The tick loop runs every few minutes; this keeps one flush per
- * scheduled hour regardless of tick jitter. */
+ * fired for TODAY. The tick loop runs every few minutes; this keeps one
+ * flush per scheduled hour per day regardless of tick jitter. */
 export function dueNow(
   now: Date,
   timezone: string,
   flushHoursLocal: number[],
-  lastFiredHour: number | null,
+  lastFiredSlot: string | null,
 ): boolean {
-  const hour = localHour(now, timezone)
-  if (!flushHoursLocal.includes(hour)) return false
-  return lastFiredHour !== hour
+  if (!flushHoursLocal.includes(localHour(now, timezone))) return false
+  return lastFiredSlot !== flushSlot(now, timezone)
 }
 
 /** Drain every source into ONE digest email. All-or-nothing: the marks
