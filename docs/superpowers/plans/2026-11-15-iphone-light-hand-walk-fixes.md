@@ -12,7 +12,7 @@
 
 **Amended 2026-11-15 (afternoon), before Task 2A was built.** Two things were added after the plan was first written: the owner's tenth comment (the walk and the mountain pages sat in a phone-shaped strip with navy either side: Task 2A, rulings F13 to F19, "On a wider window") and what five cold readers of the screenshot sweep found that the plan missed (69 findings, `.superpowers/sdd/2026-11-15-hand-walk-fix/sweep/review/findings-consolidated.md`: "Added from the cold read" blocks in Tasks 3 to 10, new Tasks 11 to 13, rulings F20 to F29). Where a cold-read block gives a width of 150 or 126 or the edges 4…386, read it as the wing-0 value of Task 5's `standingWidth(wing:)`, `parentWidth(wing:)` and `edges(wing:)`.
 
-**Order of building:** 1, 2, 2A, 12, 3, 11, 4, 5, 6, 7, 8, 9, 13, 10.
+**Order of building:** 1, 2, 2A, 12, 3, 4, 11, 5, 6, 7, 8, 9, 13, 10 (4 was built before 11: Task 3 left Back and Leave for now unreachable until the top row was drawn).
 
 **Left out of this pass on purpose** (told to the owner): large text on Today and Week and on the controls (S50, S51: its own pass; the stage's cap stays); the Inbox (S53) and the rest of Settings and More (S24), which are the full edition's views; moving between weeks (S54); half open in the middle of the walk (S56: check on the real Duo); editing a flag's words; a colour key on Look back up; the sign's eyebrow on the narrow phone (S48's second half); a count of unshown month goals on Week's band; a half-typed draft following from page to page (S42: ruling D22 keeps typed words); and the readers' matters of taste S64 to S69. Not cured by Task 2A: the walk at 79% size on windows about 670 points high, and opened flat as one column on the fold; each wants its own board.
 
@@ -83,6 +83,16 @@ Added 2026-11-15 for the owner's comment 10 ("why do you have the content inside
 - **F28** (S47, S48, S49, S59) On Today and Week a task's words take up to two lines instead of being cut at one: rows, the sign's task line, the "for …" line, the Week band's flags. Cost if wrong: about one row fewer visible on a long day.
 - **F29** (S38) The word "piece" goes from the sign. The sign names the first year goal with nothing under it on this season (`WalkEnding.nextToWalk`, read in `Signpost.facts`), so its eyebrow becomes "No winter goal under this yet" (`DailyCopy.noPiece`, the season's word in it). Cost if wrong: none known.
 
+Added while the pass was being built (2026-11-15, evening), each where the board's numbers or the plan's words met the code:
+
+- **F30** (Task 4) The words block (eyebrow, question, why line) never ends below y 278. A question that would take more than three lines at 32 pt in the block's width is set at 28 pt; if the block still would not end by 278 the why line is not drawn. The quoted goal stays whole up to 56 characters. Cost if wrong: a long goal's question reads a little smaller, and on the longest the helper line is missing.
+- **F31** (Task 5) A flag's cloth is `18 + 17 × lines` high (the board: 19), and the goal-above flag gives up lines (3, then 2, then 1) before any flag is dropped, since the question already quotes it whole. This amends F20 for the goal above. Cost if wrong: flags a point tighter; a long goal above cut on its flag when the post is full.
+- **F32** (Task 5) The side posts' high row stands 86 above the low row (the board: 84), and two pills in one row of one side that would be nearer than 1 point are each narrowed to stay 1 apart. The board's own numbers made them touch. Cost if wrong: none visible.
+- **F33** (Task 5) Lines are counted from the real faces (`WalkLayout+Lines.swift`: DM Sans SemiBold's own letter widths at 13 / 11 / 12 / 11 pt), pinned by a test against real text measurement: never fewer lines than the text takes. This replaces "`floor((width - 16) / 7.0)` characters a line". Cost if wrong: an estimate a line short would cut a title; the test exists to prevent that.
+- **F34** (Task 5) The caret above the standing pill has a frame and is drawn only where 9 points are free above the pill at or below y 282; on a full post it is left off. Cost if wrong: on a full post the small "you are here" arrow is missing.
+- **F35** (Task 5) On a walk-down only the walked goal's line is on the mountain: an area gets no post for a goal above that is off that line. A side post that is drawn can always be walked to. Cost if wrong: on a walk-down the other areas' counts are not in view.
+- **F36** (Task 5) With examples on: e starts at `min(examples, max(2, 4 − flags))` and the person's flags shown are `min(flags, 4 − e)`; when that does not fit, examples give way first (down to one), then the person's flags (down to one, the chosen one kept). An example always shows while examples are on; the person's flags are never fewer than one when they have any. Cost if wrong: with examples on, sometimes only one example shows.
+
 ## Review Focus
 
 1. **Eight areas and a loose pile.** Someone keeps all eight areas and has flags with no area. Expected: seven side posts and the nameless one lay out, nothing overlaps, nothing rises into the question or sits under the hint. Pinned in Task 5 (`eightAreasAndALoosePileStillLayOut`).
@@ -142,6 +152,14 @@ All in stage points (390 x 844). x is measured from the board's left edge on eve
 - Everything else is where the phone has it.
 - The picture: the step's stop enlarged about (195, 556) by `(390 + 2·max(bleed.left, bleed.right)) / 390` ((195, 328) on Welcome, (195, 321) on Look back up); k at most `0.840 / scale` unless the window needs more to be covered; then slid the least that keeps the window on the painting.
 - Shades, veil and paper sheets cover the board plus its bleed.
+
+**As built by Task 5 (these replace the numbers above where they differ; F31 to F36).**
+- A flag or example: `18 + 17 × lines` high, `+ 14` with a tag line (35 / 52 / 69; tagged 49 / 66 / 83). The goal above: `12 + 14 × lines`, on 3, 2 or 1 lines as the flags allow, counted with 6 points of padding each side (cloth width less 12, at 11 pt). "+n more" 78 x 22. Pill 23 (37 on two lines), 6 under it; 4 between cloths; room y 282 to 532.
+- Lines by the face's own letter widths (`WalkLayout.Face`: `.flag` 13 pt in the cloth's width less 16; `.parent` 11 pt, less 12; `.lookBack` 12 pt, less 12; `.tag` 11 pt, tracking 0.6, less 16), not 7.0 points a character. On a phone's 150-wide cloth an example's tag reads "EXAMPLE · TAP TO USE".
+- Side posts: the high row's pill tops are 86 above the low row's (438 and 420 at wing 0). Two pills in one row of one side with a gap under 1 are each made (1 − gap) narrower, half off each end (58 and 58 on poles 57 apart become 56 and 56).
+- The caret: (pill.midX − 5, pill.minY − 9, 10 x 7), present only when `pill.minY − 9 ≥ 282` (`Label.caret`), always on Look back up.
+- A side's "+n" has its own frame (`Side.extraFrame`: the fourth pennant's place).
+- `WalkLayout.make` draws the settled walk (`WalkState.settled`).
 
 ## File structure
 
