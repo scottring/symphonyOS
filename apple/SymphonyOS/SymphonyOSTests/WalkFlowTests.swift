@@ -1278,9 +1278,9 @@ final class WalkFlowTests {
         #expect(shutBack.apply(.paperRow(back.workSeason.id), paperEnv).isEmpty && shutBack == back.s)
     }
 
-    /// Fix round 1 (3): a row in the area already stood in keeps the goal above the person chose, and only
-    /// chooses the flag.
-    @Test func aRowHereKeepsTheGoalAbove() throws {
+    /// F40 (7), replacing fix round 1 (3): a row in the area already stood in switches the goal above to the
+    /// row's own (the person's other choice gives way), so the chosen flag is drawn, and chooses it.
+    @Test func aRowHereStandsOnItsOwnGoalAbove() throws {
         var (s, _, work, goals) = paperMonth()
         _ = s.apply(.areaTapped(work), paperEnv)
         // Work has a second season goal; the person switches to it.
@@ -1291,8 +1291,12 @@ final class WalkFlowTests {
         #expect(s.standing == work && s.focus[.month] == second.id)
         _ = s.apply(.paperOpened, paperEnv)
         let effects = s.apply(.paperRow(goals[2].id), paperEnv)
-        #expect(!s.paperOpen && s.focus[.month] == second.id && s.standing == work)
-        #expect(s.selected == goals[2].id && !effects.contains(.save))
+        let own = try #require(s.item(goals[2].id)?.parentId)
+        #expect(own != second.id)
+        #expect(!s.paperOpen && s.focus[.month] == own && s.standing == work)
+        #expect(s.selected == goals[2].id && effects.contains(.save))
+        #expect(WalkLayout.make(s, today: paperEnv.periods.today, footing: .level).posts.flatMap(\.banners)
+            .contains { $0.itemId == goals[2].id })
     }
 
     /// Fix round 1 (4, P35): a flag chosen from the paper that its post does not show (it is under no area)

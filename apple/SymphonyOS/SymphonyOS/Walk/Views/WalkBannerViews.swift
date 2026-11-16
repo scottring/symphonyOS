@@ -200,15 +200,34 @@ struct WalkBannerView: View {
             .walkBannerShadow(glows: false)
     }
 
-    /// The goal above the step is about, in its own level's colour, on the lines the layout gives it.
+    /// The goal above the step is about, in its own level's colour, on the lines the layout gives it, and its
+    /// place in the area's round ("1 of 3", F40) on a line of its own in the "+n more" face. The stop for the
+    /// flags under none of the area's goals ("Not under a goal yet") is a pale dashed cloth, as an example is.
     private var parent: some View {
-        WalkClothWords(words: banner.words, face: .parent, width: banner.frame.width - WalkLayout.Face.parent.inset)
-            .foregroundStyle(.white)
-            .opacity(words)
-            .padding(.top, Self.parentTop)
-            .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
-            .background(WalkNotchedCloth(notch: Self.parentNotch).fill(colour))
-            .walkBannerShadow(glows: banner.glows)
+        VStack(spacing: 0) {
+            WalkClothWords(words: banner.words, face: .parent, width: banner.frame.width - WalkLayout.Face.parent.inset)
+            if let count = banner.tag {
+                Text(count)
+                    .font(WalkClothFace.font(.tag))
+                    .lineLimit(1)
+                    .opacity(0.85)
+                    .frame(height: WalkLayout.tagLine)
+            }
+        }
+        .foregroundStyle(banner.loose ? WalkPalette.ink : .white)
+        .opacity(words)
+        .padding(.top, Self.parentTop)
+        .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
+        .background {
+            if banner.loose {
+                WalkNotchedCloth(notch: Self.parentNotch).fill(.white.opacity(0.72))
+                WalkNotchedCloth(notch: Self.parentNotch).inset(by: 3)
+                    .stroke(.white.opacity(0.95), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+            } else {
+                WalkNotchedCloth(notch: Self.parentNotch).fill(colour)
+            }
+        }
+        .walkBannerShadow(glows: banner.glows)
     }
 
     /// Look back up: the newest flag's words, and "+n more" on a line of its own where the level holds more.

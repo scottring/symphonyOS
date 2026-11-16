@@ -38,6 +38,26 @@ private func fullRidge() -> [WalkItem] {
     return out
 }
 
+/// `fullRidge`, and in every area on each level a second goal above with five flags under it (so a stop
+/// has "+n more"), more goals above to go round, and a flag under none (the "Not under a goal yet" stop).
+private func richRidge() -> [WalkItem] {
+    var out = fullRidge()
+    for (i, name) in names.enumerated() {
+        let year2 = flag(.year, "Second year goal for \(name.lowercased())", in: name, id: uid(2100 + i))
+        out.append(year2)
+        for j in 0..<5 {
+            out.append(flag(.season, "Season \(j + 1) under the second", in: name, parent: year2.id, id: uid(3100 + i * 10 + j)))
+        }
+        out.append(flag(.season, "A season goal under none", in: name, id: uid(3900 + i)))
+        let season2 = uid(3100 + i * 10)
+        for j in 0..<5 {
+            out.append(flag(.month, "Month \(j + 1) under the second", in: name, parent: season2, id: uid(4100 + i * 10 + j)))
+        }
+        out.append(flag(.month, "A month goal under none", in: name, id: uid(4900 + i)))
+    }
+    return out
+}
+
 private extension WalkLayout {
     var banners: [Banner] { posts.flatMap(\.banners) }
 }
@@ -236,16 +256,18 @@ struct MountainPageTests {
         let s = flag(.season, "Bathroom done by February", in: "Home", parent: y1.id)
         var season = MountainPage(level: .season, items: [other, y1, y2, s], areas: ridge, saved: [])
         #expect(season.focusArea == area("Home").id)
-        #expect(season.focus == y2.id)                     // the area's newest goal above
-        #expect(season.apply(.flag(y2.id)) == [])
-        #expect(season.focus == y1.id)
-        #expect(season.walkState.focus[.season] == y1.id)
-        _ = season.apply(.flag(y1.id))
+        #expect(season.focus == y1.id)                     // F40 (5): the goal above of the area's newest flag
+        #expect(season.layout(today: day(2026, 11, 14)).banners.first { $0.kind == .parent }?.tag == "1 of 2")
+        #expect(season.apply(.flag(y1.id)) == [])
         #expect(season.focus == y2.id)
+        #expect(season.walkState.focus[.season] == y2.id)
+        #expect(season.layout(today: day(2026, 11, 14)).banners.filter { $0.kind == .full }.isEmpty)   // y2 holds none
+        _ = season.apply(.flag(y2.id))
+        #expect(season.focus == y1.id)
         // One that is not the goal above (not drawn), or another area's: nothing.
-        _ = season.apply(.flag(y1.id))
+        _ = season.apply(.flag(y2.id))
         _ = season.apply(.flag(other.id))
-        #expect(season.focus == y2.id && season.focusArea == area("Home").id && season.selected == nil)
+        #expect(season.focus == y1.id && season.focusArea == area("Home").id && season.selected == nil)
 
         // Only one goal above here: its tap does nothing, and its label says it is only read.
         let lone = flag(.season, "Lift twice a week", in: "Health")
@@ -279,10 +301,10 @@ struct MountainPageTests {
         // Month: Health is kept first, but only Home holds a month goal.
         let month = MountainPage(level: .month, items: items, areas: ridge, saved: [area("Health").id])
         #expect(month.focusArea == area("Home").id)
-        #expect(month.focus == ms2.id)
+        #expect(month.focus == ms1.id)                     // F40 (5): the goal above of Home's newest month goal
         let state = month.walkState
         #expect(state == state.settled)
-        #expect(state.standing == area("Home").id && state.focus[.month] == ms2.id)
+        #expect(state.standing == area("Home").id && state.focus[.month] == ms1.id)
         let drawn = month.layout(today: today, footing: .level)
         #expect(drawn.labels.map(\.id) == [area("Home").id])
         #expect(drawn.banners.contains { $0.itemId == mm.id })
@@ -303,7 +325,7 @@ struct MountainPageTests {
         var early = MountainPage(level: .month, items: [hy, hs], areas: ridge, saved: [area("Health").id])
         #expect(early.focusArea == area("Health").id && early.focus == hs.id)
         early.read(items: items, areas: ridge, saved: [area("Health").id])
-        #expect(early.focusArea == area("Home").id && early.focus == ms2.id)
+        #expect(early.focusArea == area("Home").id && early.focus == ms1.id)
         // Once it has walked, it stays where it was walked to.
         _ = early.apply(.peak(area("Health").id))
         early.read(items: items + [flag(.month, "Book the skip", in: "Home", parent: ms1.id)], areas: ridge,
@@ -412,16 +434,19 @@ struct MountainPageTests {
     @Test func everyTapOnThePageDoesWhatItSays() {
         let today = day(2026, 11, 14)
         let loose = [flag(.year, "Somewhere to start"), flag(.season, "Nowhere yet"), flag(.month, "Loose ends")]
-        var checked = 0
+        var checked = 0, mores = 0, switches = 0, noneStops = 0
         for level in [WalkLevel.year, .season, .month] {
             for standing in names {
-                var page = MountainPage(level: level, items: fullRidge() + loose, areas: ridge, saved: [])
+                var page = MountainPage(level: level, items: richRidge() + loose, areas: ridge, saved: [])
                 page.periods = MountainPage.periods(level: level, selected: today, today: today, seasons: nil)
                 _ = page.apply(.peak(area(standing).id))
                 let layout = page.layout(today: today)
                 #expect(layout.labels.allSatisfy { $0.standing && !$0.tappable }, "\(level) \(standing)")
                 for post in layout.posts {
                     for banner in post.banners {
+                        if case .more = banner.kind { mores += 1 }
+                        if banner.kind == .parent, banner.taps { switches += 1 }
+                        if banner.loose { noneStops += 1 }
                         var after = page
                         let event = WalkLayout.tapEvent(banner, on: post).flatMap(MountainPage.event(for:))
                         if let event { _ = after.apply(event) }
@@ -444,6 +469,43 @@ struct MountainPageTests {
             }
         }
         #expect(checked > 200, "\(checked)")
+        // The fixture reaches "+n more", a goal above that switches, and the stop for the flags under none.
+        #expect(mores > 0 && switches > 0, "\(mores) more, \(switches) switches")
+        // Going round, the "Not under a goal yet" stop is reached and its tap switches on.
+        var page = MountainPage(level: .month, items: richRidge(), areas: ridge, saved: [])
+        for _ in 0..<12 where page.focus != WalkState.noGoalAbove {
+            _ = page.apply(.flag(page.focus!))
+        }
+        let none = page.layout(today: today).banners.first { $0.loose }
+        #expect(none?.itemId == WalkState.noGoalAbove && none?.taps == true && none?.label.contains("tap to switch") == true)
+        #expect(page.layout(today: today).banners.filter { $0.kind == .full }.map(\.text) == ["A month goal under none"])
+        _ = page.apply(.flag(WalkState.noGoalAbove))
+        #expect(page.focus != WalkState.noGoalAbove && page.walked)
+        #expect(noneStops == 0)                              // no page starts on it while its area's flags hang under goals
+    }
+
+    /// F40 (5): until the person walks, a Season or Month page stands on the goal above of the area's newest
+    /// flag (not simply the newest goal above); with the area's flags all under none, on that stop; with no
+    /// flag on the level, on the newest goal above.
+    @Test func aPageFirstStandsOnItsNewestFlagsGoal() {
+        let y1 = flag(.year, "Feel strong again", in: "Health")
+        let y2 = flag(.year, "Cook at home on weeknights", in: "Health")
+        let a = flag(.season, "Lift twice a week", in: "Health", parent: y1.id)
+        let b = flag(.season, "Batch cook on Sunday", in: "Health", parent: y2.id)
+        let c = flag(.season, "In bed by eleven", in: "Health", parent: y1.id)
+        #expect(MountainPage(level: .season, items: [y1, y2, a, b, c], areas: ridge, saved: []).focus == y1.id)
+        #expect(MountainPage(level: .season, items: [y1, y2, c, b], areas: ridge, saved: []).focus == y2.id)
+        let lone = flag(.season, "Stretch every morning", in: "Health")
+        let onNone = MountainPage(level: .season, items: [y1, y2, lone], areas: ridge, saved: [])
+        #expect(onNone.focus == WalkState.noGoalAbove)
+        #expect(onNone.layout(today: day(2026, 11, 14)).banners.filter { $0.kind == .full }.map(\.text) == [lone.title])
+        #expect(MountainPage(level: .season, items: [y1, y2], areas: ridge, saved: []).focus == y2.id)
+        // What the page shows under the goal above is only its own (the owner's "Lift twice a week" under
+        // "Cook at home on weeknights" is gone).
+        let page = MountainPage(level: .season, items: [y1, y2, a, b], areas: ridge, saved: [])
+        #expect(page.focus == y2.id)
+        #expect(page.layout(today: day(2026, 11, 14)).banners.filter { $0.kind == .full }.map(\.text) == [b.title])
+        #expect(page.layout(today: day(2026, 11, 14)).banners.first { $0.kind == .parent }?.tag == "2 of 2")
     }
     @Test func aWalkTapIsTheSameTapHere() {
         let id = UUID()

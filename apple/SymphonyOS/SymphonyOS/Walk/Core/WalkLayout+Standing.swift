@@ -119,6 +119,12 @@ extension WalkLayout {
         guard s.step < 6, !s.ground, let level = s.level else { return .plain }
         if item.level == level { return item.mine ? .mine : .plain }
         if item.level.rawValue == level.rawValue - 1, s.focus[level] == item.id {
+            // F40, Season to Week: its place in the area's round, while there is more than one stop.
+            if s.hangsByGoalAbove {
+                let stops = s.goalAboveStops()
+                guard stops.count > 1, let at = stops.firstIndex(of: item.id) else { return .focused }
+                return .goalOfSeveral(at + 1, stops.count)
+            }
             guard let next = s.item(s.nextGoalAbove()) else { return .focused }
             // The next one in the round is here, or (on Today) the nameless post's first thing.
             return s.column(of: next) == s.standing ? .focusedOfSeveral : .focusedThenFirstThing
@@ -145,6 +151,9 @@ struct WalkStanding {
         let words: [String]; let lines: Int; let size: CGSize
         /// Look back up: how many more flags of its level the cloth stands for.
         var more: Int? = nil
+        /// F40: the goal above's stop for the flags under none (`WalkState.noGoalAbove`): its id, and a pale cloth.
+        var stopId: UUID? = nil
+        var loose = false
     }
 
     let s: WalkState
@@ -218,10 +227,11 @@ struct WalkStanding {
         let base = CGPoint(x: L.centreX, y: foot)
         let banners = zip(pieces, frames).enumerated().map { i, pair -> L.Banner in
             let (piece, ruled) = pair
-            var b = L.Banner(id: piece.id, itemId: piece.item?.id, level: piece.level, kind: piece.kind,
+            var b = L.Banner(id: piece.id, itemId: piece.stopId ?? piece.item?.id, level: piece.level, kind: piece.kind,
                              frame: ruled.offsetBy(dx: 0, dy: -hand.lift), lines: piece.lines, text: piece.text,
                              words: piece.words, tag: piece.tag, glows: piece.glows, label: piece.label, taps: piece.taps)
             b.more = piece.more
+            b.loose = piece.loose
             b.tilt = hand.tilts[i]
             b.shift = hand.shifts[i]
             // The cloth goes with its leaning pole, sits its shift off it, and turns about where it meets it.
@@ -283,11 +293,22 @@ struct WalkStanding {
         return item
     }
 
-    /// The standing area's flags on the step's level, in planting order. Today has one: the first thing.
-    func flags(_ level: WalkLevel) -> [WalkItem] {
-        let here = s.standing
-        if level == .today { return [s.item(s.firstThing)].compactMap { $0 }.filter { s.column(of: $0) == here } }
-        return s.items(on: level).filter { s.column(of: $0) == here }
+    /// The standing area's flags on the step's level that the post shows, in planting order
+    /// (`WalkState.standingFlags`): on Season, Month and Week only the stop's (F40). Today has one: the first thing.
+    func flags(_ level: WalkLevel) -> [WalkItem] { s.standingFlags() }
+
+    /// F40: the stop for the flags under none of the area's goals is the one shown.
+    var looseStop: Bool {
+        guard let level = s.level else { return false }
+        return s.focus[level] == WalkState.noGoalAbove && s.goalAboveStops().contains(WalkState.noGoalAbove)
+    }
+
+    /// F40: the goal above's place in the area's round, on its own line, while there is more than one stop.
+    func countLine() -> (words: String, index: Int, count: Int)? {
+        guard let level = s.level, let current = s.focus[level] else { return nil }
+        let stops = s.goalAboveStops()
+        guard stops.count > 1, let at = stops.firstIndex(of: current) else { return nil }
+        return (WalkCopy.goalAboveCount(at + 1, of: stops.count), at + 1, stops.count)
     }
 
     /// The stack's cloths, top to bottom: the goal above, the flags shown (oldest highest), the
@@ -309,7 +330,9 @@ struct WalkStanding {
     /// is cut to the lines that fit.
     func pieces(_ level: WalkLevel) -> [Piece] {
         let goal = parent(level)
-        let goalLines = goal.map { L.lines(for: $0.title, width: L.parentWidth(wing: wing), face: .parent) } ?? 0
+        let loose = goal == nil && looseStop
+        let goalLines = goal.map { L.lines(for: $0.title, width: L.parentWidth(wing: wing), face: .parent) }
+            ?? (loose ? L.lines(for: WalkCopy.noGoalAbove, width: L.parentWidth(wing: wing), face: .parent) : 0)
         let flags = self.flags(level)
         let ghosts = s.examplesOn.contains(s.step) ? s.examplesLeft(today: today).map { ghostPiece($0, level) } : []
         let pill = s.area(s.standing).map(pillSize)?.height
@@ -317,7 +340,8 @@ struct WalkStanding {
 
         func stack(_ above: Int, _ own: [Piece], _ examples: [Piece]) -> [Piece] {
             let hidden = flags.count - own.count
-            return (goal.map { [parentPiece($0, lines: above)] } ?? []) + own + examples
+            let top = goal.map { [parentPiece($0, lines: above)] } ?? (loose ? [loosePiece(lines: above, level)] : [])
+            return top + own + examples
                 + (hidden > 0 ? [morePiece(hidden, level)] : [])
         }
         func fits(_ cloths: [Piece]) -> Bool {
@@ -365,15 +389,38 @@ struct WalkStanding {
         return cut([]) ?? stack(goalLines, [], [])
     }
 
-    /// The goal above, on `lines` lines (its own count, or fewer where it gives way to a flag).
+    /// The goal above, on `lines` lines (its own count, or fewer where it gives way to a flag), and its place in
+    /// the area's round on a line of its own (F40: `tag`, "1 of 3", 14 more) while there is more than one stop.
     func parentPiece(_ item: WalkItem, lines: Int) -> Piece {
         let across = L.parentWidth(wing: wing)
         let role = L.role(item, in: s, firstThing: false)
+        let count = countLine()?.words
         return Piece(id: "\(postId)-above-\(item.id.uuidString)", who: item.id.uuidString, kind: .parent, item: item,
-                     level: item.level, text: L.normalised(item.title), tag: nil, glows: false,
+                     level: item.level, text: L.normalised(item.title), tag: count, glows: false,
                      label: WalkCopy.bannerLabel(item.title, level: item.level, tag: nil, role: role), taps: role.taps,
                      words: L.setLines(item.title, face: .parent, width: across - L.Face.parent.inset, limit: lines),
-                     lines: lines, size: CGSize(width: across, height: L.parentPad + L.parentLine * CGFloat(lines)))
+                     lines: lines, size: parentSize(lines: lines, counted: count != nil))
+    }
+
+    /// F40: the stop for the flags hanging under none of the area's goals, in the goal above's place: a pale
+    /// cloth reading "Not under a goal yet", with its place in the round; a tap switches on.
+    func loosePiece(lines: Int, _ level: WalkLevel) -> Piece {
+        let across = L.parentWidth(wing: wing)
+        let count = countLine()
+        let above = WalkLevel(rawValue: level.rawValue - 1) ?? level
+        var piece = Piece(id: "\(postId)-above-none", who: "\(postId)-above-none", kind: .parent, item: nil, level: above,
+                          text: WalkCopy.noGoalAbove, tag: count?.words, glows: false,
+                          label: WalkCopy.noGoalAboveLabel(count?.index ?? 1, of: count?.count ?? 1), taps: true,
+                          words: L.setLines(WalkCopy.noGoalAbove, face: .parent, width: across - L.Face.parent.inset, limit: lines),
+                          lines: lines, size: parentSize(lines: lines, counted: count != nil))
+        piece.stopId = WalkState.noGoalAbove
+        piece.loose = true
+        return piece
+    }
+
+    /// The goal above's cloth: `12 + 14 × lines`, and 14 more for its count line (F40).
+    func parentSize(lines: Int, counted: Bool) -> CGSize {
+        CGSize(width: L.parentWidth(wing: wing), height: L.parentPad + L.parentLine * CGFloat(lines) + (counted ? L.tagLine : 0))
     }
 
     /// A flag of the step's level (on Today the first thing, tagged). `lines`: cut to these; nil, in full.

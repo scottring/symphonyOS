@@ -25,6 +25,9 @@ struct WalkLayout: Equatable {
         var more: Int? = nil
         /// A tap does something (its label says what); VoiceOver reads one that does not as plain text.
         var taps: Bool = true
+        /// F40: the goal above's stop for the flags under none of the area's goals ("Not under a goal yet"):
+        /// drawn as a pale dashed cloth, as an example is. Its `tag` on a goal above is its place, "1 of 3".
+        var loose: Bool = false
         /// The hand (`WalkFooting`): degrees the cloth hangs off its post's line, and points it sits off the pole.
         var tilt: Double = 0
         var shift: CGFloat = 0
@@ -168,8 +171,11 @@ struct WalkLayout: Equatable {
     /// or in another area): the why line then names it (`WalkCopy.chosenNote`). Nil otherwise.
     static func unseenChoice(_ state: WalkState) -> WalkItem? {
         let s = state.settled
-        guard !s.ground, s.level != nil, let item = s.item(s.selected), s.column(of: item) != s.standing else { return nil }
-        return item
+        guard !s.ground, s.level != nil, let item = s.item(s.selected) else { return nil }
+        // F40: on Season, Month and Week the post draws only the stop shown, so a flag of this area may be unseen too.
+        let drawn = s.column(of: item) == s.standing
+            && (!s.hangsByGoalAbove || s.standingFlags().contains { $0.id == item.id })
+        return drawn ? nil : item
     }
     /// The spoken flag: one line of the newest words, above the light.
     static let spokenFlagRect = CGRect(x: 120, y: 560, width: 150, height: 36)

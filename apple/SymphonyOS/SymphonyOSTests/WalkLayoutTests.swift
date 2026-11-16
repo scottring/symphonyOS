@@ -46,7 +46,9 @@ private func flag(_ level: WalkLevel, _ title: String, in areaName: String? = ni
                     parentId: parent, day: day, mine: mine)
 }
 
-/// A stress plan (`DemoStress.full`, `.long`) as the walk's preview plants it, on `step`, standing in an area.
+/// A stress plan (`DemoStress.full`, `.long`) as the walk's preview plants it, on `step`, standing in an area,
+/// on the goal above of the area's newest flag on the step's level (F40: the post shows only that goal's
+/// flags; this plan hangs each flag under its area's first goal above, so they are all drawn there).
 private func plan(_ plan: DemoStress.Plan, step: Int, standing: String) -> WalkState {
     var s = WalkState()
     s.areas = Array(ridge.prefix(6)) + (plan.customArea.map { [WalkArea(id: uid(1900), name: $0)] } ?? [])
@@ -62,6 +64,10 @@ private func plan(_ plan: DemoStress.Plan, step: Int, standing: String) -> WalkS
                                 parentId: parent?.id, day: said.day))
     }
     s.focusArea = id(standing)
+    if let level = s.level, s.hangsByGoalAbove,
+       let parent = s.items(on: level).last(where: { $0.areaId == id(standing) && $0.parentId != nil })?.parentId {
+        s.focus[level] = parent
+    }
     return s.settled
 }
 
@@ -227,9 +233,8 @@ struct WalkLayoutTests {
                         problems.append("\(b.text.prefix(20)) on \(b.lines)")
                     }
                 }
-                let here = s.level == .today
-                    ? [s.item(s.firstThing)].compactMap { $0 }.filter { s.column(of: $0) == s.standing }
-                    : s.items(on: s.level!).filter { s.column(of: $0) == s.standing }
+                // F40: the flags of the stop shown (on Today the first thing).
+                let here = s.standingFlags()
                 let hidden = here.count - full.count
                 if layout.mores.map(\.kind) != (hidden > 0 ? [.more(hidden)] : []) { problems.append("\(hidden) hidden, \(layout.mores.map(\.kind))") }
                 return problems
@@ -672,7 +677,7 @@ struct WalkLayoutTests {
         var checked = 0, cut = 0
         for wing in wings {
             for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) where !layout.banners(.ghost).isEmpty {
-                let here = s.items(on: s.level!).filter { s.column(of: $0) == s.standing }
+                let here = s.standingFlags()                 // F40: the flags of the stop shown
                 guard !here.isEmpty else { continue }
                 let full = layout.banners(.full)
                 #expect(!full.isEmpty, "wing \(wing), \(Generated.describe(s)): examples took every flag")
@@ -778,10 +783,11 @@ struct WalkLayoutTests {
         let post = layout.posts[0]
         #expect(post.base == CGPoint(x: 195, y: 556) && post.lean == 0 && post.pole == 24)
         #expect(layout.banners.last?.frame.maxY == 532)
-        // The goal above "Run three times a week" (two lines at 11 pt in its 126), then Health's four month
-        // goals, each on its one line (18 + 17 = 35), 4 between cloths.
+        // The goal above "Lift twice a week" (one line at 11 pt in its 126, and "1 of 3" on a line of its own,
+        // F40: 12 + 14 + 14), then Health's four month goals, each on its one line (18 + 17 = 35), 4 between cloths.
         let frames = layout.banners.map(\.frame)
         #expect(layout.banners.map(\.kind) == [.parent, .full, .full, .full, .full])
+        #expect(layout.banners.first?.text == "Lift twice a week" && layout.banners.first?.tag == "1 of 3")
         #expect(frames == [CGRect(x: 132, y: 336, width: 126, height: 40), CGRect(x: 120, y: 380, width: 150, height: 35),
                            CGRect(x: 120, y: 419, width: 150, height: 35), CGRect(x: 120, y: 458, width: 150, height: 35),
                            CGRect(x: 120, y: 497, width: 150, height: 35)], "\(frames)")
@@ -1522,8 +1528,11 @@ struct WalkLayoutTests {
         s = s.settled
         layout = ruled(s)
         let focused = s.item(s.focus[.season])!
+        let at = s.goalAboveStops().firstIndex(of: focused.id)! + 1
         #expect(layout.banners.map(\.kind) == [.parent])
-        #expect(layout.banners[0].label == "Year: \(focused.title), the goal this step is about, tap for the next one here")
+        // F40: its place in the round is read, and drawn on its own line.
+        #expect(layout.banners[0].label == "Year: \(focused.title), the goal this step is about, goal \(at) of 2, tap to switch")
+        #expect(layout.banners[0].tag == "\(at) of 2")
         #expect(layout.banners[0].taps && WalkLayout.tapEvent(layout.banners[0], on: layout.posts[0]) == .bannerTapped(focused.id))
         let alone = ruled(state(2, kept: ["Home"], items: [mine], standing: "Home"))
         #expect(alone.banners[0].label == "Year: Run a 5K, the goal this step is about" && !alone.banners[0].taps)
@@ -2918,7 +2927,8 @@ enum Invariants {
             let size: CGSize
             switch b.kind {
             case .full, .ghost: size = CGSize(width: width, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
-            case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines))
+            // F40: the goal above's place in the round ("1 of 3") is a line of its own, 14 more.
+            case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
             case .more: size = CGSize(width: 78, height: 22)
             case .compact: size = CGSize(width: width, height: max(36, 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14)))
             }
@@ -2932,10 +2942,24 @@ enum Invariants {
         let more = banners.filter { if case .more = $0.kind { return true }; return false }.count
         if full > 4 || above > 1 || more > 1 { problems.append("\(full) in full, \(above) above, \(more) more") }
         if full + banners.filter({ $0.kind == .ghost }).count > 4 { problems.append("more than four flags and examples") }
+        // F40: on Season, Month and Week the post draws only the flags of the stop shown (the goal above's own,
+        // or those under none of the area's goals), and the goal above's count line is its place in the round.
+        if s.hangsByGoalAbove, (1...5).contains(s.step), !s.ground {
+            let mine = Set(s.standingFlags().map(\.id))
+            for b in banners where b.kind == .full {
+                if let id = b.itemId, !mine.contains(id) { problems.append("F40: \(b.id) is not a flag of the stop shown") }
+            }
+            let stops = s.goalAboveStops()
+            if let above = banners.first(where: { $0.kind == .parent }), let level = s.level {
+                let at = s.focus[level].flatMap(stops.firstIndex(of:))
+                let expected = stops.count > 1 ? at.map { WalkCopy.goalAboveCount($0 + 1, of: stops.count) } : nil
+                if above.tag != expected { problems.append("F40: the count line \(String(describing: above.tag)), not \(String(describing: expected))") }
+            }
+        }
         if (1...4).contains(s.step), !s.ground, s.examplesOn.contains(s.step), !s.examplesLeft(today: today).isEmpty {
             // F36: an example always shows, and never at the cost of the person's last flag.
             if !banners.contains(where: { $0.kind == .ghost }) { problems.append("examples on, none shows") }
-            if full == 0, let level = s.level, s.items(on: level).contains(where: { s.column(of: $0) == s.standing }) {
+            if full == 0, !s.standingFlags().isEmpty {
                 problems.append("examples took the person's last flag")
             }
         }

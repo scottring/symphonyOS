@@ -100,13 +100,12 @@ struct MountainPage: Equatable {
     private mutating func settle() {
         kept = Self.kept(items: items, areas: areas, saved: saved)
         if let id = selected, item(id) == nil { selected = nil; moving = false }
-        if let id = focus, item(id) == nil { focus = nil }
+        if let id = focus, id != WalkState.noGoalAbove, item(id)?.level.rawValue != level.rawValue - 1 { focus = nil }
         if !walked || (focusArea.map { !kept.contains($0) } ?? true) {
             let held = Set(items.filter { $0.level == level }.compactMap(\.areaId))
             focusArea = kept.first(where: held.contains) ?? kept.first
-            if !walked { focus = nil }
+            if !walked { focus = startingStop() }
         }
-        if level != .year, let id = focus, item(id)?.level.rawValue != level.rawValue - 1 { focus = nil }
         adopt(walk.settled)
         if !items.contains(where: { $0.level == level }) { paperOpen = false }
     }
@@ -119,6 +118,19 @@ struct MountainPage: Equatable {
         case .season: PlanCalendar.sameDay(a.season.start, b.season.start)
         case .month, .week, .today: PlanCalendar.sameDay(a.monthStart, b.monthStart)
         }
+    }
+
+    /// F40 (5): where a page first stands on Season and Month in the area it stands in: on the goal above of
+    /// the area's newest flag hanging under one; with flags under none only, on that stop ("Not under a goal
+    /// yet"); with no flag on the level, nil (the walk's rule then takes the newest goal above).
+    private func startingStop() -> UUID? {
+        guard level != .year else { return nil }
+        let s = walk
+        let stops = s.goalAboveStops()
+        let here = s.items(on: level).filter { s.column(of: $0) == s.standing }
+        guard !stops.isEmpty, !here.isEmpty else { return nil }
+        if let newest = here.last(where: { $0.parentId.map(stops.contains) ?? false }) { return newest.parentId }
+        return stops.contains(WalkState.noGoalAbove) ? WalkState.noGoalAbove : nil
     }
 
     /// The walk's state for this page, before it settles: the page's own standing, goal above and choice.
@@ -406,7 +418,8 @@ struct MountainPage: Equatable {
     }
 
     /// A flag of this page's level is chosen, and let go on a second tap; the goal above (Season, Month)
-    /// switches to the next one in the area stood in (`WalkState.nextGoalAbove`). A side post stands there,
+    /// switches to the next stop of the area's round (`WalkState.nextGoalAbove`, F40), letting go of a chosen
+    /// flag the new stop does not show. A side post stands there,
     /// on every level, as the walk's own tap does (on Season and Month on that area's newest goal above);
     /// a chosen flag left behind is let go. Move to, Pull it up and Walk it down act on the chosen flag.
     /// The paper rises while there is something on it (letting the choice go) and comes down; a row on it
@@ -414,15 +427,22 @@ struct MountainPage: Equatable {
     mutating func apply(_ event: Event) -> [Effect] {
         switch event {
         case .flag(let id):
-            guard let item = item(id) else { return [] }
-            if item.level == level {
-                selected = selected == id ? nil : id
-                moving = false
-                walked = true                            // a flag chosen here keeps the page where it is
-            } else if level != .year, id == focus {
+            // The goal above (or the stop for the flags under none, F40) switches to the next stop.
+            if level != .year, id == focus {
                 walk(.bannerTapped(id))
-                if focus != id { walked = true }
+                if focus != id {
+                    walked = true
+                    if let chosen = item(selected), !walkState.standingFlags().contains(where: { $0.id == chosen.id }) {
+                        selected = nil
+                        moving = false
+                    }
+                }
+                return []
             }
+            guard let item = item(id), item.level == level else { return [] }
+            selected = selected == id ? nil : id
+            moving = false
+            walked = true                                // a flag chosen here keeps the page where it is
             return []
         case .peak(let id):
             guard walkState.walksThere(id) else { return [] }

@@ -422,18 +422,67 @@ struct WalkState: Equatable {
         return false
     }
 
-    /// Steps 2 to 5: where a tap on the goal the step is about goes: the next goal above here,
-    /// round again (on Today the first thing is one of them); none with only one.
-    /// A first thing on the nameless post is in every area's round on Today: the nameless post
-    /// has no label to walk to, so this is the way back to it.
+    /// Steps 2 to 5: where a tap on the goal the step is about goes: the next stop of the area's round
+    /// (`goalAboveRound`), round again; none with only one.
     func nextGoalAbove() -> UUID? {
         guard let level, level != .year, let current = focus[level] else { return nil }
+        let round = goalAboveRound()
+        guard round.count > 1, let index = round.firstIndex(of: current) else { return nil }
+        return round[(index + 1) % round.count]
+    }
+
+    /// Steps 2 to 5: the goals above a tap on the goal above goes round, in a fixed order. On Season,
+    /// Month and Week (F40) the area's stops (`goalAboveStops`). On Today every week task here in planting
+    /// order; a first thing on the nameless post is in every area's round there: the nameless post has
+    /// no label to walk to, so this is the way back to it.
+    func goalAboveRound() -> [UUID] {
+        guard let level, level != .year else { return [] }
+        if hangsByGoalAbove { return goalAboveStops() }
         let here = standing
-        let round = parentsAnywhere().filter {
+        return parentsAnywhere().filter {
             column(of: $0) == here || (level == .today && $0.id == firstThing && column(of: $0) == nil)
-        }
-        guard round.count > 1, let index = round.firstIndex(where: { $0.id == current }) else { return nil }
-        return round[(index + 1) % round.count].id
+        }.map(\.id)
+    }
+
+    // MARK: The goal above shows only its own (F40)
+
+    /// The stop of an area's round that holds its flags hanging under none of the area's goals above.
+    static let noGoalAbove = UUID(uuidString: "00000000-0000-0000-0000-0000000F40A0")!
+
+    /// Season, Month and Week (steps 2 to 4): the standing post shows only the flags of the goal above shown.
+    /// (Year has no goal above; on Today the post's one flag is the first thing.)
+    var hangsByGoalAbove: Bool { level == .season || level == .month || level == .week }
+
+    /// The area stood in's goals above (`parentsHere`, in planting order), then, where the area also holds
+    /// flags on this level hanging under none of its goals above, the stop for those (`noGoalAbove`). Empty
+    /// where the area has no goal above at all: then the post shows all its flags, as before.
+    func goalAboveStops() -> [UUID] {
+        guard hangsByGoalAbove else { return [] }
+        let goals = parentsHere()
+        guard !goals.isEmpty else { return [] }
+        return goals.map(\.id) + (unhungHere().isEmpty ? [] : [Self.noGoalAbove])
+    }
+
+    /// The step's flags in the area stood in whose parent is none of this area's goals one level up (no
+    /// parent, or one elsewhere), in planting order.
+    func unhungHere() -> [WalkItem] {
+        guard let level, let above = WalkLevel(rawValue: level.rawValue - 1) else { return [] }
+        let here = standing
+        let goals = Set(items(on: above).filter { column(of: $0) == here }.map(\.id))
+        return items(on: level).filter { column(of: $0) == here && !($0.parentId.map(goals.contains) ?? false) }
+    }
+
+    /// The step's flags the standing post shows, in planting order: on Season, Month and Week, where the
+    /// area has goals above, only those of the stop shown (the goal above's own children, or on the
+    /// `noGoalAbove` stop those hanging under none); otherwise every flag of the area on the level.
+    /// Today's is the first thing.
+    func standingFlags() -> [WalkItem] {
+        guard let level else { return [] }
+        let here = standing
+        if level == .today { return [item(firstThing)].compactMap { $0 }.filter { column(of: $0) == here } }
+        let all = items(on: level).filter { column(of: $0) == here }
+        guard hangsByGoalAbove, let stop = focus[level], goalAboveStops().contains(stop) else { return all }
+        return stop == Self.noGoalAbove ? unhungHere() : all.filter { $0.parentId == stop }
     }
 
     /// The goal above after a tap on this flag, or nil when the tap does not change it: the
@@ -482,6 +531,10 @@ struct WalkState: Equatable {
             if !stands, let first = kept.first { focusArea = first }
         case 2...5:
             guard let level else { return }
+            if focus[level] == Self.noGoalAbove {
+                if stands, goalAboveStops().contains(Self.noGoalAbove) { return }
+                focus[level] = nil
+            }
             if let parent = item(focus[level]) {
                 focusArea = column(of: parent)
                 return
@@ -587,9 +640,10 @@ struct WalkState: Equatable {
     /// task itself is the one the step is about. A flag this walk may choose is chosen, so the Move row
     /// shows. A flag with no kept area leaves the walk standing where it was (it is chosen if it may be).
     ///
-    /// Only while the paper is up, never on the ground. A row in the area already stood in keeps the goal
-    /// above the person chose (it only chooses). On a walk down the goal above changes only to one on the
-    /// walked line (on Today, only to a task on it), so what is said next still hangs on that line.
+    /// Only while the paper is up, never on the ground. On Season, Month and Week (F40) the goal above becomes
+    /// the row's own (or the stop of the flags under none), in the area already stood in too, so the chosen
+    /// flag is in sight. On a walk down the goal above changes only to one on the walked line (on Today, only
+    /// to a task on it), so what is said next still hangs on that line; a row off it is named by the note.
     private mutating func walkToRow(_ id: UUID) -> [WalkEffect] {
         guard paperOpen, !ground else { return [] }
         let does = paperRowTap(id)
@@ -603,7 +657,14 @@ struct WalkState: Equatable {
         }
         guard let row = item(id), let level else { return [] }
         var effects: [WalkEffect] = []
-        if does.walks, let column = column(of: row) {
+        if hangsByGoalAbove, let column = column(of: row), let shown = standing(toShow: row, in: column) {
+            if shown.focusArea != focusArea || shown.focus[level] != focus[level] {
+                focusArea = shown.focusArea
+                focus[level] = shown.focus[level]
+                follow(focus[level])
+                effects.append(.save)
+            }
+        } else if does.walks, let column = column(of: row) {
             if level == .today, onWalkedLine(row) {
                 focusArea = column
                 focus[.today] = row.id
@@ -623,6 +684,20 @@ struct WalkState: Equatable {
             effects.append(.sound(.tick, afterMs: 0))
         }
         return effects
+    }
+
+    /// F40: the walk standing in `column` on the stop that draws `row` (its own goal above, or the stop of the
+    /// flags under none); nil where none does on the walked line (a walk down's row off it).
+    private func standing(toShow row: WalkItem, in column: UUID) -> WalkState? {
+        guard let level, let above = WalkLevel(rawValue: level.rawValue - 1) else { return nil }
+        let parent = item(row.parentId).flatMap { $0.level == above && self.column(of: $0) == column ? $0 : nil }
+        if let parent, !onWalkedLine(parent) { return nil }
+        var trial = self
+        trial.focusArea = column
+        trial.focus[level] = parent?.id ?? Self.noGoalAbove
+        trial.settleStanding()
+        guard trial.standing == column, trial.standingFlags().contains(where: { $0.id == row.id }) else { return nil }
+        return trial
     }
 
     /// What a row's tap does here (`walkToRow`, and each row's words to VoiceOver): whether the walk goes

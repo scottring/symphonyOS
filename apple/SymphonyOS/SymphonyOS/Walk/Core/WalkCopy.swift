@@ -386,6 +386,15 @@ enum WalkCopy {
     static let exampleTag = "EXAMPLE · TAP TO USE", exampleTagShort = "TAP TO USE"
     /// The ground's own words while speaking and in the why line.
     static let groundWhy = "Tap the ones that matter to you."
+    /// F40: the goal above's stop for the flags hanging under none of the area's goals, on its pale cloth.
+    static let noGoalAbove = "Not under a goal yet"
+    /// F40: the goal above's place in the area's round, on its own line under its words: "1 of 3".
+    static func goalAboveCount(_ index: Int, of count: Int) -> String { "\(index) of \(count)" }
+    /// The "Not under a goal yet" cloth to VoiceOver: "Not under a goal yet, goal 3 of 3, tap to switch".
+    static func noGoalAboveLabel(_ index: Int, of count: Int) -> String {
+        "\(noGoalAbove), goal \(index) of \(count), \(tapToSwitch)"
+    }
+    static let tapToSwitch = "tap to switch"
     /// Added to a step's why line while a tap on the goal above switches to another (F3, `nextGoalAbove`).
     static let focusAbove = " Tap the goal above to switch."
 
@@ -534,6 +543,8 @@ enum WalkCopy {
         /// tap goes on to the next week task here); `firstThingFocusable`, not planted by this walk,
         /// while another is (a tap makes it the goal above).
         case firstThingFocusable, firstThingFocused
+        /// F40, Season to Week: the goal above, at this place of that many in the area's round; a tap switches.
+        case goalOfSeveral(Int, Int)
         /// Look back up (F21): the level's newest flag, standing for this many more; a tap opens the paper.
         case opensPaper(Int)
         /// A tap does something: the label says what. A plain flag, someone else's first thing,
@@ -542,7 +553,7 @@ enum WalkCopy {
             switch self {
             case .plain, .firstThing, .focused: return false
             case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                 .example, .stub, .opensPaper:
+                 .example, .stub, .opensPaper, .goalOfSeveral:
                 return true
             }
         }
@@ -556,6 +567,7 @@ enum WalkCopy {
         case .plain: return withTag
         case .focused: return "\(withTag), the goal this step is about"
         case .focusedOfSeveral: return "\(withTag), the goal this step is about, tap for the next one here"
+        case .goalOfSeveral(let i, let n): return "\(withTag), the goal this step is about, goal \(i) of \(n), \(tapToSwitch)"
         case .focusedThenFirstThing: return "\(withTag), the goal this step is about, tap for the first thing"
         case .firstThingChosen: return "Today: \(text), first thing, chosen, \(tapToLetGo)"
         case .firstThing: return "Today: \(text), first thing"

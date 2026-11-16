@@ -195,6 +195,10 @@ enum DemoMode {
             let parents = s.items(on: above)
             let index = step == 2 ? 1 : 0
             if parents.indices.contains(index) { s.focus[level] = parents[index].id }
+            // `-SymphonyWalkSwitch`: the goal above tapped once, on to the next stop of its area's round (F40).
+            if ProcessInfo.processInfo.arguments.contains("-SymphonyWalkSwitch"), let next = s.settled.nextGoalAbove() {
+                s.focus[level] = next
+            }
         }
         return WalkPosition(s, status: .inProgress, planted: planted, periods: periods, now: now)
     }

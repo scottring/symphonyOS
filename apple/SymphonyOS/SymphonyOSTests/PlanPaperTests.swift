@@ -136,8 +136,10 @@ struct PlanPaperTests {
     // MARK: The paper and the mountain agree
 
     /// The paper is the whole level the mountain shows: the area stood in has as many rows as its post
-    /// shows flags plus its "+n more", and every side post's count is its section's. Over every generated
-    /// state from Year to Week (Today's post shows only the first thing, by design), on a phone.
+    /// shows flags plus its "+n more" (F40: where the area has goals above, the post shows one stop's flags,
+    /// counted in full there, and the section holds every flag of the area), and every side post's count is
+    /// its section's. Over every generated state from Year to Week (Today's post shows only the first
+    /// thing, by design), on a phone.
     @Test func theMountainAndThePaperCountTheSame() {
         let states = Generated.all, layouts = Generated.levelLayouts
         var checked = 0
@@ -149,7 +151,9 @@ struct PlanPaperTests {
             let banners = layout.posts.flatMap(\.banners)
             let shown = banners.filter { $0.kind == .full }.count
             let more = banners.reduce(0) { if case .more(let n) = $1.kind { return $0 + n }; return $0 }
-            if rows(s.standing) != shown + more {
+            let area = s.items(on: level).filter { s.column(of: $0) == s.standing }.count
+            if s.standingFlags().count != shown + more || rows(s.standing) != area
+                || (s.goalAboveStops().isEmpty && rows(s.standing) != shown + more) {
                 problems.append("\(Generated.describe(s)): paper \(rows(s.standing)), post \(shown) + \(more)")
             }
             for side in layout.sides where side.count != rows(side.area) {
@@ -219,7 +223,11 @@ struct PlanPaperTests {
                     let banners = layout.posts.flatMap(\.banners)
                     let more = banners.reduce(0) { if case .more(let n) = $1.kind { return $0 + n }; return $0 }
                     let here = p.sections.first { $0.area == s.standing }?.rows.count ?? 0
-                    #expect(here == banners.filter { $0.kind == .full }.count + more, "step \(step) in \(area.name)")
+                    let shown = banners.filter { $0.kind == .full }.count + more
+                    // F40: the post shows the stop's flags; the paper every flag of the area.
+                    #expect(s.standingFlags().count == shown, "step \(step) in \(area.name)")
+                    #expect(here == s.items(on: level).filter { s.column(of: $0) == s.standing }.count, "step \(step) in \(area.name)")
+                    if s.goalAboveStops().isEmpty { #expect(here == shown, "step \(step) in \(area.name)") }
                     #expect(p.total == s.items(on: level).count)
                 }
             }

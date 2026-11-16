@@ -101,7 +101,8 @@ extension DemoMode {
     /// would, through the page's own events: `zoom`: a tap on the chosen flag's side post (the page
     /// stands in its area); `select`: the first flag of the page's level whose panel has a line
     /// (nothing under it), else the first, chosen from the paper's row (so the page stands where it
-    /// is); `move`: Move to; `paper`: the strip tapped, the paper raised. A bare page is left as it is.
+    /// is); `move`: Move to; `paper`: the strip tapped, the paper raised; `next`: the goal above tapped once.
+    /// A bare page is left as it is.
     static func showMountain(_ page: inout MountainPage, _ states: [String]) {
         let own = page.items.filter { $0.level == page.level }
         let bare = own.first { flag in
@@ -118,6 +119,8 @@ extension DemoMode {
         }
         if states.contains("move") { _ = page.apply(.moveTapped) }
         if states.contains("paper") { _ = page.apply(.paper(true)) }
+        // `next`: the goal above tapped once, on to the next stop of its area's round (F40).
+        if states.contains("next"), let above = page.focus { _ = page.apply(.flag(above)) }
     }
 
     private static func value(after flag: String, in arguments: [String]) -> String? {
