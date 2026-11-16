@@ -901,5 +901,158 @@ final class WalkFlowTests {
         #expect(!work.completed)
         #expect(!fetch(ctx, PendingChange.self).contains { $0.recordId == work.id })
     }
+
+    // MARK: The paper (Task 7)
+
+    /// Month with two areas kept: Work holds a season goal and seven month goals, Health a season goal
+    /// and one month goal; the walk stands in Health. All planted by this walk unless `theirs`.
+    private func paperMonth(theirs: Bool = false, loose: Bool = false) -> (s: WalkState, health: UUID, work: UUID, goals: [WalkItem]) {
+        let health = WalkArea(id: UUID(), name: "Health"), work = WalkArea(id: UUID(), name: "Work")
+        var s = WalkState()
+        s.areas = [health, work]
+        s.kept = [health.id, work.id]
+        s.step = 3
+        let lift = WalkItem(id: UUID(), level: .season, title: "Lift twice a week", areaId: health.id)
+        let pitch = WalkItem(id: UUID(), level: .season, title: "Pitch three new clients", areaId: work.id)
+        let goals = (1...7).map { WalkItem(id: UUID(), level: .month, title: "Work goal \($0)", areaId: work.id,
+                                           parentId: pitch.id, mine: !(theirs && $0 == 1)) }
+        s.items = [lift, pitch, WalkItem(id: UUID(), level: .month, title: "Find a gym that fits", areaId: health.id, parentId: lift.id)]
+            + goals + (loose ? [WalkItem(id: UUID(), level: .month, title: "No area yet", areaId: nil)] : [])
+        s.focusArea = health.id
+        s.focus[.month] = lift.id
+        return (s.settled, health.id, work.id, goals)
+    }
+
+    private var paperEnv: WalkEnv { WalkEnv(periods: WalkPeriods.pick(now: now), now: now) }
+
+    /// "+n more" opens the paper over the mountain (F7), and so does the nameless post (F12); the top
+    /// row and Next go while it is open.
+    @Test func plusMoreOpensThePaper() throws {
+        var (s, _, work, _) = paperMonth(loose: true)
+        _ = s.apply(.areaTapped(work), paperEnv)
+        let layout = WalkLayout.make(s, today: now, footing: .level)
+        let post = try #require(layout.posts.first)
+        let more = try #require(post.banners.first { if case .more = $0.kind { return true }; return false })
+        #expect(more.kind == .more(3) && more.taps && more.label == WalkCopy.moreLabel(3))
+        #expect(WalkCopy.moreLabel(3) == "3 more, tap to read the list")
+        #expect(WalkLayout.tapEvent(more, on: post) == .paperOpened)
+        let nameless = try #require(layout.sides.first { $0.area == nil })
+        #expect(WalkLayout.tapEvent(nameless) == .paperOpened)
+
+        var opened = s
+        #expect(opened.apply(.paperOpened, paperEnv).isEmpty)
+        #expect(opened.paperOpen && !opened.showsTopRow && !opened.showsNextLine && !opened.showsMore)
+        let under = WalkLayout.make(opened, today: now, footing: .level)
+        #expect(under.back == nil && under.leave == nil && under.more == nil && under.nextLine == nil)
+        #expect(opened.paper(paperEnv.periods)?.sections.map(\.rows.count) == [1, 7, 1])
+        #expect(opened.paper(paperEnv.periods)?.title == paperEnv.periods.monthName)
+        _ = opened.apply(.paperClosed, paperEnv)
+        #expect(!opened.paperOpen && opened.showsTopRow && opened.paper(paperEnv.periods) == nil)
+
+        // Not on the ground, and not on Welcome or Look back up.
+        for (step, ground) in [(1, true), (0, false), (6, false)] {
+            var other = s
+            other.step = step
+            other.ground = ground
+            _ = other.apply(.paperOpened, paperEnv)
+            #expect(!other.paperOpen, "step \(step), ground \(ground)")
+        }
+    }
+
+    /// A row walks to its flag's area and chooses it (F7): the goal above becomes its own, and the
+    /// chosen flag is on the post with the Move row under it.
+    @Test func aRowWalksToItsFlagAndChoosesIt() throws {
+        var (s, health, work, goals) = paperMonth()
+        #expect(s.standing == health)
+        _ = s.apply(.paperOpened, paperEnv)
+        let oldest = goals[0]
+        let effects = s.apply(.paperRow(oldest.id), paperEnv)
+        #expect(!s.paperOpen)
+        #expect(s.standing == work && s.focus[.month] == oldest.parentId)
+        #expect(s.selected == oldest.id)
+        #expect(effects.contains(.save))
+        let layout = WalkLayout.make(s, today: now, footing: .level)
+        #expect(layout.posts.first?.banners.contains { $0.itemId == oldest.id } == true)
+        #expect(layout.moveRow != nil)
+        #expect(health != work)
+    }
+
+    /// A row for a flag that cannot be chosen (not planted by this walk) still walks there and chooses
+    /// nothing; a row with no kept area closes the paper and leaves the walk where it stood, choosing it.
+    @Test func aRowThatCannotBeChosenStillWalksThere() {
+        var (s, _, work, goals) = paperMonth(theirs: true, loose: true)
+        _ = s.apply(.paperOpened, paperEnv)
+        _ = s.apply(.paperRow(goals[0].id), paperEnv)
+        #expect(!s.paperOpen && s.standing == work && s.selected == nil)
+
+        var (l, health, _, _) = paperMonth(loose: true)
+        let loose = l.items.first { $0.areaId == nil }!
+        _ = l.apply(.paperOpened, paperEnv)
+        _ = l.apply(.paperRow(loose.id), paperEnv)
+        #expect(!l.paperOpen && l.standing == health && l.selected == loose.id)
+
+        // A row id that is no longer there only closes the paper.
+        var (g, stood, _, _) = paperMonth()
+        _ = g.apply(.paperOpened, paperEnv)
+        _ = g.apply(.paperRow(UUID()), paperEnv)
+        #expect(!g.paperOpen && g.standing == stood && g.selected == nil)
+    }
+
+    /// Today's paper is the week's tasks dated today; a row walks to its area with that task as the
+    /// one the step is about ("Start the day with …?"), and a first thing the walk planted is chosen.
+    @Test func onTodayARowIsTheTaskTheStepIsAbout() {
+        let health = WalkArea(id: UUID(), name: "Health"), home = WalkArea(id: UUID(), name: "Home")
+        var s = WalkState()
+        s.areas = [health, home]
+        s.kept = [health.id, home.id]
+        s.step = 5
+        let gym = WalkItem(id: UUID(), level: .week, title: "Tour the gym", areaId: health.id, day: now)
+        let deposit = WalkItem(id: UUID(), level: .week, title: "Send the deposit", areaId: home.id, day: now)
+        let tile = WalkItem(id: UUID(), level: .week, title: "Choose the tile", areaId: home.id, day: PlanCalendar.addDays(now, 1))
+        s.items = [gym, deposit, tile]
+        s.firstThing = gym.id
+        s.focusArea = health.id
+        s = s.settled
+        _ = s.apply(.paperOpened, paperEnv)
+        let paper = s.paper(paperEnv.periods)
+        #expect(paper?.title == "Today" && paper?.count == "2 tasks")
+        #expect(paper?.sections.flatMap(\.rows).map(\.id) == [gym.id, deposit.id])
+        _ = s.apply(.paperRow(deposit.id), paperEnv)
+        #expect(!s.paperOpen && s.standing == home.id && s.focus[.today] == deposit.id && s.selected == nil)
+        _ = s.apply(.paperOpened, paperEnv)
+        _ = s.apply(.paperRow(gym.id), paperEnv)
+        #expect(s.standing == health.id && s.selected == gym.id)
+    }
+
+    /// The paper belongs to the step it was opened on: a step change closes it, and it is never saved.
+    @Test func thePaperClosesWhenTheStepChanges() {
+        let (base, _, _, _) = paperMonth()
+        for action in [WalkAction.next, .back] {
+            var s = base
+            _ = s.apply(.paperOpened, paperEnv)
+            _ = s.act(action, paperEnv)
+            #expect(s.step != 3 && !s.paperOpen, "\(action)")
+        }
+        var s = base
+        _ = s.apply(.paperOpened, paperEnv)
+        var resumed = WalkState()
+        WalkPosition(s, status: .inProgress, planted: [], periods: paperEnv.periods, now: now).apply(to: &resumed)
+        #expect(resumed.step == 3 && !resumed.paperOpen)
+    }
+
+    /// While the paper is open nothing under it moves: Next, the light, the top row and the flags.
+    @Test func nothingElseMovesWhileThePaperIsOpen() {
+        var (s, health, work, goals) = paperMonth()
+        _ = s.apply(.paperOpened, paperEnv)
+        let open = s
+        let touches: [WalkEvent] = [.nextTapped, .orbDown, .orbHeld, .orbUp(heldMs: 0), .backTapped, .leaveTapped, .moreTapped,
+                                    .areaTapped(work), .bannerTapped(goals[0].id), .point(.w), .veilTapped, .undo]
+        for event in touches {
+            var after = open
+            let effects = after.apply(event, paperEnv)
+            #expect(after == open && effects.isEmpty, "\(event)")
+        }
+        #expect(open.standing == health)
+    }
 }
 #endif

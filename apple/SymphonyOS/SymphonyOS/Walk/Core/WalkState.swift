@@ -46,6 +46,9 @@ struct WalkState: Equatable {
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
     var dayBeforeFirst: [UUID: Date?] = [:]    // a task the first-thing mark dated today → its day before; in memory
     var sheetOpen = false; var calendarOffer = false
+    /// The paper is raised over the mountain (F7): the whole level as a plain list by area. Belongs to
+    /// the step it was opened on (`settle` closes it); never saved.
+    var paperOpen = false
     /// Set when the walk ends (Not now, Go to Today): no later event or point changes anything.
     var ended = false
 
@@ -68,6 +71,8 @@ struct WalkState: Equatable {
     /// the person does takes effect, so nothing in that second re-parents it or drops it.
     mutating func apply(_ event: WalkEvent, _ env: WalkEnv) -> [WalkEffect] {
         guard !ended else { return [] }
+        // While the paper is up nothing under it takes a touch (the light, Next, the top row, the flags).
+        if paperOpen, event.isUnderThePaper { return [] }
         // Any touch puts the lesson away (a press on the light does it in `orbDown`, a tap on the veil below).
         if teaching, !event.leavesAWaitingFlag, event != .orbDown, event != .moreTapped { teaching = false }
         let place = placeForExamples
@@ -128,6 +133,16 @@ struct WalkState: Equatable {
             teaching = false
             orb = orb == .open ? .idle : .open
             return []
+        // The paper (F7, F12): "+n more" and the nameless post raise it on steps 1 to 5 off the ground;
+        // "Show the mountain" lowers it; a row walks to its flag (`paperRow`).
+        case .paperOpened:
+            guard (1...5).contains(step), !ground, typing == nil, orb == .idle else { return [] }
+            paperOpen = true
+            return []
+        case .paperClosed:
+            paperOpen = false
+            return []
+        case .paperRow(let id): return walkToRow(id)
         // A tap on the veil around the open compass closes it; on Welcome the choices stay. While typing
         // it closes an empty field and leaves one holding words as it is.
         case .veilTapped:
@@ -341,6 +356,7 @@ struct WalkState: Equatable {
         orb = .idle
         sheetOpen = false
         teaching = false
+        paperOpen = false
     }
 
     // MARK: Where the walk stands
@@ -541,6 +557,36 @@ struct WalkState: Equatable {
         }
     }
 
+    /// A row on the paper: the paper closes, and the walk stands where that flag stands. On steps 2 to 5
+    /// the goal above is its own (the goal it hangs under, where that stands with it); on Today the
+    /// task itself is the one the step is about. A flag this walk may choose is chosen, so the Move row
+    /// shows. A flag with no kept area leaves the walk standing where it was (it is chosen if it may be).
+    private mutating func walkToRow(_ id: UUID) -> [WalkEffect] {
+        paperOpen = false
+        guard let row = item(id), let level else { return [] }
+        var effects: [WalkEffect] = []
+        if let column = column(of: row) {
+            if level == .today {
+                focusArea = column
+                focus[.today] = row.id
+            } else if level != .year, let parent = item(row.parentId), parent.level.rawValue == level.rawValue - 1,
+                      self.column(of: parent) == column {
+                focusArea = column
+                focus[level] = parent.id
+                follow(parent.id)
+            } else {
+                stand(in: column)
+            }
+            effects.append(.save)
+        }
+        if selects(id), row.mine, selected != id {
+            selected = id
+            undoShowing = false
+            effects.append(.sound(.tick, afterMs: 0))
+        }
+        return effects
+    }
+
     /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with
     /// nowhere to go, nothing. No other goal above is drawn. A tap never changes the first thing.
     private mutating func focusParent(_ id: UUID) -> [WalkEffect] {
@@ -564,6 +610,8 @@ enum WalkEvent: Equatable {
     /// A tap on the Next line at the foot; a tap on the veil behind the open compass; the top row's
     /// More, Back and Leave for now.
     case nextTapped, veilTapped, moreTapped, backTapped, leaveTapped
+    /// The paper (F7): raised ("+n more", the nameless post), lowered ("Show the mountain", Escape), a row tapped.
+    case paperOpened, paperClosed, paperRow(UUID)
 }
 
 enum WalkTimer: Equatable { case hold, undo, note, finish }

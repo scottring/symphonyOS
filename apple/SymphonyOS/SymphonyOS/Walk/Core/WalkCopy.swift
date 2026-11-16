@@ -377,8 +377,8 @@ enum WalkCopy {
     static let typePlaceholder = "Type it, then tap Add"; static let firstThingTag = "FIRST THING"
     /// How many more flags a banner on Look back up stands for: "+2 more".
     static func more(_ count: Int) -> String { "+\(count) more" }
-    /// "+n more" to VoiceOver, while a tap on it does nothing yet (the paper it opens is Task 7's).
-    static func moreLabel(_ count: Int) -> String { "\(count) more" }
+    /// "+n more" to VoiceOver: a tap opens the paper, where the whole level is read (F7).
+    static func moreLabel(_ count: Int) -> String { "\(count) more, \(readTheList.lowercased())" }
     /// A side post's fourth pennant place, when it stands for more than four flags: "+2".
     static func sideExtra(_ count: Int) -> String { "+\(count)" }
     /// An example flag's tag, and the shorter one where the flag is too narrow for it.
@@ -387,6 +387,44 @@ enum WalkCopy {
     static let groundWhy = "Tap the ones that matter to you."
     /// Added to a step's why line while a tap on the goal above switches to another (F3, `nextGoalAbove`).
     static let focusAbove = " Tap the goal above to switch."
+
+    // MARK: The paper (F7)
+
+    /// The paper's first 44 points: a tap there closes it.
+    static let showMountain = "Show the mountain"
+    /// The paper's last section: flags with no kept area.
+    static let paperNoArea = "Not under an area yet"
+    /// What a tap does on "+n more" and on the nameless post: it opens the paper.
+    static let readTheList = "Tap to read the list"
+
+    /// The paper's count, beside its heading: how many stand on the level ("1 goal", "17 goals";
+    /// "1 task", "12 tasks" on Week and Today). Never how many are undone.
+    static func paperCount(_ n: Int, level: WalkLevel) -> String {
+        let one = level == .week || level == .today ? "task" : "goal"
+        return n == 1 ? "1 \(one)" : "\(n) \(one)s"
+    }
+
+    /// The paper's heading: the step's period in words ("2027, the year ahead", "Winter", "December",
+    /// "This week", "Today").
+    static func paperTitle(_ s: WalkState, _ p: WalkPeriods) -> String {
+        switch s.level {
+        case .year?, nil: return "\(p.year), the year ahead"
+        case .season?: return p.season.name
+        case .month?: return p.monthName
+        case .week?: return "This week"
+        case .today?: return todayEyebrow
+        }
+    }
+
+    /// A section's heading to VoiceOver: "Work, 3 goals".
+    static func paperSection(_ name: String, count: Int, level: WalkLevel) -> String {
+        "\(name), \(paperCount(count, level: level))"
+    }
+
+    /// A row to VoiceOver: its title, and a week task's day ("Tour the gym, Wednesday").
+    static func paperRowLabel(_ title: String, tag: String?) -> String {
+        tag.map { "\(title), \($0.lowercased().capitalized)" } ?? title
+    }
 
     // MARK: The ending
 

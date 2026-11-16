@@ -17,6 +17,7 @@ struct WalkView: View {
     /// The window's own safe-area insets (`WindowInsetsReader`). Only the sides are read: the
     /// board stands clear of a system column (the Duo's outside screen) and the painting runs under it.
     @State private var insets = UIEdgeInsets.zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(model: WalkModel) {
         self.model = model
@@ -100,6 +101,10 @@ struct WalkView: View {
                 .offset(x: stage.origin.x, y: stage.origin.y)
                 .environment(\.walkStage, stage)
                 .environment(\.walkKeyboardLift, lift(stage, root: geo.frame(in: .global)))
+                // Under the raised paper nothing takes a touch and VoiceOver skips it all (the paper is modal).
+                .allowsHitTesting(!model.state.paperOpen)
+                .accessibilityHidden(model.state.paperOpen)
+                paper(stage, window: geo.size)
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .clipped()                                   // at the window: nothing is clipped at the board
@@ -113,6 +118,28 @@ struct WalkView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             withAnimation(.easeOut(duration: 0.25)) { keyboardTop = nil }
         }
+    }
+
+    /// The paper (F7) over the mountain while it is raised: across the whole window (the board and its
+    /// bleed) from stage y 116 down, its words in the reading column (`WalkLayout.column(wing:)`), 24 in.
+    /// It is drawn in the window's own points, outside the stage's fixed sizes, so its words follow the
+    /// person's text size. It rises in 0.3 s; with Reduce Motion it fades.
+    private func paper(_ stage: WalkStage, window: CGSize) -> some View {
+        let column = WalkLayout.column(wing: stage.wing)
+        let left = stage.toDevice(CGPoint(x: column.lowerBound, y: 0)).x
+        let right = stage.toDevice(CGPoint(x: column.upperBound, y: 0)).x
+        return ZStack(alignment: .topLeading) {
+            if let paper = model.state.paper(model.periods) {
+                PlanPaperView(paper: paper, column: left...right,
+                              top: stage.toDevice(CGPoint(x: 0, y: WalkLayout.paperTop)).y,
+                              touch: stage.touch * stage.scale, inset: WalkLayout.paperInset * stage.scale,
+                              onRow: { model.send(.paperRow($0)) }, onClose: { model.send(.paperClosed) })
+                    .frame(width: window.width, height: window.height)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom))
+            }
+        }
+        .frame(width: window.width, height: window.height, alignment: .topLeading)
+        .animation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.3), value: model.state.paperOpen)
     }
 
     /// How far, in stage points, the stage's bottom is under the keyboard: the hint

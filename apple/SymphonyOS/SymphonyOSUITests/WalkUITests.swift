@@ -141,6 +141,69 @@ final class WalkUITests: XCTestCase {
         XCTAssertTrue(remove.isHittable, "Remove is out of reach")
     }
 
+    /// "+n more" raises the paper over the mountain (F7): nothing under it takes a tap, "Show the
+    /// mountain" and every row are a full touch high, and a row walks to its flag and chooses it, so the
+    /// Move row shows. The full plan's Month with one more goal said (`undo`): Health then holds five.
+    @MainActor func testPlusMoreOpensThePaperAndARowComesBack() throws {
+        let app = walk(step: 3, ["-SymphonyWalkSeed", "full", "-SymphonyWalkOrb", "undo"])
+        let more = app.buttons.matching(NSPredicate(format: "label ENDSWITH %@", "more, tap to read the list")).firstMatch
+        tap(more, "+n more")
+        let paper = app.descendants(matching: .any)["walk.paper"]
+        XCTAssertTrue(paper.waitForExistence(timeout: 15), "the paper did not rise")
+        for id in ["walk.next", "walk.back", "walk.more", "walk.leave", "walk.orb"] {
+            XCTAssertFalse(app.buttons[id].exists && app.buttons[id].isHittable, "\(id) still takes a tap under the paper")
+        }
+        let close = app.buttons["walk.paper.close"]
+        XCTAssertTrue(close.exists && close.isHittable, "no Show the mountain")
+        XCTAssertGreaterThanOrEqual(close.frame.height, 44, "Show the mountain is less than a touch high")
+        let row = app.buttons["walk.paper.row.0"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no first row")
+        XCTAssertGreaterThanOrEqual(row.frame.height, 44, "a row is less than a touch high")
+        row.tap()
+        XCTAssertTrue(paper.waitForNonExistence(timeout: 15), "a row did not lower the paper")
+        XCTAssertTrue(app.buttons["walk.remove"].waitForExistence(timeout: 15), "the row's flag was not chosen: no Move row")
+        XCTAssertTrue(app.buttons["walk.next"].exists, "Next did not come back")
+    }
+
+    /// The paper scrolls: its last row can be reached and tapped, at any text size (rows grow with the
+    /// person's text size and wrap; nothing is cut). Full plan's Week (twelve tasks) and the long plan's
+    /// Year (five long titles). Each end is kept as a screenshot in the result.
+    @MainActor func testThePaperScrollsToItsEnd() throws {
+        for (seed, step, last) in [("full", 4, 11), ("long", 1, 4)] {
+            let app = walk(step: step, ["-SymphonyWalkSeed", seed, "-SymphonyWalkOrb", "paper"])
+            let paper = app.descendants(matching: .any)["walk.paper"]
+            XCTAssertTrue(paper.waitForExistence(timeout: 15), "\(seed): the paper did not rise")
+            let end = app.buttons["walk.paper.row.\(last)"]
+            XCTAssertTrue(end.waitForExistence(timeout: 15), "\(seed): no row \(last)")
+            // Whole on the screen, clear of the home indicator: the list's end, not a row half under the edge.
+            func inView() -> Bool { end.isHittable && end.frame.maxY <= app.frame.maxY - 34 }
+            var swipes = 0
+            while !inView() && swipes < 10 {
+                paper.swipeUp()
+                swipes += 1
+            }
+            XCTAssertTrue(inView(), "\(seed): the last row cannot be reached whole")
+            XCTAssertGreaterThanOrEqual(end.frame.height, 44, "\(seed): the last row is less than a touch high")
+            XCTAssertFalse(app.buttons["walk.paper.row.\(last + 1)"].exists, "\(seed): more rows than the level holds")
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "paper-end-\(seed)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
+    /// The paper opened for a shot (`-SymphonyWalkOrb paper`) goes with "Show the mountain", and the walk is as it was.
+    @MainActor func testShowTheMountainLowersThePaper() throws {
+        let app = walk(step: 4, ["-SymphonyWalkSeed", "full", "-SymphonyWalkOrb", "paper"])
+        let paper = app.descendants(matching: .any)["walk.paper"]
+        XCTAssertTrue(paper.waitForExistence(timeout: 15), "the paper did not rise")
+        tap(app.buttons["walk.paper.close"], "Show the mountain")
+        XCTAssertTrue(paper.waitForNonExistence(timeout: 15), "Show the mountain did not lower the paper")
+        XCTAssertTrue(app.buttons["walk.next"].waitForExistence(timeout: 15), "Next did not come back")
+        XCTAssertTrue(app.buttons["walk.back"].isHittable, "Back takes no tap once the paper is down")
+    }
+
     @MainActor func testAQuickStartPlantsAFlag() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk"]

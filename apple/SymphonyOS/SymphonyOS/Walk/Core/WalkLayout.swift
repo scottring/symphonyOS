@@ -80,6 +80,8 @@ struct WalkLayout: Equatable {
         let extra: Int; let count: Int; let label: String; var lean: Double
         /// Where "+n" stands when `extra > 0`: the fourth pennant's place.
         var extraFrame: CGRect? = nil
+        /// The nameless post on steps 1 to 5: a tap raises the paper (F12), the only way its flags are read.
+        var opensPaper = false
 
         /// Everything the post draws, as boxes: its pill, its pole (leaning), its pennants and its "+n".
         var boxes: [CGRect] {
@@ -127,6 +129,9 @@ struct WalkLayout: Equatable {
     /// Look back up: the bottom of its header line (nothing stands above it), the standing pill's
     /// top, and the lowest anything stands (the ending sheet peeks at 716).
     static let lookBackHeader: CGFloat = 92, lookBackPill: CGFloat = 110, lookBackFoot: CGFloat = 700
+    /// The paper (F7): its top on the board while raised, and how far its words stand in from the
+    /// reading column's edges (`column(wing:)`).
+    static let paperTop: CGFloat = 116, paperInset: CGFloat = 24
     /// The spoken flag: one line of the newest words, above the light.
     static let spokenFlagRect = CGRect(x: 120, y: 560, width: 150, height: 36)
 
@@ -190,17 +195,21 @@ struct WalkLayout: Equatable {
     }
 
     /// What a tap on a banner sends: an example plants its words; a flag of the step's level or the
-    /// goal above is tapped by its id. "+n more" opens the paper (Task 7; nothing until then), and
-    /// a Look back up cloth the paper for its level (Task 8; nothing until then).
+    /// goal above is tapped by its id. "+n more" opens the paper (F7), and a Look back up cloth the
+    /// paper for its level (Task 8; nothing until then).
     static func tapEvent(_ banner: Banner, on post: Post) -> WalkEvent? {
         switch banner.kind {
-        case .more, .compact: return nil
+        case .more: return .paperOpened
+        case .compact: return nil
         case .ghost: return .exampleTapped(banner.text)
         case .full, .parent: return banner.itemId.map { .bannerTapped($0) }
         }
     }
 
     /// What a tap on a side post sends: a named one walks there (it is drawn only where the walk
-    /// can stand). The nameless one opens the paper (Task 7; nothing until then).
-    static func tapEvent(_ side: Side) -> WalkEvent? { side.area.map { .areaTapped($0) } }
+    /// can stand). The nameless one opens the paper on steps 1 to 5 (F12); on Look back up it is only read.
+    static func tapEvent(_ side: Side) -> WalkEvent? {
+        if let area = side.area { return .areaTapped(area) }
+        return side.opensPaper ? .paperOpened : nil
+    }
 }

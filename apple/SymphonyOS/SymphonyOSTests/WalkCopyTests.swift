@@ -437,6 +437,7 @@ struct WalkCopyTests {
                     said.append(WalkCopy.why(v, periods))
                     said += WalkCopy.teaching(v)
                     said.append(WalkCopy.orbAccessibilityLabel(v))
+                    said.append(WalkCopy.paperTitle(v, periods))
                 }
             }
         }
@@ -447,6 +448,9 @@ struct WalkCopyTests {
         said += [WalkCopy.wordmark, WalkCopy.welcomeSub, WalkCopy.nothingToPlant, WalkCopy.speechOff, WalkCopy.nothingHeard,
                  WalkCopy.speakNow, WalkCopy.ridgeFull, WalkCopy.undo, WalkCopy.moveTo, WalkCopy.pullUp,
                  WalkCopy.typePlaceholder, WalkCopy.typeAdd, WalkCopy.typeClose, WalkCopy.backWord, WalkCopy.firstThingTag, WalkCopy.more(2), WalkCopy.moreLabel(2), WalkCopy.noArea,
+                 WalkCopy.showMountain, WalkCopy.paperNoArea, WalkCopy.readTheList, WalkCopy.paperCount(1, level: .year),
+                 WalkCopy.paperCount(12, level: .week), WalkCopy.paperSection("Work", count: 3, level: .month),
+                 WalkCopy.paperRowLabel("Tour the gym", tag: "WEDNESDAY"),
                  WalkCopy.exampleTag, WalkCopy.exampleTagShort, WalkCopy.groundWhy, WalkCopy.focusAbove,
                  WalkCopy.heresToday, WalkCopy.showMyDay, WalkCopy.lookBackHandle, WalkCopy.todayEyebrow,
                  WalkCopy.walkAnother, WalkCopy.goToToday, WalkCopy.thatsTheDay, WalkCopy.nothingToday,
@@ -542,7 +546,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.typePlaceholder == "Type it, then tap Add"); #expect(WalkCopy.firstThingTag == "FIRST THING")
         #expect(WalkCopy.typeAdd == "Add"); #expect(WalkCopy.typeClose == "Close without adding")
         #expect(WalkCopy.finish == "Finish the walk")
-        #expect(WalkCopy.more(2) == "+2 more"); #expect(WalkCopy.moreLabel(2) == "2 more"); #expect(WalkCopy.noArea == "No area")
+        #expect(WalkCopy.more(2) == "+2 more"); #expect(WalkCopy.moreLabel(2) == "2 more, tap to read the list"); #expect(WalkCopy.noArea == "No area")
         #expect(WalkCopy.exampleTag == "EXAMPLE · TAP TO USE"); #expect(WalkCopy.exampleTagShort == "TAP TO USE")
         #expect(WalkLayout.exampleTag(forWidth: 150) == "EXAMPLE · TAP TO USE")
         #expect(WalkLayout.exampleTag(forWidth: 140) == "TAP TO USE")

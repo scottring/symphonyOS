@@ -217,6 +217,8 @@ enum DemoMode {
     /// - `leave`: Leave for now: the walk closes onto Today with its waiting line.
     /// - `quick`: Quick start on Welcome; `quick,next` then reaches Year, where the light is taught.
     /// - `area:<name>`: a tap on that area's side post, so the walk stands there.
+    /// - `paper`: the paper raised over the step, as "+n more" raises it, so a shot needs no tap.
+    /// - `row:<n>`: a tap on the raised paper's row n (from 0, in reading order).
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
     /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
@@ -254,6 +256,8 @@ enum DemoMode {
                 model.choose(.leave)
             case "quick":
                 model.choose(.quick)
+            case "paper":
+                model.send(.paperOpened)
             default:
                 // `name:<words>`: type those words as the light's Type it would (on the ground, an area of
                 // one's own), so a shot can show a long name without typing in the simulator.
@@ -265,6 +269,9 @@ enum DemoMode {
                 } else if step.hasPrefix("draft:") {
                     model.choose(.type)
                     model.send(.typeChanged(String(step.dropFirst(6))))
+                } else if step.hasPrefix("row:"), let n = Int(step.dropFirst(4)),
+                          let row = model.state.paper(model.periods)?.numberedRows.first(where: { $0.index == n }) {
+                    model.send(.paperRow(row.row.id))
                 } else if step.hasPrefix("area:") {
                     let name = step.dropFirst(5).lowercased()
                     if let area = model.state.areas.first(where: { $0.name.lowercased() == name }) { model.send(.areaTapped(area.id)) }

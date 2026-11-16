@@ -438,7 +438,7 @@ struct WalkLayoutTests {
                         let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
                         #expect(layout.sides.count == 8 && layout.sides.filter { $0.area == nil }.count == 1)
                         let nameless = layout.sides.first { $0.area == nil }!
-                        #expect(nameless.pill == nil && nameless.count == 2 && nameless.pennants.count == 2 && WalkLayout.tapEvent(nameless) == nil)
+                        #expect(nameless.pill == nil && nameless.count == 2 && nameless.pennants.count == 2 && WalkLayout.tapEvent(nameless) == .paperOpened)
                         #expect(nameless.label.hasPrefix(step == 4 ? "No area, 2 tasks this week" : "No area, 2 goals this "))
                         let problems = Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7)
                         #expect(problems.isEmpty, "step \(step) in \(standing), wing \(wing), \(footing): \(problems.prefix(3))")
@@ -503,7 +503,13 @@ struct WalkLayoutTests {
         for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
             for side in layout.sides {
                 guard let id = side.area else {
-                    #expect(WalkLayout.tapEvent(side) == nil, "\(Generated.describe(s)): the nameless post")
+                    // The nameless post opens the paper on steps 1 to 5 (F12); on Look back up it is only read.
+                    #expect(WalkLayout.tapEvent(side) == (s.level == nil ? nil : .paperOpened), "\(Generated.describe(s)): the nameless post")
+                    if s.level != nil {
+                        var opened = s
+                        _ = opened.apply(.paperOpened, env)
+                        #expect(opened.paperOpen, "\(Generated.describe(s)): the nameless post did not open the paper")
+                    }
                     continue
                 }
                 #expect(s.walksThere(id), "\(Generated.describe(s)): \(side.name)")
@@ -1518,12 +1524,12 @@ struct WalkLayoutTests {
         let ghost = ruled(ex).banners(.ghost).first
         #expect(ghost?.label == "Example: Feel strong again, tap to make it yours" && ghost?.taps == true)
 
-        // "+n more" opens the paper, which is not here yet: it says how many and promises no tap.
+        // "+n more" opens the paper (F7): it says how many and that a tap reads the list.
         let crowd = (1...8).map { flag(.year, "Goal \($0)", in: "Home") }
         let crowded = ruled(state(1, kept: ["Home"], items: crowd, standing: "Home"))
         let more = crowded.mores.first
-        #expect(more?.kind == .more(4) && more?.text == "+4 more" && more?.label == "4 more" && more?.taps == false)
-        #expect(more.map { WalkLayout.tapEvent($0, on: crowded.posts[0]) == nil } == true)
+        #expect(more?.kind == .more(4) && more?.text == "+4 more" && more?.label == "4 more, tap to read the list" && more?.taps == true)
+        #expect(more.map { WalkLayout.tapEvent($0, on: crowded.posts[0]) == .paperOpened } == true)
     }
 
     /// The layout's words against the reducer, over every generated state (each settled, as the walk

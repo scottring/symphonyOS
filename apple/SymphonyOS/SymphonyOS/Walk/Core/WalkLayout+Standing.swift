@@ -364,7 +364,7 @@ struct WalkStanding {
 
     func morePiece(_ hidden: Int, _ level: WalkLevel) -> Piece {
         Piece(id: "\(postId)-more", who: "\(postId)-more", kind: .more(hidden), item: nil, level: level == .today ? .week : level,
-              text: WalkCopy.more(hidden), tag: nil, glows: false, label: WalkCopy.moreLabel(hidden), taps: false,
+              text: WalkCopy.more(hidden), tag: nil, glows: false, label: WalkCopy.moreLabel(hidden), taps: true,
               words: [WalkCopy.more(hidden)], lines: 1, size: L.moreSize)
     }
 
@@ -433,14 +433,14 @@ struct WalkStanding {
                           poleX: side.poleX, poleTop: side.poleTop + off, poleFoot: foot,
                           pennants: side.pennants.map { L.Pennant(frame: hung($0.frame), level: $0.level) },
                           extra: side.extra, count: side.count, label: side.label, lean: lean,
-                          extraFrame: side.extraFrame.map(hung))
+                          extraFrame: side.extraFrame.map(hung), opensPaper: side.opensPaper)
         }
     }
 
     func resized(_ side: L.Side, pill: CGRect) -> L.Side {
         L.Side(id: side.id, area: side.area, name: side.name, pill: pill, poleX: side.poleX, poleTop: side.poleTop,
                poleFoot: side.poleFoot, pennants: side.pennants, extra: side.extra, count: side.count,
-               label: side.label, lean: side.lean, extraFrame: side.extraFrame)
+               label: side.label, lean: side.lean, extraFrame: side.extraFrame, opensPaper: side.opensPaper)
     }
 
     /// The flags with no kept area. `drawn`: only those that give the nameless post a reason to
@@ -482,7 +482,8 @@ struct WalkStanding {
             ?? WalkCopy.sideLabelWholePlan(name: area?.name ?? WalkCopy.noArea, count: flags.count)
         return L.Side(id: area?.id.uuidString ?? "nameless", area: area?.id, name: name, pill: pill, poleX: poleX,
                       poleTop: top, poleFoot: foot, pennants: pennants, extra: flags.count - shown, count: flags.count,
-                      label: words, lean: 0, extraFrame: flags.count > shown ? place(shown) : nil)
+                      label: words, lean: 0, extraFrame: flags.count > shown ? place(shown) : nil,
+                      opensPaper: area == nil && s.level != nil)
     }
 
     // MARK: The hand

@@ -270,7 +270,8 @@ struct WalkWorldView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(side.label)
                     .accessibilityIdentifier("walk.side.\(side.name.isEmpty ? "loose" : side.name.lowercased())")
-                    .walkAccessibilityHint(side.area == nil ? nil : WalkCopy.areaHint(ground: false, kept: true, focused: false))
+                    .walkAccessibilityHint(side.area == nil ? (side.opensPaper ? WalkCopy.readTheList : nil)
+                                           : WalkCopy.areaHint(ground: false, kept: true, focused: false))
                     .walkReadOnly(WalkLayout.tapEvent(side) == nil)
                     .accessibilityHidden(veilsWords)
                     .accessibilitySortPriority(1)             // after the area you stand in and its flags

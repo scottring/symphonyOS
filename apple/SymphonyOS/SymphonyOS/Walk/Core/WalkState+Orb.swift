@@ -31,16 +31,16 @@ extension WalkState {
     var showsVeil: Bool { step == 0 || orb == .open || teaching || ((1...5).contains(step) && typing != nil) }
 
     /// Next at the foot shows on steps 1 to 5 while the light is at rest and nothing is being typed,
-    /// the lesson included (S19: it shows the way on). On Welcome it is the quick start, under the
-    /// light while it is not pressed.
+    /// the lesson included (S19: it shows the way on), and not while the paper is up. On Welcome it is
+    /// the quick start, under the light while it is not pressed.
     var showsNextLine: Bool {
         if step == 0 { return orb == .idle || orb == .open }
-        return (1...5).contains(step) && orb == .idle && typing == nil
+        return (1...5).contains(step) && orb == .idle && typing == nil && !paperOpen
     }
 
     /// The top row (Back, More, Leave for now) on every step after Welcome but Look back up; hidden
-    /// while typing (F10: there is no Back with unsent words).
-    var showsTopRow: Bool { (1...5).contains(step) && typing == nil }
+    /// while typing (F10: there is no Back with unsent words) and while the paper is up (it has its own way back).
+    var showsTopRow: Bool { (1...5).contains(step) && typing == nil && !paperOpen }
 
     /// "More", in the middle of the top row: it opens the choices on the light and closes them again;
     /// shown while the light is taught too, since the lesson points to it.
@@ -299,6 +299,23 @@ extension WalkState {
 }
 
 extension WalkEvent {
+    /// While the paper is up only these reach the walk: the paper's own (open, close, a row), and what
+    /// time and the system send (the words and the session's end, the waits, a permission answer).
+    /// Every touch on what the paper covers (the light, Next, the top row, the flags and posts, the
+    /// typing field, the veil) is not.
+    var isUnderThePaper: Bool {
+        switch self {
+        case .paperOpened, .paperClosed, .paperRow, .heard, .listenEnded, .finishExpired, .noteExpired, .undoExpired,
+             .speechReady, .calendarAnswered:
+            return false
+        case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled, .speechUnavailable, .typeChanged, .typeSubmitted,
+             .typeDismissed, .point, .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .veilTapped, .moreTapped, .backTapped,
+             .leaveTapped:
+            return true
+        }
+    }
+
     /// Events that leave a flag waiting for its last words to wait on: the words and the
     /// session's end themselves, the finish wait, touches on the light that do nothing
     /// while it waits (a cancel lets it go, as it always has; only a press, whose
@@ -311,7 +328,8 @@ extension WalkEvent {
             return true
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
-             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped, .backTapped, .leaveTapped:
+             .rowToggled, .walkAnother, .sheetHandle, .goToToday, .nextTapped, .moreTapped, .backTapped, .leaveTapped,
+             .paperOpened, .paperClosed, .paperRow:
             return false
         }
     }
