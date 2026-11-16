@@ -825,3 +825,170 @@ F28, S39, S41, S45 (Week), S47, S48, S49, S57, S58, S59. Build it after Task 9: 
 
   Look for: a row's words cut where two lines would hold them; a band flag touching the sheet; the listening line on a row.
 - [ ] **Step 6: Commit** `Light Today and Week: a task's words on two lines, and the small fixes the cold read found`.
+
+---
+
+## As built (2026-11-16)
+
+Written at the end of Task 10, for the owner. The branch is `claude/ios-light-build`; nothing is pushed, nothing is on anyone's phone yet. Built in this order: 1, 2, 2A, 12, 3, 4, 11, 5, 6, 7, 8, 9, 13, 10. Every task was reviewed; most had one fix round, Task 5 had four. The full record of every decision, with file and line, is the ledger (`.superpowers/sdd/2026-11-15-iphone-light-hand-walk-fixes/progress.md`).
+
+### What changed, in plain words
+
+- **The walk stands in one area at a time.** One tall post in the middle carries that area's name, the goal above (from Season down), and the step's own goals. Every other area is a small post at the side with coloured pennants and its name; a tap walks there.
+- **The controls are where people look.** A top row (Back, More, Leave for now), the light in the middle with three choices on it, one gold Next button at the foot. While typing, an X and a gold Add sit in the field.
+- **The goal above shows only its own goals** (the owner's decision of 2026-11-16, ruling F40). A tap on it moves to the area's next goal above; "1 of 3" says how many. Goals in the area that hang under none of them get their own stop, "Not under a goal yet". An empty goal above says so.
+- **The paper.** "+n more", the nameless post, and a cloth on Look back up open a plain list of the whole level, by area. A tap on a row walks to that goal.
+- **Look back up** reads one area top to bottom, one cloth a level, the newest goal on each with "+n more"; the other areas stand at the side. "See my whole plan" behind Today and Week is the same picture.
+- **The Month, Season and Year pages** are the same drawing as the walk, standing in one area, with a paper foot: a strip that opens the paper, and the add bar under it.
+- **Today and Week** show a task's words on two lines instead of cutting them.
+- **Wider windows** (the Duo's inside screen, half of it, opened flat, the outside screen) have the painting edge to edge; no navy bars.
+- **The phone stays upright** for a light household; the Duo's inside screen still turns.
+- **Examples** answer the question asked: only for the area you stand in and the step's level.
+- **Words are broken into lines by the app itself** (ruling F39), from the fonts' own letter widths, so a line never runs past its cloth and nothing is shrunk to fit.
+
+### Every ruling, one line each
+
+Each line: what was built, then the cost if the ruling is wrong.
+
+- **F1** The "1 of 3" area count shows only on the whole-year walk's Year step. Cost: a quick-start person never sees how many areas they kept.
+- **F2** A goal is planted in the area you stand in; the old automatic sorting and "That went under …" note are gone. Cost: "run a 5K" said while standing in Work stays in Work until moved.
+- **F3** Steps 2 to 5 show one goal from the level above on the post; a tap on it switches. Cost: switching takes a tap people may not guess (the why line says it).
+- **F4** On steps 2 to 5 a side post stands only for an area with a goal on this level or the one above; on Year and Look back up every other kept area has one. Cost: an empty area cannot be walked to on a lower step without going back up.
+- **F5** The ground shows area names only. Cost: on the ground you cannot see which areas already hold goals.
+- **F6** Look back up and "See my whole plan" read the standing area top to bottom. Cost: the first look back shows one area's words, not all.
+- **F7** "+n more" opens the paper; a row walks to its goal and chooses it. Cost: one more surface inside the walk.
+- **F8** Welcome is unchanged (Task 10 also stopped the foot's shade darkening it). Cost: the quick start still reads as words under the light.
+- **F9** A title longer than three lines is cut with "…" on its flag; the paper shows it whole. Cost: a long goal is read in full only on the paper.
+- **F10** While the keyboard is up the top row is hidden. Cost: leaving while typing takes a keyboard dismiss first.
+- **F11** A chosen goal's Move to / Remove row stands above the light. Cost: none known.
+- **F12** Goals with no kept area stand on a nameless side post; a tap opens the paper. Cost: they are read only on the paper.
+- **F13** Extra width on a wider window goes to the side posts, wider flags, and Back / Leave for now in the corners; the middle stays phone-sized. Cost: on the inside screen the middle still reads as a phone's column.
+- **F14** A wider window shows the same mountain enlarged, never past 1.6 times its pixels. Cost: on the inside screen upright the painting is a little soft.
+- **F15** On windows about 670 high the walk is the phone's board at 79% size. Cost: smaller words on three of the Duo's four shapes (a known gap; needs its own board).
+- **F16** On short windows the pages draw their mountain at full size, cropped. Cost: a page frames the painting differently from the walk.
+- **F17** Opened flat, the walk and pages stay one column centred on the fold. Cost: the post and the light sit on the crease (a known gap; needs its own board).
+- **F18** On the outside screen the walk is centred beside the system's column. Cost: none seen.
+- **F19** Cloths on one post are their own touch shapes (not held 44 apart). Cost: on a crowded post a tap can land on the neighbour.
+- **F20** The person's words win over the board's sizes: goal above up to 3 lines, a long area name on 2 lines, a Look back up cloth up to 3 lines. Cost: taller stacks, sometimes one flag fewer.
+- **F21** A Look back up cloth opens its level's paper. Cost: one more tappable thing on the last screen.
+- **F22** Typing has an X (closes, plants nothing) and a gold Add; the mountain's words are veiled while typing. Cost: two small controls.
+- **F23** Undo is offered only for what was done on the step in view. Cost: a slip noticed after Next needs Back and Remove.
+- **F24** The walk's Move to offers only kept areas; Remove is always in sight. Cost: none known.
+- **F25** Short windows get "See my whole plan" as a one-line handle. Cost: about 20 points of Today's sheet.
+- **F26** A light household's phone-sized screens stay upright. Cost: no sideways use on a phone.
+- **F27** Examples only for the standing area and level; a used one comes down. Cost: fewer examples where a list is short.
+- **F28** Today and Week give a task two lines. Cost: about one row fewer on a long day.
+- **F29** "piece" is gone from the sign: "No winter goal under this yet". Cost: wording the owner did not pick.
+- **F30** The question block never ends below y 278: a long question drops a size, then loses its helper line. Cost: on the longest goals the helper line is missing.
+- **F31** A flag is 18 + 17 a line high; the goal above gives up lines before any flag is dropped. Cost: a long goal above is cut on its flag when the post is full.
+- **F32** The side posts' high row is 86 above the low row (board: 84), and touching pills narrow by a point. Cost: none visible.
+- **F33** (superseded by F39) Lines counted from the real fonts.
+- **F34** The small "you are here" caret is drawn only where it has room. Cost: on a full post the caret is missing.
+- **F35** On a walk-down only the walked goal's line is on the mountain. Cost: other areas' counts are not in view then.
+- **F36** With examples on, examples give way before the person's own goals. Cost: sometimes only one example shows.
+- **F37** Every line of a cloth has a fixed height. Cost: an emoji may sit a little low.
+- **F38** (superseded by F39) Where a line may break.
+- **F39** The app breaks every cloth's and question's lines itself, from the fonts' widths; views draw them unscaled. Cost: an unusual title may break a word earlier than the system would.
+- **F40** The goal above shows only its own goals; a tap moves round the area's goals above, then "Not under a goal yet"; "1 of 3" on the cloth. The owner's decision, 2026-11-16. Cost: an area's other goals are one tap away instead of all in sight.
+
+Process rulings (the controller's, while building):
+
+- **P1** Task 5 made only the view edits needed to compile; Task 6 drew. Cost: none left.
+- **P2** Old state (`expanded`, stubs) kept compiling until Task 9 deleted it. Cost: none left.
+- **P3** The pages passed a no-op for side posts until Task 9 wired them. Cost: none left.
+- **P4** Task 9's goal count reads the demo plan, not a literal. Cost: none.
+- **P5** "The Mac must still build" means no new Mac errors; the Mac target was already broken in two full-edition files (`DinnerCard.swift`, `ListsView.swift`). Cost: a Mac build stays broken for reasons outside this pass.
+- **P6** Task 2 was finished from the work a dead session left. Cost: none found by review.
+- **P7, P8** Commit trailers: the session link and one co-author line on every commit. Cost: the trailer names one model for all.
+- **P9** A walk-down's goal above comes only from its own goal's line. Cost: after a skipped step the new goal has no goal above.
+- **P10** On Today a tap never traps the walk and always leads back to Finish (fourth wording). Cost: a walk-planted first thing is removed by Undo or Back only.
+- **P11** The plan does not stop to wait for the owner's answer on the wide-window shots. Cost: rework if he rejects the direction (he did not).
+- **P12** Undo of Pull it up gives a walk-down its line back. Cost: none.
+- **P13** Phones larger than the board are exempt from the 1.6 sharpness cap. Cost: moot after Task 5.
+- **P14** On a walk-down the first thing off the walked line is left out of one check. Cost: it is never shown as the goal above there.
+- **P15** A first thing just spoken becomes the goal above, so Next reads Finish. Cost: choosing another takes a tap round first.
+- **P16** Task 4 built before Task 11. Cost: none.
+- **P17** For about an hour the walk could not go back or leave (between Tasks 3 and 4). Cost: none now.
+- **P18** Back and Leave do nothing while typing; Undo pill hidden while typing. Cost: none.
+- **P19** The contrast test samples where the words are now. Cost: Year a shade darker on wide windows.
+- **P20** A very wide 56-letter goal is cut at a word in the question. Cost: such a goal is whole only on its flag and the paper.
+- **P21** The example lists are the plan's drafts; the owner may change them. Cost: wording.
+- **P22** (not used.)
+- **P23** "Show examples" is offered only while it would show something. Cost: none.
+- **P24** Examples turn off when you move to another area. Cost: one more tap to see them there.
+- **P25** American wording in the examples (and, from Task 10, in the demo plans). Cost: wording.
+- **P26** Implementers and reviewers ran on one model after a usage limit stopped a task overnight. Cost: a subtler fault might reach the final review.
+- **P27** Two picture stops moved on the phone (Year closer, Month further left) so side posts stand on land. Cost: his approved phone picture differs on two steps (one line each to restore).
+- **P28** The standing pill's and side pills' names are counted from the font's real capital widths and never shrunk (Task 10); the ground's chips are still by estimate (a known gap). Cost: a long name is cut with "…" on a side pill.
+- **P29** The painting's land is data and every side slot is tested on it. Cost: none.
+- **P30** The pages' side posts walk (Task 9); names counted from real widths (Task 10). Cost: none.
+- **P31** (superseded by F39) No break at a space before punctuation.
+- **P32** 14 side slots stand off the land (3 at the skyline on Year, 11 over thin river channels on Month), named exceptions. Cost: a small post can stand over a channel or touch the skyline.
+- **P33** The pale braided flats under the peaks count as land. Cost: small posts stand on what reads as frozen water.
+- **P34** Fonts' negative kerning is not counted (a known gap); a cut line drops a trailing comma (built in Task 10). Cost: 8 ordinary titles break one word earlier.
+- **P35** A goal chosen from the paper but not drawn on the post is named in the why line's place. Cost: one more sentence on a rare screen.
+- **P36** Every Look back up cloth gets a full 44-point touch. Cost: the stack is taller than the board.
+- **P37** Look back up's foot stands on land: the board's 556, else the nearest land above. Cost: a shorter pole on the phone.
+- **P38** Week's cloth on Look back up skips the task Today's cloth shows; the nameless post is read-only there; 98 windows no phone has are carved out. Cost: none on a real device.
+- **P39** Task 8's fix round, then the rest held for the final wave. Cost: none.
+- **P40** The chosen note stands where the why line stands. Cost: on the longest questions the Move row names the goal only to VoiceOver.
+- **P41** The why line is broken by the app like the cloths. Cost: none.
+- **P42** The river's lower bend is water in the data, so Look back up's foot stands on the bank (built in Task 10: the phone's foot moved from 556 to 537.5; no side slot moved). Cost: a shorter pole.
+- **P43** The foot's test reaches all three of its cases with made-up water (Task 10). Cost: none.
+- **P44** (replaced by F40.)
+- **P45** On the pages Move to offers every area, kept or not; moving a goal to a new area keeps it. Cost: a goal can be scattered into an area never chosen.
+- **P46** Task 9's fix round: the heading hides under the paper; a day turning leaves the page alone. Cost: none.
+- **P47** Task 13's four small concerns accepted (the list's top fade shows only when scrolled). Cost: on the smallest phone a row's edge shows beside the listening line.
+- **P48** Empty goals above stay in the round; an empty stop says so ("No fall goal under this yet" on a page, "Hold the light to add one." in the walk). Cost: a person taps through goals with nothing under them.
+- **P49** With Move to open on the two smallest windows, the panel can cover the chosen goal on the Year page when an area has a 24-letter name; the panel names the goal, so it is accepted and pinned. Cost: the chosen cloth is under its own panel there.
+- **P50** Today's step stays outside F40: the cloth above is the candidate for "Start the day with …?", and the first thing under it is not its child. Cost: one stacked picture that is not a hierarchy.
+- **P51** Task 9's last open items were done in Task 10 (section D). Cost: none once Task 10 is reviewed.
+
+### Where the build differs from the board's numbers, and why
+
+- A flag is 18 + 17 a line high (board 19): the board's own picture missed its numbers by 2 points (F31).
+- The side posts' high row is 86 above the low (board 84): at 84 a pill touched the pole below (F32).
+- Year's picture is closer (k 0.55, x 464; board 0.42, x 340) and Month's further left (x 290; board 370) so side posts stand on land (P27).
+- Look back up's cloths are at least 36 high and 8 apart (board: 23 and 4) so each takes a 44-point touch (P36); they hang square.
+- Look back up's foot is 537.5 on the phone (board 556): 556 is in the river's lower bend (P37, P42).
+- The standing pill's width comes from the font's real capital widths, not 8.4 points a capital: "HEALTH" is 73 wide (was 75), "HOME" on a side pill 46 (was 44) (Task 10, A6).
+- The question block's top is 96, its foot never below 278 (F30); the board did not say what happens to a long question.
+- Tests renamed since the plan was written: `sidePostsStandWhereThePhonesDo` is now `sidePostsStandOnLand` (`WalkBackdropTests`); `onThePhoneThePictureIsUnchanged` is now `onThePhoneThePictureStandsAtItsStops` (`WalkBackdropTests`; `aPhoneHasNoWings` is in `WalkStageTests`). The plan's body still uses the old names.
+
+### Known gaps (not built)
+
+- Fonts' negative kerning is not counted (P34): 8 ordinary titles break one word earlier than the system would; 13 of 920 question breakings take one more line.
+- A closing mark can start a line alone after a word broken by letters (odd titles only); a letter from a fallback font can overhang its line a little; a run with no spaces mixing Latin with emoji or Chinese could be counted short.
+- Two different tests for "a wider window" in `WalkStage`; no guard for a negative or zero scale; the outside screen's first frame may draw before its insets arrive.
+- `thePictureCoversEveryWindow` and `thePictureIsNeverEnlargedPastItsPixels` check only the ruled layouts' cameras; `sidePostsStandOnLand` checks the slots, not the drawn pills; the touch test approximates two windows' wings; some early RED claims have no log (the 355 touch cases, the zeroed `QJ` pair, the DailyMetrics carve-out).
+- Large files: `WalkLayoutTests.swift` (about 3,200 lines), `WalkHintRow.swift`, `WalkLayout+Standing.swift`, `MountainPageView.swift`.
+- Sizes still written in views on Today and Week (row padding, the list fade, the slot capsule, the sign's title heights) and in `MountainPageView` (scrim, foot radius); the page's camera is no longer pinned by a test.
+- 44 stage points are 34.8 real points on the 79% windows; the paper's words are full size there while positions scale; opened flat is one column; the pages' bar, strip and hint cross the fold.
+- Examples are drawn upright: no italic DM Sans is bundled.
+- The ground's chips still count a name at 8.4 points a capital and shrink it to 0.85 where it is wider: with eight areas on a phone a chip holds 46 points of words, and HEALTH, PEOPLE and LEARNING are wider at their real size, so counting them for real would split a one-word name across two lines. It needs a ground board decision (a narrower mark, or a smaller face).
+- `WalkEndingRow`'s title stays two lines at accessibility sizes; sign-out ignores the pinned demo day (debug only).
+- During a walk-down, goals the walk did not plant under a goal off the walked line are seen only on the paper; the "Not under a goal yet" stop offers goals off the line, and planting there starts a new line; the loose stop is not kept when a walk is picked back up (it lands on the newest goal above).
+- Left as small cleanups not done in Task 10: `MountainPage` falls back to today's date where its periods are not set yet (requiring them breaks many page tests that build a page without periods); `mountainFoot`'s `paperTop` is computed and pinned but not drawn from; the "one flag cut to fit" branch of the stack was not proven unreachable.
+- The walk at 79% on short windows and the single column on the fold opened flat each want their own board.
+
+### What Scott should look at on his phone
+
+In plain words, the things only his eye (or his real Duo) can judge:
+
+1. **Two picture stops moved** (P27): Year is a little closer and Month slides left, so the small side posts stand on land. Compare `shots/task-6/stop-before-step{1,3}-right.png` with `stop-after-…`. If he prefers the old picture, it is one line each to restore.
+2. **Small posts off the land** (P32): on Year three high side posts touch the skyline; on Month eleven slot positions over the river's thin channels. The cure is a new board (one row of side posts on Month, or a closer Year).
+3. **The pale braided flats count as land** (P33): small posts can stand on what may read as frozen water.
+4. **The river's lower bend** (P42): Look back up's post on the phone now stands on the bank (537.5, not 556). `shots/task-10/owner-phone-lookback-foot-after.png`.
+5. **A tall bare pole on Look back up** when an area holds only a year and a season goal: two cloths at the top of a long pole.
+6. **Look back up's cloths hang square** (no tilt), so every cloth keeps a full touch.
+7. **Week's cloth on Look back up skips the task Today's cloth shows** (P38), so one task is not read twice.
+8. **The nameless post is read-only on Look back up**; its goals are on every level's paper.
+9. **A partner's goals are listed on the paper** (P35), as the posts count them; the light version has no partner yet.
+10. **Move to on the pages offers every area** (P45), kept or not, and moving a goal to a new area keeps that area.
+11. **The goal above shows only its own goals** (F40, his decision of 2026-11-16): "1 of 3" on the cloth, a tap moves to the next, "Not under a goal yet" for the rest. An empty goal above says "No fall goal under this yet" on a page (`owner-phone-season-empty-stop.png`), and "Hold the light to add one." in the walk. The round includes empty goals above (P48).
+12. **Today is left out of F40** (P50): on Today's step the cloth above is the task "Start the day with …?" asks about, and the first thing under it is not its child. His call whether that should look different.
+13. **While a goal is chosen on a page, its panel covers the area's pill** on phone windows; with Move to open on the two smallest windows it can cover the chosen goal itself when an area has a 24-letter name (P49).
+14. **Example wording** (P21, P25): the lists are drafts; "Grow a kitchen garden" (not "Plant", which the walk never says) and "Text friends about Friday dinner today". Weekday examples can land next week ("on Monday" said on a Friday plants the following Monday).
+15. **Walk it down from a page** (`owner-phone-walkdown-open.png`): it opens standing in the goal's own area, with that goal above.
+16. **Things only the real Duo can confirm** (Task 12): the inside screen still turns; folding with the app open; the outside screen stays upright; a sign-out then a full household signing in on the same phone; the account-deletion sign-out; half open in the middle of the walk.
+17. **Left out of this pass on purpose**: large text on Today and Week and on the controls; Inbox and the rest of Settings; moving between weeks; editing a goal's words; a colour key on Look back up; the walk at 79% on short windows and opened flat (each needs a new board).

@@ -148,7 +148,7 @@ Email: [OWNER: demo email]
 Password: [OWNER: demo password]
 
 How to try it
-- The first walk starts automatically for a new account with no goals. Hold the light at the bottom, speak, and let go to plant a goal; or tap the light to open its choices and type instead. The walk can be replayed from Settings.
+- The first walk starts automatically for a new account with no goals. Hold the light, speak, and let go to add a goal; or tap More at the top (or the light) to open its choices and type instead. Back and Leave for now are at the top, the gold Next button at the foot. The walk can be replayed from Settings.
 - After the walk, Today and Week have an add bar at the foot of the page. Type in it, or tap the light to speak.
 
 Account deletion
