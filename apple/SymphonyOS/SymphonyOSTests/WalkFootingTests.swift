@@ -49,7 +49,10 @@ struct WalkFootingTests {
     @Test func levelIsTheBoard() {
         for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
             for post in layout.posts {
-                guard post.lean == 0, post.base == CGPoint(x: 195, y: 556), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
+                // The foot is the board's 556; looking back up, where 556 is water, the nearest land above (P37, P42).
+                let foot = s.step == 6 ? WalkLayout.lookBackStandingFoot(.overlookSquare, WalkStage(device: WalkArt.stageSize),
+                                                                         lowest: post.banners.last?.drawn.maxY ?? 110) : 556
+                guard post.lean == 0, post.base == CGPoint(x: 195, y: foot), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
                 else { Issue.record("\(Generated.describe(s)): the ruled post is not ruled"); return }
                 // Year to Today hang from the lowest cloth's place; Look back up from 6 under its pill at 110 (or from 110), 8 apart.
                 if s.step == 6 {
@@ -60,6 +63,10 @@ struct WalkFootingTests {
                     // P36: each at least 36 high, 8 apart.
                     for (a, b) in zip(post.banners, post.banners.dropFirst()) where b.frame.minY - a.frame.maxY != 8 || a.frame.height < 36 {
                         Issue.record("\(Generated.describe(s)): looking back up, \(b.frame.minY - a.frame.maxY) between cloths, \(a.frame.height) high"); return
+                    }
+                    // The last cloth too (Task 10: the pairs above never reached it).
+                    if let last = post.banners.last, last.frame.height < 36 {
+                        Issue.record("\(Generated.describe(s)): looking back up, the last cloth \(last.frame.height) high"); return
                     }
                 } else if let lowest = post.banners.last, lowest.frame.maxY != 532 { Issue.record("\(Generated.describe(s)): lowest cloth at \(lowest.frame.maxY)"); return }
             }
@@ -151,11 +158,12 @@ struct WalkFootingTests {
     /// widest (1 point away) it hangs all but still, and stays clear of it; with no post beside it, freely.
     @Test func besideAWidePillAClothKeepsStill() {
         let titles = ["Run a 5K", "Sleep by ten", "Cook at home", "Stretch"]
-        // People (a 58-wide pill, inner low, 271 to 329 at the right) beside Health's lowest cloths.
-        let tight = year(kept: ["Health", "People"], standing: "Health", titles: titles)
+        // Learning (a 58-wide pill, inner low, 271 to 329 at the right) beside Health's lowest cloths. (Task 10:
+        // People's pill is 56 now its capitals are counted from the face, so the widest name stands here.)
+        let tight = year(kept: ["Health", "Learning"], standing: "Health", titles: titles)
         let free = year(kept: ["Health"], standing: "Health", titles: titles)
         let pill = ruled(tight).sides[0].pill!
-        #expect(ruled(tight).sides[0].name == "People" && pill.minX == 271 && pill.width == 58)
+        #expect(ruled(tight).sides[0].name == "Learning" && pill.minX == 271 && pill.width == 58)
         let beside = natural(tight).posts[0].banners.last!, alone = natural(free).posts[0].banners.last!
         #expect(beside.id == alone.id)
         let sidePill = natural(tight).sides[0].pill!

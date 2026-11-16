@@ -16,6 +16,29 @@ extension WalkLayout {
     static let chipRowGap: CGFloat = 4
     /// What a chip's words stand between: 9 either side and the mark's 12.
     static let chipInset: CGFloat = 30
+    /// A chip's name is still broken by estimate, 8.4 points a capital, and drawn shrinking to 0.85 where
+    /// its capitals are wider (a known gap, Task 10): with eight areas on a phone a chip holds 46 points of
+    /// words, narrower than HEALTH, PEOPLE or LEARNING at their real widths, so counting them for real would
+    /// break a one-word name across its two lines. Its cure is a ground board decision.
+    static let chipChar: CGFloat = 8.4
+
+    /// A ground chip's name: in capitals, wrapped at its spaces where a line holds `width` by `chipChar`,
+    /// on at most two lines, the second cut with an ellipsis; a single word longer than a line stays whole.
+    static func chipLines(for name: String, width: CGFloat) -> [String] {
+        let perLine = max(1, Int(floor(width / chipChar)))
+        var lines: [String] = []
+        for word in name.uppercased().split(separator: " ").map(String.init) {
+            if let last = lines.last, last.count + 1 + word.count <= perLine {
+                lines[lines.count - 1] = last + " " + word
+            } else {
+                lines.append(word)
+            }
+        }
+        guard lines.count > 2 else { return lines.isEmpty ? [""] : lines }
+        let rest = lines[1...].joined(separator: " ")
+        return [lines[0], String(rest.prefix(max(1, perLine - 1))).trimmingCharacters(in: .whitespaces) + "…"]
+    }
+
     /// A lone chip stands at the midline; two or more span the columns.
     static let loneGap: CGFloat = 200
 
@@ -41,7 +64,7 @@ extension WalkLayout {
             return abs(da - db) < 0.01 ? a < b : da < db
         } ?? 0
         let row = areas.indices.map { rows ? abs($0 - centre) % 2 : 0 }
-        let words = areas.map { Array(pillLines(for: $0.name, width: width - chipInset).prefix(2)) }
+        let words = areas.map { Array(chipLines(for: $0.name, width: width - chipInset).prefix(2)) }
         let lines = words.map(\.count)
         let heights = lines.map { $0 > 1 ? chipTallHeight : chipHeight }
         // Rows from the foot up: the lower row ends at the standing foot, each row as tall as its tallest chip.

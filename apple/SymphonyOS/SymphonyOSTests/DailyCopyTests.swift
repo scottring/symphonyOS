@@ -153,6 +153,23 @@ struct DailyCopyTests {
         }
     }
 
+    /// P48 and Task 10 (D3): on a Season or Month page the hint reads, first that applies: an empty page;
+    /// a goal above with nothing under it, in the sign's own words for its season or month; while the goal
+    /// above is one of several, that a tap switches; then the side posts; then the flags.
+    @Test func aPageSaysWhatItsGoalAboveHolds() {
+        let fall = WalkPeriods.pick(now: PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!)
+        #expect(DailyCopy.emptyStop(.season, periods: fall) == "No fall goal under this yet")
+        #expect(DailyCopy.emptyStop(.month, periods: fall) == "No November goal under this yet")
+        #expect(DailyCopy.emptyStop(.year, periods: fall) == nil)
+        #expect(DailyCopy.switchGoalAbove == "Tap the goal above to switch")
+        let stop = DailyCopy.emptyStop(.month, periods: fall)
+        #expect(DailyCopy.hint(.month, sides: true, empty: true, emptyStop: stop, switches: true) == DailyCopy.emptyMountain)
+        #expect(DailyCopy.hint(.month, sides: true, empty: false, emptyStop: stop, switches: true) == stop)
+        #expect(DailyCopy.hint(.month, sides: true, empty: false, switches: true) == DailyCopy.switchGoalAbove)
+        #expect(DailyCopy.hint(.month, sides: true, empty: false) == "Tap a post to walk to that area")
+        #expect(DailyCopy.hint(.month, sides: false, empty: false) == "Tap a flag to move it or walk it down")
+    }
+
     /// The pages' paper: the strip's words, two lines tall and one line short, and the paper's heading.
     @Test func thePagesPaperSaysWhatItReads() {
         #expect(DailyCopy.readWhole(.year) == "Read the whole year")

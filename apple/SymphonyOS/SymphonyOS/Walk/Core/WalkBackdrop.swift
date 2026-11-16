@@ -182,6 +182,11 @@ struct WalkBackdrop: Equatable {
             // The broad river right of the wooded spit, and its lower curve.
             box(0.72, 0.75, 0.510, 0.523), box(0.75, 0.97, 0.5085, 0.530), box(0.55, 0.73, 0.524, 0.532),
             box(0.40, 0.80, 0.530, 0.545),
+            // The lower bend (P42): the arm turning down under the curve, the arm going back right
+            // under the wooded spit's bank, and the broad water below it down to the forest's edge.
+            box(0.43, 0.575, 0.545, 0.551), box(0.53, 0.585, 0.551, 0.5585), box(0.585, 0.645, 0.5565, 0.5635),
+            box(0.645, 0.675, 0.5585, 0.567), box(0.675, 0.75, 0.565, 0.588), box(0.75, 0.80, 0.570, 0.583),
+            box(0.80, 0.85, 0.5715, 0.578),
         ]
         return backdrop
     }()

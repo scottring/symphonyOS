@@ -64,7 +64,7 @@ extension WalkState {
                               title: WalkCopy.paperTitle(level, p), today: p.today)
             .hinted { id in
                 let does = paperRowTap(id)
-                return WalkCopy.paperRowHint(walks: does.walks, chooses: does.chooses, lookingBack: step == 6)
+                return WalkCopy.paperRowHint(walks: does.walks, chooses: does.chooses, switches: does.switches, lookingBack: step == 6)
             }
     }
 }

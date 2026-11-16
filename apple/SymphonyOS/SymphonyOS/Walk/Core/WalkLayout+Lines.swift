@@ -27,19 +27,34 @@ extension WalkLayout {
         case lookBack
         /// A tag line (a Week day, FIRST THING, an example's tag): 11 pt, tracked 0.6, 8 either side.
         case tag
+        /// An area's name on its standing pill or its ground chip, in capitals: 11 pt, tracked 1.1, 12
+        /// either side (`pillInset`; a ground chip leaves `chipInset` for its mark).
+        case pill
+        /// An area's name on a side pill, in capitals: 9.5 pt, tracked 1, 7 either side (`sidePillInset`).
+        case sidePill
 
         var size: CGFloat {
             switch self {
             case .flag: 13
             case .lookBack: 12
-            case .parent, .tag: 11
+            case .parent, .tag, .pill: 11
+            case .sidePill: 9.5
             }
         }
-        var tracking: CGFloat { self == .tag ? 0.6 : 0 }
+        var tracking: CGFloat {
+            switch self {
+            case .tag: 0.6
+            case .pill: 1.1
+            case .sidePill: 1
+            case .flag, .parent, .lookBack: 0
+            }
+        }
         var inset: CGFloat {
             switch self {
             case .flag, .tag: 16
             case .parent, .lookBack: 12
+            case .pill: 24
+            case .sidePill: 14
             }
         }
     }
@@ -199,7 +214,10 @@ extension WalkLayout {
     /// - where the words need more than `limit` lines, the last kept line is made again to end in
     ///   "…": its first word and as many whole further words as fit with the "…", or, if not even
     ///   its first word fits whole, as many of its characters as fit.
-    /// No line is empty; a title of only spaces has none.
+    /// - a cut line ends in "…" after its last word or character, never after a stray mark (`markBeforeCut`).
+    /// No line is empty; a title of only spaces has none. Every room the layout gives holds a character
+    /// and a fill's "-" (`WalkLayoutTests.everyRoomHoldsACharacterAndItsHyphen`); a narrower one could
+    /// not keep a line inside it.
     static func breakLines(_ text: String, room: CGFloat, limit: Int, measure: (String, Character?) -> CGFloat) -> [String] {
         guard limit > 0 else { return [] }
         let words = text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map { pieces(in: $0) }.filter { !$0.isEmpty }
@@ -257,8 +275,14 @@ extension WalkLayout {
             while k < characters.count, measure(String(characters[...k]) + ellipsis, nil) <= room { k += 1 }
             last = String(characters[..<k])
         }
+        // A mark or space the cut leaves at the end goes before the "…" ("permit for the van…", not
+        // "van,…"), unless nothing else would be left.
+        while let end = last.last, markBeforeCut.contains(end) || end.isWhitespace, last.count > 1 { last.removeLast() }
         return Array(lines.prefix(limit - 1)) + [last + ellipsis]
     }
+
+    /// The marks a cut line drops before its "…" (P34): what would read as a stray comma, stop or dash.
+    static let markBeforeCut: Set<Character> = [",", ".", ";", ":", "!", "?", "-", "–", "—", "/", "(", "[", "{", "“", "‘", "«", "·", "&", "\""]
 
     /// How many of these characters begin a line, at least one: as many as fit with the "-" a break
     /// between two letters or digits there shows.

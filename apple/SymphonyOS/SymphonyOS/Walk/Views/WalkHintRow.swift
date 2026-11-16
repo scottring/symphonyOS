@@ -39,7 +39,7 @@ struct WalkHintRow: View {
                 typingRow(s)
             } else {
                 if let frame = WalkLayout.nextFrame(s), let line = WalkCopy.nextLine(s, model.periods) {
-                    if s.step == 0 {
+                    if WalkLayout.nextIsWelcomeLine(s) {
                         welcomeLine(line)
                             .frame(width: frame.width, height: frame.height)
                             .position(x: frame.midX, y: frame.midY)
@@ -47,17 +47,22 @@ struct WalkHintRow: View {
                         nextButton(line, frame)
                     }
                 }
-                if let frame = WalkLayout.hintFrame(s) {
-                    hintText(WalkCopy.hint(s))
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
+                // VoiceOver reads the hint, the Undo pill or the Move row after the mountain and before the
+                // light; Next (unprioritised) after the light.
+                Group {
+                    if let frame = WalkLayout.hintFrame(s) {
+                        hintText(WalkCopy.hint(s))
+                            .frame(width: frame.width, height: frame.height)
+                            .position(x: frame.midX, y: frame.midY)
+                    }
+                    if let frame = WalkLayout.undoFrame(s) {
+                        undoPill(s, frame)
+                    }
+                    if WalkLayout.moveRowFrame(s) != nil {
+                        moveRow(s)
+                    }
                 }
-                if let frame = WalkLayout.undoFrame(s) {
-                    undoPill(s, frame)
-                }
-                if WalkLayout.moveRowFrame(s) != nil {
-                    moveRow(s)
-                }
+                .accessibilitySortPriority(Self.aboveTheLightPriority)
             }
         }
         .frame(width: stage.width, height: stage.height, alignment: .topLeading)
@@ -137,6 +142,9 @@ struct WalkHintRow: View {
         .position(x: frame.midX, y: frame.midY)
     }
 
+    /// Between the scene (2) and the light (1) in `WalkView`'s reading order.
+    static let aboveTheLightPriority: Double = 1.5
+
     /// The narrowest Next is drawn ("The foot": its words plus 56, at least 160, at most its frame's 280).
     static let nextMinWidth: CGFloat = 160
 
@@ -213,7 +221,7 @@ struct WalkHintRow: View {
     @ViewBuilder private func moveRow(_ s: WalkState) -> some View {
         let title = s.item(s.selected)?.title ?? ""
         let targets = s.moveTargets
-        if let frame = WalkLayout.moveChipsFrame(s), !targets.isEmpty {
+        if let frame = WalkLayout.moveChipsFrame(s) {
             ScrollView(.horizontal) {
                 HStack(spacing: 6) {
                     Text(WalkCopy.moveTo)
@@ -257,7 +265,7 @@ struct WalkHintRow: View {
     static let chipsFade: CGFloat = 24
 
     /// A chip: capitals on a navy pill with a thin edge, never shrunk; `width` when the layout gives one,
-    /// else as wide as its words. It takes a touch `stage.touch` high.
+    /// else as wide as its words and never narrower than a touch (`stage.touch`). It takes a touch `stage.touch` high.
     private func chip(_ label: String, width: CGFloat? = nil, height: CGFloat, colour: Color, border: Color,
                       _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -268,6 +276,7 @@ struct WalkHintRow: View {
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 12)
+                .frame(minWidth: width == nil ? stage.touch : nil)          // 44 real points across, at any scale
                 .frame(width: width, height: height)
                 .background(WalkPillBackground(fill: WalkPalette.navy.opacity(0.62), border: border))
                 .frame(height: max(height, stage.touch))
@@ -376,15 +385,13 @@ struct WalkHintRow: View {
 
 /// Under the light's own layer, so nothing on the compass is dimmed: the foot's shade (from y 560 to
 /// the foot, "The foot's shade": the walk's dark navy from nothing to 0.55 at 45% and 0.86 at the
-/// foot), and soft bands of the ground colour behind the open compass's hint, the points' words and
+/// foot; never on Welcome, `WalkLayout.footShadeTop`), and soft bands of the ground colour behind the open compass's hint, the points' words and
 /// the lines that teach the light, where they stand over the veiled mountain. The shade and the bands
 /// run from side to side of the window (the board plus its bleed), and the shade on down to the
 /// window's foot.
 struct WalkUnderlay: View {
     let model: WalkModel
     @Environment(\.walkStage) private var device
-    /// Where the foot's shade begins, in stage points.
-    static let shadeTop: CGFloat = 560
 
     var body: some View {
         let s = model.state
@@ -392,18 +399,20 @@ struct WalkUnderlay: View {
         let window = device.window
         let shade = WalkPalette.glowShadow          // rgba(0, 14, 70)
         ZStack(alignment: .topLeading) {
-            VStack(spacing: 0) {
-                LinearGradient(stops: [.init(color: shade.opacity(0), location: 0),
-                                       .init(color: shade.opacity(0.55), location: 0.45),
-                                       .init(color: shade.opacity(0.86), location: 1)],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: stage.height - Self.shadeTop)
-                shade.opacity(0.86)
-                    .frame(height: device.bleed.bottom)
+            if let top = WalkLayout.footShadeTop(s) {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [.init(color: shade.opacity(0), location: 0),
+                                           .init(color: shade.opacity(0.55), location: 0.45),
+                                           .init(color: shade.opacity(0.86), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: stage.height - top)
+                    shade.opacity(0.86)
+                        .frame(height: device.bleed.bottom)
+                }
+                .frame(width: window.width)
+                .offset(x: window.minX, y: top)
+                .frame(width: stage.width, height: stage.height, alignment: .topLeading)
             }
-            .frame(width: window.width)
-            .offset(x: window.minX, y: Self.shadeTop)
-            .frame(width: stage.width, height: stage.height, alignment: .topLeading)
             if s.showsPoints, let hint = WalkLayout.hintFrame(s) {
                 band(height: hint.height + 20, width: window.width).position(x: window.midX, y: hint.midY)
             }

@@ -732,6 +732,24 @@ struct MountainPageTests {
         #expect(page.focusArea == area("Home").id && page.selected == nowhere.id && page.panel?.title == "Loose ends")
     }
 
+    /// P48 and Task 10 (D3): on a Season page standing on a goal above that holds a flag, among two, the
+    /// hint says a tap on it switches; switched to the one with nothing under it, the sign's own words for it.
+    @Test func aSeasonPageSaysWhatItsGoalAboveHolds() {
+        let today = day(2026, 11, 10)
+        let empty = flag(.year, "Learn to sail", in: "Health")
+        let run = flag(.year, "Run a half marathon", in: "Health")
+        let tenK = flag(.season, "Run a 10k in the fall", in: "Health", parent: run.id)
+        var page = MountainPage(level: .season, items: [empty, run, tenK], areas: ridge, saved: [area("Health").id])
+        let periods = MountainPage.periods(level: .season, selected: today, today: today, seasons: nil)
+        page.periods = periods
+        #expect(page.focus == run.id)
+        #expect(page.hint(page.layout(today: today)) == DailyCopy.switchGoalAbove)
+        _ = page.apply(.flag(run.id))
+        #expect(page.focus == empty.id)
+        #expect(page.hint(page.layout(today: today)) == DailyCopy.emptyStop(.season, periods: periods))
+        #expect(page.hint(page.layout(today: today)) == "No fall goal under this yet")
+    }
+
     // MARK: Walk it down
 
     @Test func walkDownOpensTheNextLevelAboutTheFlag() {
@@ -1214,10 +1232,14 @@ struct MountainPageTests {
         #expect(look.label(on: .today) == DailyCopy.showMyDay)
         #expect(DailyCopy.showMyDay == WalkCopy.showMyDay)
         #expect(look.label(on: .week) == DailyCopy.showMyWeek)
-        // A flag is read: its tap does nothing here.
+        // A flag is read: its tap does nothing here, the look back and its plan are as they were (Task 10:
+        // `selected == nil` alone could not fail, the plan never chooses).
+        let before = look
         look.tap(.bannerTapped(goals[0].id))
+        #expect(look == before)
         look.tap(nil)
-        #expect(look.plan(goals: goals, tasks: tasks, periods: periods, me: me).selected == nil)
+        #expect(look == before)
+        #expect(look.plan(goals: goals, tasks: tasks, periods: periods, me: me) == plan)
 
         // Raised again: nothing open, nothing for the bar.
         #expect(look.handleTapped(areas: ridge, kept: []) == [])

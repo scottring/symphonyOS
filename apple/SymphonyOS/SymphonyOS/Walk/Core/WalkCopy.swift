@@ -82,7 +82,7 @@ enum WalkCopy {
         }
         // Exactly when the goal above takes a tap: the round it walks (on Today the nameless post's first
         // thing is in it too), not only the goals here.
-        if s.nextGoalAbove() != nil { line += focusAbove }
+        if s.nextGoalAbove() != nil { line += s.focus[level] == WalkState.noGoalAbove ? focusAboveLoose : focusAbove }
         return line
     }
 
@@ -104,7 +104,9 @@ enum WalkCopy {
             if let focused = s.focus[.today], focused != s.firstThing { return hintStartHere }
             if s.firstThing != nil { return hintFirstThing }
         } else if s.items(on: level).contains(where: { s.column(of: $0) == s.standing }) {
-            // Another only where the post stood at already holds one on this level (S36).
+            // Another only where the post stood at already holds one on this level (S36); on a goal above
+            // with nothing under it yet (an empty stop, P48), one.
+            if s.standsOnAnEmptyStop { return s.speechIsOff ? hintSpeechOff : hintOne }
             return s.speechIsOff ? hintSpeechOff : hintAnother
         }
         return s.speechIsOff ? hintSpeechOff : hintFirst
@@ -115,6 +117,8 @@ enum WalkCopy {
     static let hintOpen = "Tap one, or tap the light to close"
     static let hintFirst = "Hold the light and speak."
     static let hintAnother = "Hold the light to add another."
+    /// On a goal above with nothing under it yet while the area holds others (P48).
+    static let hintOne = "Hold the light to add one."
     static let hintGround = "Tap the ones that matter, then Next."
     /// The ground with nothing kept yet: the Next line says "Skip this step", so the hint does not say Next.
     static let hintGroundNone = "Tap the ones that matter."
@@ -390,13 +394,16 @@ enum WalkCopy {
     static let noGoalAbove = "Not under a goal yet"
     /// F40: the goal above's place in the area's round, on its own line under its words: "1 of 3".
     static func goalAboveCount(_ index: Int, of count: Int) -> String { "\(index) of \(count)" }
-    /// The "Not under a goal yet" cloth to VoiceOver: "Not under a goal yet, goal 3 of 3, tap to switch".
-    static func noGoalAboveLabel(_ index: Int, of count: Int) -> String {
-        "\(noGoalAbove), goal \(index) of \(count), \(tapToSwitch)"
+    /// The "Not under a goal yet" cloth to VoiceOver, with the level every cloth's label starts with and
+    /// without calling it a goal: "Season: Not under a goal yet, 3 of 3, tap to switch".
+    static func noGoalAboveLabel(_ index: Int, of count: Int, level: WalkLevel) -> String {
+        "\(levelName(level)): \(noGoalAbove), \(index) of \(count), \(tapToSwitch)"
     }
     static let tapToSwitch = "tap to switch"
     /// Added to a step's why line while a tap on the goal above switches to another (F3, `nextGoalAbove`).
     static let focusAbove = " Tap the goal above to switch."
+    /// The same, while the cloth above is the "Not under a goal yet" stop, which is not a goal (Task 10, D4).
+    static let focusAboveLoose = " Tap “\(noGoalAbove)” to switch."
 
     // MARK: The paper (F7)
 
@@ -442,13 +449,14 @@ enum WalkCopy {
 
     /// A row on the paper to VoiceOver: what its tap does here (`WalkState.paperRowTap`). On Look back up a
     /// row shows its area and chooses nothing; a row that neither walks nor chooses only closes the list.
-    static func paperRowHint(walks: Bool, chooses: Bool, lookingBack: Bool) -> String {
+    /// `switches`: in the area stood in, the tap brings the goal above the row hangs under (F40 rule 7).
+    static func paperRowHint(walks: Bool, chooses: Bool, switches: Bool = false, lookingBack: Bool) -> String {
         if lookingBack { return walks ? "Tap to see that area" : closeTheList }
         switch (walks, chooses) {
         case (true, true): return "Tap to walk there and choose it"
         case (true, false): return areaHint(ground: false, kept: true, focused: false)
-        case (false, true): return "Tap to choose it"
-        case (false, false): return closeTheList
+        case (false, true): return switches ? "Tap to see it under its goal and choose it" : "Tap to choose it"
+        case (false, false): return switches ? "Tap to see it under its goal" : closeTheList
         }
     }
     static let closeTheList = "Tap to close the list"
@@ -533,7 +541,7 @@ enum WalkCopy {
     enum BannerRole: Equatable {
         /// `focused`: the goal above the step is about; `focusedOfSeveral`: the same, with another
         /// one above in the area stood in, which a tap switches to.
-        case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example, stub(Int)
+        case mine, plain, focused, focusedOfSeveral, firstThing, firstThingMine, example
         /// On Today, the goal above when the next one in the round is not here but the nameless post's
         /// first thing: a tap goes to the first thing.
         case focusedThenFirstThing
@@ -553,7 +561,7 @@ enum WalkCopy {
             switch self {
             case .plain, .firstThing, .focused: return false
             case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                 .example, .stub, .opensPaper, .goalOfSeveral:
+                 .example, .opensPaper, .goalOfSeveral:
                 return true
             }
         }
@@ -575,7 +583,6 @@ enum WalkCopy {
         case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"
         case .firstThingFocused: return "Today: \(text), first thing, tap for the next one here"
         case .example: return "Example: \(text), tap to make it yours"
-        case .stub(let n): return "\(n) more, tap to show"
         case .opensPaper(let n):
             return n > 0 ? "\(withTag), and \(n) more, \(readTheList.lowercased())" : "\(withTag), \(readTheList.lowercased())"
         }

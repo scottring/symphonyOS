@@ -462,7 +462,7 @@ struct WalkCopyTests {
                  WalkCopy.ringLabel(done: 1, total: 3), WalkCopy.ring(done: 1, total: 3), WalkCopy.endingDate(p),
                  WalkCopy.replayButton, WalkCopy.replayFooter, WalkCopy.resumeButton, WalkCopy.walkWaiting,
                  WalkCopy.orbLabelWelcome, WalkCopy.orbLabel, WalkCopy.orbLabelTask, WalkCopy.orbLabelSpeechOff, WalkCopy.orbLabelGround, WalkCopy.rowDone, WalkCopy.rowOpen,
-                 WalkCopy.typeFieldLabel, WalkCopy.hintChoose, WalkCopy.hintOpen, WalkCopy.hintFirst, WalkCopy.hintAnother,
+                 WalkCopy.typeFieldLabel, WalkCopy.hintChoose, WalkCopy.hintOpen, WalkCopy.hintFirst, WalkCopy.hintAnother, WalkCopy.hintOne,
                  WalkCopy.hintGround, WalkCopy.hintGroundNone, WalkCopy.hintStartHere, WalkCopy.hintFirstThing,
                  WalkCopy.hintSpeaking, WalkCopy.hintSpeechOff, WalkCopy.teachHold, WalkCopy.teachLetGo,
                  WalkCopy.teachSpeechOff, WalkCopy.skipStep, WalkCopy.finish, WalkCopy.startWithThis, WalkCopy.nextGoal,
@@ -473,7 +473,7 @@ struct WalkCopyTests {
                  WalkCopy.areaHint(ground: false, kept: true, focused: true)]
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
                                             .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                                            .example, .stub(2), .opensPaper(3), .opensPaper(0)]
+                                            .example, .opensPaper(3), .opensPaper(0)]
         said += roles.map { WalkCopy.bannerLabel("Run a 5K", level: .week, tag: "TODAY", role: $0) }
         said += [WalkCopy.lookBackHint, WalkCopy.sideLabelWholePlan(name: "Health", goals: 7, tasks: 2),
                  WalkCopy.sideLabelWholePlan(name: "Work", goals: 1, tasks: 0), WalkCopy.sideLabelWholePlan(name: "Home", goals: 0, tasks: 3)]
@@ -601,6 +601,7 @@ struct WalkCopyTests {
         #expect(WalkCopy.nextGoal == "Next goal")
         #expect(WalkCopy.hintFirst == "Hold the light and speak.")
         #expect(WalkCopy.hintAnother == "Hold the light to add another.")
+        #expect(WalkCopy.hintOne == "Hold the light to add one.")
         #expect(WalkCopy.hintGround == "Tap the ones that matter, then Next.")
         #expect(WalkCopy.hintGroundNone == "Tap the ones that matter.")
         // It names the Next line's own words there (final review 2, minor).
@@ -755,7 +756,6 @@ struct WalkCopyTests {
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingFocused)    // the goal above
                 == "Today: Gym induction, first thing, tap for the next one here")
         #expect(b("Run a 5K", .year, nil, .example) == "Example: Run a 5K, tap to make it yours")
-        #expect(b("", .year, nil, .stub(3)) == "3 more, tap to show")
         // Look back up (F21): the level's newest flag, how many more stand on it, and that a tap reads them all.
         #expect(b("Feel strong again", .year, nil, .opensPaper(3)) == "Year: Feel strong again, and 3 more, tap to read the list")
         #expect(b("Tour the gym", .today, nil, .opensPaper(0)) == "Today: Tour the gym, tap to read the list")
@@ -789,7 +789,7 @@ struct WalkCopyTests {
     @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
                                             .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
-                                            .example, .stub(2), .opensPaper(3), .opensPaper(0)]
+                                            .example, .opensPaper(3), .opensPaper(0)]
         for role in roles {
             let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
             #expect(role.taps == label.contains(", tap "), "\(role)")

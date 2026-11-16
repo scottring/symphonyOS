@@ -250,7 +250,8 @@ struct DailyMetricsTests {
                 let targets = m.touchTargets
                 for r in targets {
                     if r.width < touch || r.height < touch { fail("\(r) under 44") }
-                    if carvedOut, r == m.lookBack, r.minY < top, r.maxY <= h - bottom {
+                    // Excused only where the handle crosses into the top inset (Task 10: wholly inside it is a fault).
+                    if carvedOut, r == m.lookBack, r.minY < top, r.maxY > top, r.maxY <= h - bottom {
                         intoTheInset.append("\(at): the handle \(r) above the top inset")
                     } else if r.minY < top || r.maxY > h - bottom {
                         fail("\(r) in the insets")
@@ -954,8 +955,11 @@ extension DailyMetricsTests {
     /// meets the cloth.
     @Test func thePanelNeverCoversTheChosenFlag() throws {
         let today = PlanCalendar.calendar.date(from: DateComponents(year: 2026, month: 11, day: 10))!
-        // The demo's ridge (six areas), and the fullest one (eight: Move to then offers seven chips).
-        let six = ["Health", "Home", "People", "Work", "Money", "Fun"], eight = six + ["Faith", "Learning"]
+        // The demo's ridge (six areas), then seven and eight with the longest name a person can give an area
+        // (24 characters, as `WalkLayoutTests`' ridge has it), whose chip is what makes the panel tall (D1).
+        let six = ["Health", "Home", "People", "Work", "Money", "Fun"]
+        let seven = six + [DemoStress.customName], eight = seven + ["Learning"]
+        #expect(DemoStress.customName.count == WalkWords.maxAreaName)
         let ridge = eight.map { WalkArea(id: UUID(), name: $0) }
         var items: [WalkItem] = []
         for (level, words, name) in DemoStress.full.script {
@@ -966,7 +970,7 @@ extension DailyMetricsTests {
                                   day: said.day, mine: true))
         }
         var checked = 0, covered: Set<String> = []
-        for (moving, names) in [(false, six), (true, six), (true, eight)] {
+        for (moving, names) in [(false, six), (true, six), (false, eight), (true, seven), (true, eight)] {
             let areas = ridge.filter { names.contains($0.name) }
             for w in pageWindows where ["phone", "narrow", "outside", "outside page", "half"].contains(w.name) {
                 let f = foot(w)
@@ -1003,11 +1007,22 @@ extension DailyMetricsTests {
             }
         }
         #expect(checked > 300, "\(checked)")
-        // Verified exactly: no case, Move to open or closed, six areas or eight. (The review reported two, on
-        // 375 x 667 and 382 x 678 for "More slow weekends together" with Move to open; with the panel's own
-        // estimate and the page standing where a paper row puts it, neither meets the chosen cloth.)
-        #expect(covered.isEmpty, "\(covered.sorted())")
+        // Ruling P49: with Move to open and the 24-character name among the chips, on the two smallest windows
+        // (375 x 667 and the outside screen's page, 382 x 678) the panel covers the Year page's "More slow
+        // weekends together" (and on 375 x 667 "Build a three-month cushion"); it names its goal, so it is
+        // accepted, and pinned exactly. Every other case,
+        // Move to open or closed, is clear. (Task 9's report put the earlier empty set down to the panel's
+        // estimate; it was the fixture: its extra areas had short names.)
+        #expect(covered == Self.panelCoversAccepted, "\(covered.sorted())")
     }
+    /// P49's two families, exactly as this sweep finds them (6 of its cases; the reviewer's own sweep, which also
+    /// chose from the post, counted 8 of 2,080): Year page, Move to open with the 24-character name among seven or
+    /// eight areas, on 375 x 667 ("narrow") and the outside screen's page, 382 x 678.
+    static let panelCoversAccepted: Set<String> = [
+        "narrow year More slow weekends together moving 7", "narrow year More slow weekends together moving 8",
+        "narrow year Build a three-month cushion moving 7", "narrow year Build a three-month cushion moving 8",
+        "outside page year More slow weekends together moving 7", "outside page year More slow weekends together moving 8",
+    ]
 
     /// The panel's height by estimate: 18 + 20 a title line + 19 for its line + 4 + 44 a row of chips.
     @Test func thePanelsHeightIsCountedFromItsLines() {

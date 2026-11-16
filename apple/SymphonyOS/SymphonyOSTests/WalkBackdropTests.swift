@@ -320,6 +320,25 @@ struct WalkBackdropTests {
         print("Look back up's foot: \(feet.joined(separator: "; "))")
     }
 
+    /// P43: the foot's other two branches, on the phone's step-6 picture with water made for the test
+    /// over the midline: water from 520 down past 556 lifts the foot to the nearest land above (519.5);
+    /// water over the whole span from 24 under the lowest cloth down past 556 leaves it at 556.
+    @Test func lookingBackTheFootClimbsToLandOrStaysAt556() throws {
+        let window = WalkStage(device: WalkArt.stageSize)
+        var art = self.art
+        let c = try #require(art.backdropCamera(step: 6, stage: window))
+        func paintingY(_ y: CGFloat) -> CGFloat { (c.y + y / c.k) / backdrop.size.height }
+        func water(from top: CGFloat, to bottom: CGFloat) -> CGRect {
+            CGRect(x: 0.4, y: paintingY(top), width: 0.2, height: paintingY(bottom) - paintingY(top))
+        }
+        art.backdrop?.water = [water(from: 520, to: 556.5)]
+        #expect(WalkLayout.lookBackStandingFoot(art, window, lowest: 300) == 519.5)
+        art.backdrop?.water = [water(from: 300, to: 557)]
+        #expect(WalkLayout.lookBackStandingFoot(art, window, lowest: 300) == 556)
+        art.backdrop?.water = []
+        #expect(WalkLayout.lookBackStandingFoot(art, window, lowest: 300) == 556)
+    }
+
     @Test func theHeldShadeIsOnlyWhereThePaintingIsBright() {
         #expect((0...6).map { art.topShade(step: $0) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])
         #expect((0...6).map { art.topShade(step: $0, stage: WalkWindows.phone) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])

@@ -58,7 +58,7 @@ struct DailyDemoTests {
         let today = day(2026, 11, 10)
         let rows = facts(try seeded("morning", on: today), on: today).rows
         #expect(rows.map(\.title) == ["Send the contractor the deposit", "Tour the gym on Main Street",
-                                      "Renew the passport", "Call Mum about Sunday lunch"])
+                                      "Renew the passport", "Call Mom about Sunday lunch"])
         #expect(rows.first?.forGoal == "Finish the bathroom")
         #expect(rows.first?.first == true)
         #expect(rows.map(\.forGoal) == ["Finish the bathroom", "Feel strong again", nil, "More slow weekends together"])
@@ -186,8 +186,8 @@ struct DailyDemoTests {
     private func chosen(_ page: MountainPage) -> String? { page.items.first { $0.id == page.selected }?.title }
 
     /// `-SymphonyDailyState select`: the first flag of the page's level with nothing under it
-    /// (else the first) is chosen, so the panel shows its line; `move` opens Move to; `zoom`
-    /// zooms that flag's peak on Year, or focuses its parent on Season and Month.
+    /// (else the first) is chosen, so the panel shows its line; `move` opens Move to; `zoom` taps that
+    /// flag's side post, so the page stands in its area.
     @Test func theMountainsDemoStates() throws {
         var year = try mountain(.year)
         DemoMode.showMountain(&year, ["select"])

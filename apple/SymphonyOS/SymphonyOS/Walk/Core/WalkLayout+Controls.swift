@@ -67,6 +67,14 @@ extension WalkLayout {
         return CGRect(x: centreX - nextFootWidth / 2, y: nextTop, width: nextFootWidth, height: nextFootHeight)
     }
 
+    /// Next is drawn as Welcome's glowing line under the light (F8), not the gold button at the foot.
+    static func nextIsWelcomeLine(_ s: WalkState) -> Bool { s.step == 0 }
+
+    /// The foot's shade, from y 560 down, under the controls on every step but Welcome: there it would
+    /// darken the approved first screen over its veil (F8).
+    static let footShadeStart: CGFloat = 560
+    static func footShadeTop(_ s: WalkState) -> CGFloat? { s.step == 0 ? nil : footShadeStart }
+
     // MARK: Above the light, at rest
 
     /// The hint's top at rest (above the light), at the foot while the light is busy, and while typing.
@@ -112,14 +120,14 @@ extension WalkLayout {
     }
 
     /// Inside the Move row (F24): "Move to" and the kept areas' chips at its left (scrolling sideways
-    /// when they overflow), Remove alone at its right, never scrolled. On Today there is nowhere to
-    /// move: no chips, and Remove stands alone in the middle.
+    /// when they overflow), Remove alone at its right, never scrolled. With no other kept area there are
+    /// no chips. On Today there is nowhere to move: no chips, and Remove stands alone in the middle.
     static let moveChipsRect = CGRect(x: 10, y: 558, width: 272, height: 38)
     static let removeRect = CGRect(x: 290, y: 558, width: 90, height: 38)
     static let removeAloneRect = CGRect(x: 150, y: 558, width: 90, height: 38)
 
     static func moveChipsFrame(_ s: WalkState) -> CGRect? {
-        guard moveRowFrame(s) != nil, s.level != .today else { return nil }
+        guard moveRowFrame(s) != nil, s.level != .today, !s.moveTargets.isEmpty else { return nil }
         return moveChipsRect
     }
 

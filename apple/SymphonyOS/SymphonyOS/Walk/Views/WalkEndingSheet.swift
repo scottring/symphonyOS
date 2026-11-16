@@ -42,8 +42,9 @@ struct WalkEndingView: View {
                 .allowsHitTesting(false)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilitySortPriority(3)       // read before the flags behind it
-            // "Tap a post to see that area", once, while other areas stand at the side and the sheet is down.
-            if let hint = model.layout(stage: device).lookBackHint, !s.sheetRaised {
+            // "Tap a post to see that area", once, while other areas stand at the side and the sheet is down
+            // (the layout gives no hint frame while the sheet is raised).
+            if let hint = model.layout(stage: device).lookBackHint {
                 Text(WalkCopy.lookBackHint)
                     .font(.custom("DMSans-Regular", fixedSize: 12.5))
                     .foregroundStyle(.white)
@@ -300,7 +301,7 @@ struct SheetHandleCapsule: View {
         }
         .foregroundStyle(EndingPaper.deepGreen)
         .padding(.horizontal, 20)
-        .frame(height: 36)
+        .frame(height: DailyMetrics.handleCapsule)
         .background(Capsule().fill(EndingPaper.walkFill))
         .overlay { if let outline { Capsule().strokeBorder(outline, lineWidth: 1) } }
     }

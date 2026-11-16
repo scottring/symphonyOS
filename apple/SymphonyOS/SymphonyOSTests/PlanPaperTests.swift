@@ -135,6 +135,23 @@ struct PlanPaperTests {
 
     // MARK: The paper and the mountain agree
 
+    /// How many flags the stop shown holds, counted from the items alone (Task 10, D5), not by
+    /// `standingFlags()`, which the layout draws from: on Season, Month and Week with a goal above of the
+    /// area shown, its own children; on the "Not under a goal yet" stop, the area's flags under none of its
+    /// goals one level up; otherwise every flag of the area on the level.
+    private static func stopFlags(_ s: WalkState) -> Int {
+        guard let level = s.level else { return 0 }
+        let here = s.items(on: level).filter { s.column(of: $0) == s.standing }
+        guard [WalkLevel.season, .month, .week].contains(level), let above = WalkLevel(rawValue: level.rawValue - 1),
+              let stop = s.focus[level] else { return here.count }
+        if stop == WalkState.noGoalAbove {
+            let goals = Set(s.items(on: above).filter { s.column(of: $0) == s.standing }.map(\.id))
+            return here.filter { !($0.parentId.map(goals.contains) ?? false) }.count
+        }
+        guard let goal = s.item(stop), s.column(of: goal) == s.standing else { return here.count }
+        return here.filter { $0.parentId == goal.id }.count
+    }
+
     /// The paper is the whole level the mountain shows: the area stood in has as many rows as its post
     /// shows flags plus its "+n more" (F40: where the area has goals above, the post shows one stop's flags,
     /// counted in full there, and the section holds every flag of the area), and every side post's count is
@@ -152,7 +169,7 @@ struct PlanPaperTests {
             let shown = banners.filter { $0.kind == .full }.count
             let more = banners.reduce(0) { if case .more(let n) = $1.kind { return $0 + n }; return $0 }
             let area = s.items(on: level).filter { s.column(of: $0) == s.standing }.count
-            if s.standingFlags().count != shown + more || rows(s.standing) != area
+            if Self.stopFlags(s) != shown + more || rows(s.standing) != area
                 || (s.goalAboveStops().isEmpty && rows(s.standing) != shown + more) {
                 problems.append("\(Generated.describe(s)): paper \(rows(s.standing)), post \(shown) + \(more)")
             }
@@ -225,7 +242,7 @@ struct PlanPaperTests {
                     let here = p.sections.first { $0.area == s.standing }?.rows.count ?? 0
                     let shown = banners.filter { $0.kind == .full }.count + more
                     // F40: the post shows the stop's flags; the paper every flag of the area.
-                    #expect(s.standingFlags().count == shown, "step \(step) in \(area.name)")
+                    #expect(Self.stopFlags(s) == shown, "step \(step) in \(area.name)")
                     #expect(here == s.items(on: level).filter { s.column(of: $0) == s.standing }.count, "step \(step) in \(area.name)")
                     if s.goalAboveStops().isEmpty { #expect(here == shown, "step \(step) in \(area.name)") }
                     #expect(p.total == s.items(on: level).count)

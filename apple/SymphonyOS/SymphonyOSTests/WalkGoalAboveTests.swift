@@ -70,6 +70,57 @@ private extension WalkLayout {
 }
 
 struct WalkGoalAboveTests {
+    /// Task 10 (D4): the words around the "Not under a goal yet" stop and rule 7 say what is true. A paper row
+    /// in the area stood in, under another goal above, says its tap brings it into sight under its goal (it
+    /// does: the goal above switches); one already in sight does not. The loose stop's label carries the level
+    /// as every cloth's does and does not call it a goal; the why line names it rather than "the goal above".
+    @Test func theWordsAroundTheLooseStopAreTrue() throws {
+        let shape = Shape(step: 3, goals: 2, per: 2, unhung: 1, elsewhere: 0)
+        var s = shape.state()
+        let stops = s.goalAboveStops()
+        #expect(stops.count == 3 && stops.last == WalkState.noGoalAbove && s.focus[.month] == stops[1])
+        let underFirst = try #require(s.items(on: .month).first { $0.parentId == stops[0] })
+        let shownNow = try #require(s.standingFlags().first)
+        #expect(s.paperRowTap(underFirst.id).switches && !s.paperRowTap(shownNow.id).switches)
+        #expect(!s.paperRowTap(underFirst.id).walks)
+        #expect(WalkCopy.paperRowHint(walks: false, chooses: false, switches: true, lookingBack: false) == "Tap to see it under its goal")
+        #expect(WalkCopy.paperRowHint(walks: false, chooses: true, switches: true, lookingBack: false)
+                == "Tap to see it under its goal and choose it")
+        // The row's tap does what its words say: the goal above becomes the row's own, and it is drawn.
+        s.paperOpen = true
+        _ = s.apply(.paperRow(underFirst.id), env)
+        #expect(s.focus[.month] == stops[0] && s.standingFlags().contains { $0.id == underFirst.id })
+
+        var loose = shape.state()
+        loose.focus[.month] = WalkState.noGoalAbove
+        loose = loose.settled
+        let layout = WalkLayout.make(loose, today: today, footing: .level)
+        let cloth = try #require(layout.above)
+        #expect(cloth.label == WalkCopy.noGoalAboveLabel(3, of: 3, level: .season))
+        #expect(cloth.label == "Season: Not under a goal yet, 3 of 3, tap to switch")
+        #expect(WalkCopy.why(loose, env.periods).hasSuffix(WalkCopy.focusAboveLoose))
+        #expect(WalkCopy.focusAboveLoose == " Tap “Not under a goal yet” to switch.")
+        #expect(WalkCopy.why(shape.state(), env.periods).hasSuffix(WalkCopy.focusAbove))
+    }
+
+    /// P48 (Task 10, 12a): on Season, Month and Week, standing on a goal above with nothing under it while the
+    /// area holds other flags on the level, the hint asks for one, not another; on a goal above that holds
+    /// flags, another; with nothing in the area on the level at all, the first.
+    @Test func anEmptyStopAsksForOne() {
+        for step in 2...4 {
+            var s = Shape(step: step, goals: 2, per: 0, unhung: 0, elsewhere: 0).state()   // goal 0 holds none, goal 1 three
+            let level = WalkLevel(rawValue: step)!
+            let goals = s.goalAboveStops()
+            #expect(goals.count == 2, "step \(step)")
+            s.focus[level] = goals[1]
+            #expect(!s.standsOnAnEmptyStop && WalkCopy.hint(s) == WalkCopy.hintAnother, "step \(step)")
+            s.focus[level] = goals[0]
+            #expect(s.standsOnAnEmptyStop && WalkCopy.hint(s) == WalkCopy.hintOne, "step \(step)")
+            let bare = Shape(step: step, goals: 1, per: 0, unhung: 0, elsewhere: 0).state()
+            #expect(bare.standsOnAnEmptyStop && WalkCopy.hint(bare) == WalkCopy.hintFirst, "step \(step)")
+        }
+    }
+
     /// Going round the stops: each stop draws only its own flags (the goal above's children, or on the last
     /// stop those under none of the area's goals), "+n more" counts the rest of that stop's, every flag of
     /// the area on the level is shown or counted exactly once in all, the count line is right, the side
@@ -109,7 +160,9 @@ struct WalkGoalAboveTests {
                 #expect(s.standingFlags().map(\.id) == mine.map(\.id), "\(shape) at \(at)")
                 if stops.count > 1 {
                     #expect(above.tag == "\(at + 1) of \(stops.count)" && above.taps, "\(shape) at \(at)")
-                    #expect(above.label.contains("goal \(at + 1) of \(stops.count), tap to switch"), "\(shape) at \(at)")
+                    // The loose stop is not called a goal (Task 10, D4).
+                    let place = stop == WalkState.noGoalAbove ? "\(at + 1) of \(stops.count), tap to switch" : "goal \(at + 1) of \(stops.count), tap to switch"
+                    #expect(above.label.contains(place), "\(shape) at \(at)")
                     #expect(above.frame.height == 12 + 14 * CGFloat(above.lines) + 14, "\(shape) at \(at)")
                 } else {
                     #expect(above.tag == nil && !above.taps && !above.label.contains("tap"), "\(shape)")
@@ -200,12 +253,35 @@ struct WalkGoalAboveTests {
     }
 
     /// Year, Today and Look back up are as they were: no stops, no count line.
-    @Test func yearTodayAndLookingBackAreUnchanged() {
+    @Test func yearTodayAndLookingBackAreUnchanged() throws {
         var s = Shape(step: 2, goals: 2, per: 2, unhung: 1, elsewhere: 0).state()
         for step in [1, 5, 6] {
             s.step = step
             #expect(s.goalAboveStops().isEmpty, "step \(step)")
             #expect(WalkLayout.make(s.settled, today: today, footing: .level).banners.allSatisfy { !$0.loose }, "step \(step)")
         }
+        // Task 10 (D5): what is drawn, exactly. Year: Health's two year goals, oldest first, no goal above.
+        let health = area("Health").id
+        let years = s.items(on: .year).filter { $0.areaId == health }
+        s.step = 1
+        let year = WalkLayout.make(s.settled, today: today, footing: .level)
+        #expect(year.drawn == years.map(\.id) && year.above == nil && year.more == 0)
+        #expect(year.banners.map(\.label) == years.map { "Year: \($0.title), tap to move or remove" })
+        // Look back up: one cloth a level, the newest each, standing for the rest: the year's second goal (+1)
+        // and the season's last flag, "Under none 0" (2 + 5 + 1 in all, +7), whatever stop Season stood on.
+        s.step = 6
+        let back = WalkLayout.make(s.settled, today: today, footing: .level)
+        let seasons = s.items(on: .season).filter { $0.areaId == health }
+        #expect(back.banners.map(\.itemId) == [years.last?.id, seasons.last?.id])
+        #expect(back.banners.map(\.more) == [1, 7] && seasons.last?.title == "Under none 0")
+        // Today: the first thing alone on the post (a week task under the first month goal), its candidate above.
+        var t = Shape(step: 4, goals: 2, per: 2, unhung: 1, elsewhere: 0).state()
+        let first = try #require(t.items(on: .week).first { $0.areaId == health && $0.parentId != nil })
+        t.step = 5
+        t.firstThing = first.id
+        t = t.settled
+        let todayLayout = WalkLayout.make(t, today: today, footing: .level)
+        #expect(todayLayout.drawn == [first.id] && todayLayout.more == 0)
+        #expect(todayLayout.above.map { !$0.loose && $0.level == .week } ?? true)
     }
 }

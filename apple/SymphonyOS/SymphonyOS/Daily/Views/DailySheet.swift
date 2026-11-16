@@ -109,7 +109,7 @@ struct DailyPaperFade: View {
 /// so a row going under the header reads as scrolled rather than cut. It takes no touches.
 struct DailyListTopFade: View {
     static let height: CGFloat = 14
-    static let space = "daily.list"
+    nonisolated static let space = "daily.list"
     let shown: Bool
 
     var body: some View {
@@ -198,7 +198,7 @@ struct DailyRaisedPaper: View {
 /// redrawing the page as they scroll, so the row a change touched can be scrolled into sight: clear
 /// of the fade and the Undo above the bar, or of Week's Move to panel (`DailyMetrics.reveal`).
 @MainActor final class DailyRowFrames {
-    static let space = "daily.page"
+    nonisolated static let space = "daily.page"
     private var frames: [UUID: CGRect] = [:]
     /// The list's scroll view, as laid out now.
     private var list: CGRect?

@@ -250,13 +250,14 @@ struct WalkBannerView: View {
         .walkBannerShadow(glows: banner.glows)
     }
 
-    /// "+n more": the flags not shown, on a small cloth in the level's colour a shade deeper.
+    /// "+n more": the flags not shown, on a small cloth in the level's colour a shade deeper; its line as
+    /// the layout gives it (`Banner.words`, F39), unscaled.
     private var more: some View {
-        Text(banner.text)
-            .font(WalkClothFace.font(.tag))
+        Text(banner.words.first ?? "")
+            .font(WalkClothFace.font(.parent))
             .foregroundStyle(.white)
             .lineLimit(1)
-            .minimumScaleFactor(0.8)
+            .fixedSize()
             .opacity(words)
             .padding(.bottom, 4)
             .frame(width: banner.frame.width, height: banner.frame.height)

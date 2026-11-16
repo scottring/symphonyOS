@@ -25,9 +25,10 @@ extension WalkLayout {
         let question: String
         let questionSize: CGFloat
         let questionLines: [String]
-        let whyLines: Int
         let foot: CGFloat
         let why: [String]
+        /// How many lines the why line is drawn on: its lines.
+        var whyLines: Int { why.count }
         var showsWhy: Bool { whyLines > 0 }
     }
 
@@ -152,7 +153,7 @@ extension WalkLayout {
         return n
     }
 
-    /// The block's foot by estimate: the eyebrow, the question, and the why line when it has lines.
+    /// The block's foot: the eyebrow, the question and the why line, each by its face's measured line height.
     static func wordsFoot(questionSize: CGFloat, questionLines: Int, whyLines: Int) -> CGFloat {
         var foot = wordsTop + eyebrowLine + blockGap + CGFloat(questionLines) * questionSize * questionLineRatio
         if whyLines > 0 { foot += blockGap + CGFloat(whyLines) * whyLine + CGFloat(whyLines - 1) * whySpacing }
@@ -175,7 +176,7 @@ extension WalkLayout {
             let room = cuts ? whyRoom(questionSize: size, questionLines: lines.count) : 0
             whys = room > 0 ? whySetLines(why, wing: wing, limit: room) : []
         }
-        return Words(question: question, questionSize: size, questionLines: lines, whyLines: whys.count,
+        return Words(question: question, questionSize: size, questionLines: lines,
                      foot: wordsFoot(questionSize: size, questionLines: lines.count, whyLines: whys.count), why: whys)
     }
 

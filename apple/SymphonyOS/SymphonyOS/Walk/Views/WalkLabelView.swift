@@ -49,11 +49,12 @@ struct WalkLabelView: View {
         VStack(spacing: 0) {
             ForEach(Array(label.words.enumerated()), id: \.offset) { _, line in
                 Text(line)
-                    .font(.custom(WalkClothFace.name, fixedSize: 11))
-                    .tracking(1.1)
+                    .font(.custom(WalkClothFace.name, fixedSize: WalkLayout.Face.pill.size))
+                    .tracking(WalkLayout.Face.pill.tracking)
                     .lineLimit(1)
-                    // Only where a name's capitals are wider than the layout's estimate of them.
-                    .minimumScaleFactor(0.85)
+                    // The standing pill's line is the layout's, as given, never scaled (P30); a ground chip's is
+                    // still by estimate and shrinks where its capitals are wider (`WalkLayout.chipChar`, a known gap).
+                    .modifier(PillLine(fixed: !label.ground))
                     .frame(height: Self.nameLine)
             }
         }
@@ -68,6 +69,14 @@ struct WalkLabelView: View {
             shape.fill(WalkPalette.navy.opacity(0.85))
                 .overlay(shape.strokeBorder(.white, lineWidth: 1.5))
         }
+    }
+}
+
+/// A pill's line at its own size (`fixed`), or shrinking to 0.85 to fit (a ground chip).
+private struct PillLine: ViewModifier {
+    let fixed: Bool
+    func body(content: Content) -> some View {
+        if fixed { content.fixedSize() } else { content.minimumScaleFactor(0.85) }
     }
 }
 

@@ -234,7 +234,7 @@ extension DemoMode {
             let deposit = plant(.week, "Send the contractor the deposit", "Home", under: tile, on: today)
             let tour = plant(.week, "Tour the gym on Main Street", "Health", under: gym, on: today)
             let passport = plant(.week, "Renew the passport", on: today)
-            let mum = plant(.week, "Call Mum about Sunday lunch", "People", under: weekends, on: today)
+            let mum = plant(.week, "Call Mom about Sunday lunch", "People", under: weekends, on: today)
             writer.toggleDone(mum.id)
             if seed == "quiet" {
                 plant(.week, longTitle, on: today)

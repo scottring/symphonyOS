@@ -463,6 +463,13 @@ struct WalkState: Equatable {
         return goals.map(\.id) + (unhungHere().isEmpty ? [] : [Self.noGoalAbove])
     }
 
+    /// Season, Month and Week: the goal above shown is one of the area's stops and nothing hangs under it
+    /// yet (P48: an empty goal above stays in the round, so a first goal can be added under it).
+    var standsOnAnEmptyStop: Bool {
+        guard hangsByGoalAbove, let level, let stop = focus[level], goalAboveStops().contains(stop) else { return false }
+        return standingFlags().isEmpty
+    }
+
     /// The step's flags in the area stood in whose parent is none of this area's goals one level up (no
     /// parent, or one elsewhere), in planting order.
     func unhungHere() -> [WalkItem] {
@@ -704,12 +711,19 @@ struct WalkState: Equatable {
     /// to stand in another area (on Look back up, in that flag's area), and whether the flag is chosen. On
     /// steps 1 to 5 it walks exactly where a tap on that area's label would (`walksThere`): never to the
     /// area already stood in, nor to one the walk cannot stand in (on Today, on a walk down, an area with
-    /// nothing on the walked line).
-    func paperRowTap(_ id: UUID) -> (walks: Bool, chooses: Bool) {
-        guard let row = item(id) else { return (false, false) }
+    /// nothing on the walked line). `switches`: in the area already stood in, on Season, Month and Week, the
+    /// goal above changes to the one the row hangs under (F40 rule 7), so the row comes into sight.
+    func paperRowTap(_ id: UUID) -> (walks: Bool, chooses: Bool, switches: Bool) {
+        guard let row = item(id) else { return (false, false, false) }
         let column = column(of: row)
-        if step == 6 { return (column != nil, false) }
-        return (column.map(walksThere) ?? false, selects(id) && row.mine)
+        if step == 6 { return (column != nil, false, false) }
+        let walks = column.map(walksThere) ?? false
+        var switches = false
+        if !walks, hangsByGoalAbove, let level, let column, column == standing,
+           let shown = standing(toShow: row, in: column) {
+            switches = shown.focus[level] != focus[level]
+        }
+        return (walks, selects(id) && row.mine, switches)
     }
 
     /// Steps 2 to 5: a tap on the goal the step is about switches (`goalAboveAfterTap`); with

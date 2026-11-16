@@ -39,9 +39,6 @@ extension WalkLayout {
         let words = lookBackFirstLine + lookBackLine * CGFloat(banner.lines - 1) + (banner.more == nil ? 0 : tagLine)
         return lookBackWordsPad + max(0, banner.frame.height - words) / 2
     }
-    /// By estimate: a capital in the standing pill (11 pt, tracked) and one in a side pill (9.5 pt,
-    /// tracked). A title's lines are counted from the face itself (`WalkLayout+Lines.swift`).
-    static let pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3
 
     // MARK: The side posts' numbers
 
@@ -87,23 +84,23 @@ extension WalkLayout {
 
     // MARK: Words
 
-    /// An area's name as its pill draws it: in capitals, wrapped at its spaces where a line holds
-    /// `width` by the estimate of 8.4 points a capital, on at most two lines; what does not fit
-    /// on the second is cut with an ellipsis. A single word longer than a line stays whole on its own.
+    /// An area's name as its standing pill or ground chip draws it (P28, P30): in capitals, broken by
+    /// the one breaker (F39) at DM Sans SemiBold's own widths at 11 pt tracked 1.1 (`Face.pill`) into
+    /// lines no wider than `width`, at most two, the second cut with "…" only where two cannot hold it.
+    /// Drawn as given, never scaled.
     static func pillLines(for name: String, width: CGFloat) -> [String] {
-        let perLine = max(1, Int(floor(width / pillChar)))
-        var lines: [String] = []
-        for word in name.uppercased().split(separator: " ").map(String.init) {
-            if let last = lines.last, last.count + 1 + word.count <= perLine {
-                lines[lines.count - 1] = last + " " + word
-            } else {
-                lines.append(word)
-            }
-        }
-        guard lines.count > 2 else { return lines.isEmpty ? [""] : lines }
-        let rest = lines[1...].joined(separator: " ")
-        return [lines[0], String(rest.prefix(max(1, perLine - 1))).trimmingCharacters(in: .whitespaces) + "…"]
+        let lines = setLines(name.uppercased(), face: .pill, width: width, limit: 2)
+        return lines.isEmpty ? [""] : lines
     }
+
+    /// An area's name as its side pill draws it: in capitals, one line no wider than `width` at 9.5 pt
+    /// tracked 1 (`Face.sidePill`), cut with "…" where it does not fit. Drawn as given, never scaled.
+    static func sidePillLine(for name: String, width: CGFloat) -> String {
+        setLines(name.uppercased(), face: .sidePill, width: width, limit: 1).first ?? ""
+    }
+
+    /// How wide a name's line is on a pill of `face` (its capitals as the pill sets them).
+    static func pillWordsWidth(_ line: String, face: Face) -> CGFloat { textWidth(line, face: face) }
 
     // MARK: Roles
 
@@ -264,8 +261,8 @@ struct WalkStanding {
 
     func pillSize(_ area: WalkArea) -> (lines: Int, width: CGFloat, height: CGFloat) {
         let lines = pillWords(area)
-        let widest = CGFloat(lines.map(\.count).max() ?? 0)
-        return (lines.count, min(width, max(L.pillLeast, ceil(widest * L.pillChar + L.pillInset))),
+        let widest = lines.map { L.pillWordsWidth($0, face: .pill) }.max() ?? 0
+        return (lines.count, min(width, max(L.pillLeast, ceil(widest + L.pillInset))),
                 lines.count > 1 ? L.pillTallHeight : L.pillHeight)
     }
 
@@ -410,7 +407,7 @@ struct WalkStanding {
         let above = WalkLevel(rawValue: level.rawValue - 1) ?? level
         var piece = Piece(id: "\(postId)-above-none", who: "\(postId)-above-none", kind: .parent, item: nil, level: above,
                           text: WalkCopy.noGoalAbove, tag: count?.words, glows: false,
-                          label: WalkCopy.noGoalAboveLabel(count?.index ?? 1, of: count?.count ?? 1), taps: true,
+                          label: WalkCopy.noGoalAboveLabel(count?.index ?? 1, of: count?.count ?? 1, level: above), taps: true,
                           words: L.setLines(WalkCopy.noGoalAbove, face: .parent, width: across - L.Face.parent.inset, limit: lines),
                           lines: lines, size: parentSize(lines: lines, counted: count != nil))
         piece.stopId = WalkState.noGoalAbove
@@ -487,7 +484,8 @@ struct WalkStanding {
     func morePiece(_ hidden: Int, _ level: WalkLevel) -> Piece {
         Piece(id: "\(postId)-more", who: "\(postId)-more", kind: .more(hidden), item: nil, level: level == .today ? .week : level,
               text: WalkCopy.more(hidden), tag: nil, glows: false, label: WalkCopy.moreLabel(hidden), taps: true,
-              words: [WalkCopy.more(hidden)], lines: 1, size: L.moreSize)
+              words: L.setLines(WalkCopy.more(hidden), face: .parent, width: L.moreSize.width - L.Face.parent.inset, limit: 1),
+              lines: 1, size: L.moreSize)
     }
 
     func flagSize(lines: Int, tagged: Bool) -> CGSize {
@@ -591,7 +589,7 @@ struct WalkStanding {
         }
         let edges = L.edges(wing: wing)
         let pill = area.map { area -> CGRect in
-            let across = min(L.sidePill(wing: wing), ceil(CGFloat(area.name.count) * L.sidePillChar + L.sidePillInset))
+            let across = min(L.sidePill(wing: wing), ceil(L.pillWordsWidth(area.name.uppercased(), face: .sidePill) + L.sidePillInset))
             let x = min(max(poleX - across / 2, edges.lowerBound), edges.upperBound - across)
             return CGRect(x: x, y: pillTop, width: across, height: L.sidePillHeight)
         }

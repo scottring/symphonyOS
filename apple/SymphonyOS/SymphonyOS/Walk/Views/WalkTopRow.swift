@@ -64,10 +64,12 @@ struct WalkTopRow: View {
 }
 
 private extension View {
-    /// The top row's words: DM Sans SemiBold 14 on one line, in `colour`, with the walk's glow.
+    /// The top row's words: DM Sans SemiBold 14 on one line, in `colour`, with the walk's glow. They grow
+    /// with the text size up to the stage's cap (extra large) and shrink to 0.85 before anything is cut.
     func walkTopWords(_ colour: Color) -> some View {
         font(.custom("DMSans-SemiBold", size: 14))
             .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .foregroundStyle(colour)
             .walkGlow()
     }

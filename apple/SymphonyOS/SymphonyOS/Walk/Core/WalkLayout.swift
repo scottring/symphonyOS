@@ -122,6 +122,12 @@ struct WalkLayout: Equatable {
             return (pill.map { [$0] } ?? []) + [pole] + pennants.map(\.frame) + (extraFrame.map { [$0] } ?? [])
         }
 
+        /// The name as the side pill draws it, in its final width: one line in capitals, cut with "…"
+        /// where it does not fit (`sidePillLine`); empty for the nameless post.
+        var pillWords: String {
+            pill.map { WalkLayout.sidePillLine(for: name, width: $0.width - WalkLayout.sidePillInset) } ?? ""
+        }
+
         /// The small shadow at the pole's foot (`WalkLayout.sideFootShadow`).
         var footShadow: CGRect {
             CGRect(x: poleX - WalkLayout.sideFootShadow.width / 2, y: poleFoot - WalkLayout.sideFootShadow.height / 2,
