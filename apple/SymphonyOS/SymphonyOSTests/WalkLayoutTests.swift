@@ -535,15 +535,16 @@ struct WalkLayoutTests {
     }
 
     /// Examples, while on (F36): `e` examples, from `min(examples, max(2, 4 − flags))`, with the newest
-    /// `min(flags, 4 − e)` of the person's flags; where that does not fit the person's flags give way
-    /// first, down to one, then the examples, down to one. Year in Health has three examples (49, 66
-    /// and 49 high with their tag line); a one-line flag is 35.
+    /// `min(flags, 4 − e)` of the person's flags. A person's own goals outrank examples: where that
+    /// does not fit the examples give way first, down to one (the person's flags counted again for
+    /// each `e`), and only then the person's flags, down to one. Year in Health has three examples
+    /// (49, 66 and 49 high with their tag line); a one-line flag is 35.
     @Test func examplesTakeTheRoomLeft() {
         #expect(WalkCopy.examples(.year, area: "Health").count == 3)
         // own flags → (own shown, examples shown, "+n more")
-        // 0: three examples (201). 1: the flag and three (240). 3 and 5: two flags and two examples
-        // would need 252, so one flag, two examples and "+n more" (213).
-        for (own, expected) in [(0, (0, 3, 0)), (1, (1, 3, 0)), (3, (1, 2, 2)), (5, (1, 2, 4))] {
+        // 0: three examples (201). 1: the flag and three (240). 3: two flags and two examples would
+        // need 252, so one example and all three flags (195). 5: three flags, one example, "+2 more" (221).
+        for (own, expected) in [(0, (0, 3, 0)), (1, (1, 3, 0)), (3, (3, 1, 0)), (5, (3, 1, 2))] {
             let goals = (0..<own).map { flag(.year, "Goal \($0)", in: "Health") }
             var s = state(1, kept: ["Health", "Home"], items: goals, standing: "Health")
             s.examplesOn = [1]
@@ -588,6 +589,11 @@ struct WalkLayoutTests {
             if let chosen = s.selected, layout.banners.contains(where: { $0.itemId == chosen }) { withAChosenFlag += 1 }
         }
         #expect(on > 500 && withAChosenFlag > 50, "\(on) with examples showing, \(withAChosenFlag) beside a chosen flag")
+        // Three goals of the person's own: all three stand, and one example with them (the examples gave way).
+        let three = (0..<3).map { flag(.year, "Goal \($0)", in: "Health") }
+        var mine = state(1, kept: ["Health"], items: three, standing: "Health")
+        mine.examplesOn = [1]
+        #expect(ruled(mine).banners(.full).count == 3 && ruled(mine).banners(.ghost).count == 1 && ruled(mine).mores.isEmpty)
         // A chosen flag with little room: three-line goals under a three-line goal above. One example
         // still shows, beside the chosen flag; the newer flags give way and are counted.
         let above = flag(.season, "Lift twice a week with the trainer at my gym", in: "Health")
@@ -600,9 +606,11 @@ struct WalkLayoutTests {
         #expect(layout.banners(.full)[0].glows && layout.mores.map(\.kind) == [.more(3)] && Invariants.check(layout, s).isEmpty)
     }
 
-    /// F36: examples never take the person's last flag. Whenever the area holds a flag on this level,
-    /// at least one of them shows, in full unless one flag and one example cannot both stand in full
-    /// (then the flag is cut to the lines that fit: a three-line dated task beside a three-line example).
+    /// F36: examples never take the person's last flag, and they are the first to give way. Whenever
+    /// the area holds a flag on this level, at least one of them shows, in full unless one flag and
+    /// one example cannot both stand in full (then the flag is cut to the lines that fit: a three-line
+    /// dated task beside a three-line example). While more than one example shows, the person has
+    /// every flag the count allows (`min(flags, 4 − examples)`): flags give way only to the last example.
     @Test func examplesNeverTakeThePersonsLastFlag() {
         var checked = 0, cut = 0
         for wing in wings {
@@ -614,6 +622,11 @@ struct WalkLayoutTests {
                 if let chosen = s.selected, here.contains(where: { $0.id == chosen }) {
                     #expect(full.contains { $0.itemId == chosen }, "wing \(wing), \(Generated.describe(s)): the chosen flag gave way")
                 }
+                let examples = layout.banners(.ghost).count
+                if examples > 1 {
+                    #expect(full.count == min(here.count, 4 - examples),
+                            "wing \(wing), \(Generated.describe(s)): \(full.count) of \(here.count) flags beside \(examples) examples")
+                }
                 let whole = full.allSatisfy { $0.lines == WalkLayout.lines(for: $0.text, width: WalkLayout.standingWidth(wing: wing)) }
                 if !whole {
                     cut += 1
@@ -624,13 +637,15 @@ struct WalkLayoutTests {
         }
         #expect(checked > 1000)
         print("Examples: \(checked) posts with a flag and an example; the flag cut on \(cut)")
-        // Seven goals and examples on: the newest stands with two examples; the rest are counted.
+        // Seven goals and examples on: the newest three stand with one example; the rest are counted.
         let goals = (0..<7).map { flag(.year, "Goal \($0)", in: "Health") }
         var s = state(1, kept: ["Health"], items: goals, standing: "Health")
         s.examplesOn = [1]
-        #expect(ruled(s).banners(.full).map(\.itemId) == [goals[6].id] && ruled(s).mores.map(\.kind) == [.more(6)])
+        #expect(ruled(s).banners(.full).map(\.itemId) == goals.suffix(3).map(\.id) && ruled(s).mores.map(\.kind) == [.more(4)])
+        #expect(ruled(s).banners(.ghost).count == 1)
+        // A chosen older flag takes the oldest shown one's place.
         s.selected = goals[2].id
-        #expect(ruled(s).banners(.full).map(\.itemId) == [goals[2].id] && ruled(s).banners(.ghost).count == 2)
+        #expect(ruled(s).banners(.full).map(\.itemId) == [goals[2].id, goals[5].id, goals[6].id] && ruled(s).banners(.ghost).count == 1)
     }
 
     @Test func aPlantedExampleDoesNotComeBack() {

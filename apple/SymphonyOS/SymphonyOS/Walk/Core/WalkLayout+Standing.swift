@@ -257,10 +257,12 @@ struct WalkStanding {
     /// to the lines that fit. A chosen flag is always among those shown: it takes the oldest shown
     /// one's place.
     ///
-    /// Examples, while on (F36): `e` examples, from `min(examples, max(2, 4 − flags))` down to one,
-    /// and with each `e` the newest `min(flags, 4 − e)` of the person's flags, which give way
-    /// first, down to one. So an example always shows, and never at the cost of the person's last
-    /// flag: if one flag and one example do not fit in full, the flag is cut to the lines that fit.
+    /// Examples, while on (F36): `e` examples, from `min(examples, max(2, 4 − flags))`, with the newest
+    /// `min(flags, 4 − e)` of the person's flags. A person's own goals outrank examples: where that
+    /// does not fit, the examples give way first, down to one (the person's flags counted again for
+    /// each `e`); only then the person's flags, down to one. So an example always shows, and never at
+    /// the cost of the person's last flag: if one flag and one example do not fit in full, the flag
+    /// is cut to the lines that fit.
     func pieces(_ level: WalkLevel) -> [Piece] {
         let goal = parent(level)
         let goalLines = goal.map { L.lines(for: $0.title, width: L.parentWidth(wing: wing), face: .parent) } ?? 0
@@ -305,9 +307,11 @@ struct WalkStanding {
 
         if !ghosts.isEmpty {
             for e in stride(from: min(ghosts.count, max(2, 4 - flags.count)), to: 0, by: -1) {
-                for n in stride(from: min(flags.count, 4 - e), through: min(1, flags.count), by: -1) {
-                    if let cloths = fitted(own(n), Array(ghosts.prefix(e))) { return cloths }
-                }
+                if let cloths = fitted(own(min(flags.count, 4 - e)), Array(ghosts.prefix(e))) { return cloths }
+            }
+            // One example left: now the person's flags give way, down to one.
+            for n in stride(from: min(flags.count, 3) - 1, through: min(1, flags.count), by: -1) {
+                if let cloths = fitted(own(n), [ghosts[0]]) { return cloths }
             }
             return cut([ghosts[0]]) ?? stack(min(1, goalLines), [], [ghosts[0]])
         }
