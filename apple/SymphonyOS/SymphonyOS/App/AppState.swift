@@ -79,7 +79,7 @@ final class AppState {
     // Navigation
     var activeTab: AppTab = .planner
     var activeSidebarItem: SidebarItem = .today
-    var selectedDate: Date = .now
+    var selectedDate: Date = DailyClock.launchDay(arguments: ProcessInfo.processInfo.arguments, real: .now)
     /// Which horizon the Planner shows. `selectedDate` anchors every horizon:
     /// the week, month, season and year shown are the ones containing it.
     var horizon: Horizon = .today

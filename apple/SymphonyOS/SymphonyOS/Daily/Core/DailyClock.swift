@@ -10,6 +10,16 @@ enum DailyClock {
         return Date()
     }
 
+    /// The date `AppState.selectedDate` starts on: the pinned day when a debug build is launched with
+    /// `-SymphonyDailyNow`, so Week and the spread's left page open on the day the pages read (the day
+    /// turn, ruling D18, never moves a selected date back to a pinned day before the real one).
+    static func launchDay(arguments: [String], real: Date) -> Date {
+        #if DEBUG
+        if let day = pinned(in: arguments) { return day }
+        #endif
+        return real
+    }
+
     /// The selected date (`AppState.selectedDate`, which Week and the spread's left page follow) once
     /// the day has turned from `old` to `new`, by ruling D18: a selected date that was today or later
     /// when the day turned, and is now before today, becomes today (today itself, the sign's
