@@ -244,13 +244,14 @@ struct WalkWorldView: View {
         }
     }
 
-    /// The side posts first, then the standing post (its pole, then its cloths), then the area's
-    /// pill and its caret over the pole's top: a cloth is never under a side post's touch shape.
+    /// Drawn: the side posts first, then the standing post (its pole, then its cloths), then the area's
+    /// pill and its caret over the pole's top, so a cloth is never under a side post's touch shape.
+    /// Read by VoiceOver: the standing pill ("you are here"), its cloths, then the side posts.
     private var world: some View {
         let camera = layout.camera
         return ZStack(alignment: .topLeading) {
             ForEach(layout.sides) { side in
-                let box = WalkSideView.box(side, touch: stage.touch)
+                let box = side.touchFrame(touch: stage.touch)
                 Button { onSide(side) } label: { WalkSideView(side: side, box: box, veiled: veilsWords) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(side.label)
@@ -258,6 +259,7 @@ struct WalkWorldView: View {
                     .walkAccessibilityHint(side.area == nil ? nil : WalkCopy.areaHint(ground: false, kept: true, focused: false))
                     .walkReadOnly(WalkLayout.tapEvent(side) == nil)
                     .accessibilityHidden(veilsWords)
+                    .accessibilitySortPriority(1)             // after the area you stand in and its flags
                     .walkPlaced(box, camera)
             }
 
@@ -277,6 +279,7 @@ struct WalkWorldView: View {
                         .walkReadOnly(!banner.taps)
                         .walkActions(actions(banner))
                         .accessibilityHidden(veilsWords)
+                        .accessibilitySortPriority(2)
                         .walkPlaced(banner.frame, camera)
                 }
             }
@@ -291,6 +294,7 @@ struct WalkWorldView: View {
                     .accessibilityAddTraits(label.selected ? .isSelected : [])
                     .walkStandingIdentifier(label.standing)
                     .accessibilityHidden(veilsWords)
+                    .accessibilitySortPriority(3)             // "you are here" first, then its flags, then the side posts
                     .walkPlaced(label.frame, camera)
                 if let caret = label.caret {
                     WalkCaret(colour: WalkPalette.gold)

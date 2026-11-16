@@ -381,7 +381,8 @@ struct WalkPointLine: View {
 
 /// The flag of the words being spoken (S25): one cloth in the step's level's colour at the layout's
 /// `spokenFlag` frame (150 × 36, above the light, clear of every post), holding one line of the
-/// newest words, cut at the head (no caret: that means typing). It unfurls from its left edge.
+/// newest words, cut at the head (no caret: that means typing). It unfurls from its left edge (with
+/// Reduce Motion it fades in instead).
 struct WalkLiveFlag: View {
     let text: String
     let colour: Color
@@ -399,10 +400,11 @@ struct WalkLiveFlag: View {
             .background(WalkSwallowtail().fill(colour))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(text)
-            .scaleEffect(x: clothOut ? 1 : 0, y: 1, anchor: .leading)
+            // It unfurls from its left edge; with Reduce Motion it only fades in, in the cross-fade's time.
+            .scaleEffect(x: clothOut || reduceMotion ? 1 : 0, y: 1, anchor: .leading)
+            .opacity(clothOut || !reduceMotion ? 1 : 0)
             .shadow(color: WalkPalette.warmGlow.opacity(0.9), radius: 5)
             .onAppear {
-                // With Reduce Motion it arrives in the cross-fade's time.
                 withAnimation(reduceMotion ? WalkSceneView.crossFade : .easeOut(duration: 0.4)) { clothOut = true }
             }
     }

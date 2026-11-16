@@ -456,6 +456,47 @@ struct WalkLayoutTests {
 
     /// Every named side post drawn can be walked to: the tap it sends stands the walk in that area,
     /// on a first walk, a whole-year walk and a walk down alike. The nameless post sends nothing yet.
+    /// A side post's touch frame (`Side.touchFrame(touch:)`), over every generated state on each wing the
+    /// layout is measured on, at that window's own touch (`WalkStage.touch`: 44 on the phone, 55.7 on the
+    /// narrow phone's 42.3, 55.5 on the half window's 110.3 and the flat window's 404.9, all 44 real
+    /// points): it is at least that square; it
+    /// covers no standing cloth's centre and not the standing pill's; and where two side posts' frames
+    /// overlap, the later one in `sides` (drawn later, so it takes the tap there) covers none of the
+    /// earlier one's own pill or pole, so a tap on a post's name or pole always reaches that post.
+    @Test func aSidePostsTouchFrameIsItsOwn() {
+        var frames = 0, overlaps = 0
+        let windows: [(wing: CGFloat, stage: WalkStage)] = [(0, WalkWindows.phone), (42.3, WalkWindows.narrow),
+                                                            (110.3, WalkWindows.half), (404.9, WalkWindows.flat)]
+        for (wing, stage) in windows {
+            #expect(abs(stage.wing - wing) < 0.1, "the window's wing is \(stage.wing), not \(wing)")
+            for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) {
+                for touch in [stage.touch] {
+                    let touchFrames = layout.sides.map { $0.touchFrame(touch: touch) }
+                    let centres = layout.posts.flatMap(\.banners).map { CGPoint(x: $0.frame.midX, y: $0.frame.midY) }
+                        + layout.labels.filter(\.standing).map { CGPoint(x: $0.frame.midX, y: $0.frame.midY) }
+                    for (side, frame) in zip(layout.sides, touchFrames) {
+                        frames += 1
+                        #expect(frame.width >= touch - 0.001 && frame.height >= touch - 0.001, "\(Generated.describe(s)), wing \(wing): \(side.name) \(frame)")
+                        for c in centres where frame.contains(c) {
+                            Issue.record("\(Generated.describe(s)), wing \(wing), touch \(touch): \(side.name)'s touch frame covers a standing centre \(c)")
+                        }
+                    }
+                    for i in layout.sides.indices {
+                        for j in layout.sides.indices where j > i && touchFrames[i].intersects(touchFrames[j]) {
+                            overlaps += 1
+                            let own = Array(layout.sides[i].boxes.prefix(layout.sides[i].pill == nil ? 1 : 2))      // its pill and its pole
+                            for box in own where box.intersects(touchFrames[j]) {
+                                Issue.record("\(Generated.describe(s)), wing \(wing), touch \(touch): \(layout.sides[j].name)'s touch frame covers \(layout.sides[i].name)'s \(box)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #expect(frames > 1000)
+        print("Side touch frames: \(frames), overlapping pairs \(overlaps)")
+    }
+
     @Test func everySidePostCanBeWalkedTo() {
         let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
         var named = 0, onAWalkDown = 0
@@ -1658,6 +1699,32 @@ struct WalkLayoutTests {
     }
 
     #if canImport(UIKit)
+    /// The question's widths, made structural as the cloths' are: every character of Crimson Pro's table
+    /// (`questionGlyphWidths`, `questionOtherWidths`) alone and in every ordered pair, set by the bundled
+    /// face at 32 and at 28 points with its own kerning (no `.kern` attribute: a zero there turns the
+    /// kerning off), is never wider than `questionWidth` counts it.
+    @Test @MainActor func noQuestionPairIsSetWiderThanItIsCounted() throws {
+        var characters: [Character] = (32...126).map { Character(UnicodeScalar($0)!) }
+        characters += WalkLayout.questionOtherWidths.keys.sorted()
+        var wider: [String] = []
+        var pairs = 0
+        for size in [WalkLayout.questionSize, WalkLayout.questionSmallSize] {
+            let font = try #require(UIFont(name: "CrimsonPro-Regular", size: size), "the bundled face is not there")
+            for a in characters {
+                let alone = String(a)
+                if Self.setWidth(alone, font: font) > WalkLayout.questionWidth(alone, size: size) + 0.001 { wider.append("\(size) “\(alone)”") }
+                for b in characters {
+                    let pair = String([a, b])
+                    let set = Self.setWidth(pair, font: font), counted = WalkLayout.questionWidth(pair, size: size)
+                    if set > counted + 0.001 { wider.append("\(size) “\(pair)” set \(set), counted \(counted)") }
+                    pairs += 1
+                }
+            }
+        }
+        #expect(wider.isEmpty, "\(wider.count) set wider than counted: \(wider.prefix(12))")
+        print("The question's pairs: \(characters.count) characters, \(pairs) ordered pairs at two sizes; set wider than counted: \(wider.count)")
+    }
+
     /// The question's line estimate is never fewer lines than the text system sets it on: every step's
     /// question quoting each goal of the demo's plans (the preview plan and both stress plans), at 32
     /// and at 28 points, on a phone, the outside screen and the half window (`realLines` with Crimson

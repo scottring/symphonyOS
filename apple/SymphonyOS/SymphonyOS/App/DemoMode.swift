@@ -209,7 +209,7 @@ enum DemoMode {
     /// - `speak`: a hold that reaches speaking; the words come through the model's real
     ///   listening path from `walkListener`, which hears them as soon as it starts.
     /// - `type`: the Type it point: the one-line field, empty.
-    /// - `select`: a tap on the newest flag the walk planted on this step (Today: the first thing).
+    /// - `select`: a tap on the newest flag the walk planted on this step in the area it stands in (Today: the first thing).
     /// - `undo`: a flag typed and planted, so the Undo pill shows.
     /// - `draft:<words>`: the Type it field open holding those words, not sent.
     /// - `next`: Next at the foot, so a step is entered as a person arrives on it.
@@ -238,8 +238,9 @@ enum DemoMode {
                 model.choose(.type)
             case "select":
                 let s = model.state
+                // The newest flag on the step's level in the area the walk stands in, so it is on screen.
                 let id = s.level == .today ? s.firstThing
-                    : s.level.flatMap { level in s.items(on: level).last(where: \.mine)?.id }
+                    : s.level.flatMap { level in s.items(on: level).last(where: { $0.mine && s.column(of: $0) == s.standing })?.id }
                 if let id { model.send(.bannerTapped(id)) }
             case "undo":
                 model.choose(.type)

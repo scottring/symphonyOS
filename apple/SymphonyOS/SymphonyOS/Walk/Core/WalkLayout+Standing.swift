@@ -46,6 +46,8 @@ extension WalkLayout {
     static let pennantSize = CGSize(width: 20, height: 13)
     static let pennantOut: CGFloat = 3 - sidePoleWidth / 2, pennantDrop: CGFloat = 2, pennantPitch: CGFloat = 14
     static let pennantsAtMost = 4
+    /// The small shadow at a side pole's foot, as the board draws it.
+    static let sideFootShadow = CGSize(width: 16, height: 4)
     /// Two pills in one row of one side keep at least this far apart: each gives way equally.
     static let sidePillsApart: CGFloat = 1
 
@@ -226,7 +228,7 @@ struct WalkStanding {
                           width: L.caretSize.width, height: L.caretSize.height)
         return L.Label(id: area.id, name: area.name,
                        frame: CGRect(x: L.centreX - pill.width / 2 + dx, y: top, width: pill.width, height: pill.height),
-                       kept: true, focused: true, opacity: 1, tappable: false, hint: WalkCopy.areaHint(s, area.id),
+                       kept: true, opacity: 1, tappable: false, hint: WalkCopy.areaHint(s, area.id),
                        standing: true, lines: pill.lines, caret: caret ? mark : nil, words: pillWords(area))
     }
 

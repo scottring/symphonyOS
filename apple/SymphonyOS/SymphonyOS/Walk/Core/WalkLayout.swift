@@ -49,7 +49,7 @@ struct WalkLayout: Equatable {
     /// An area's name: a choice on the ground (`ground`), or the pill on the standing post
     /// (`standing`: its frame is the pill alone, and the caret is drawn 2 above it).
     struct Label: Equatable, Identifiable { let id: UUID; let name: String; let frame: CGRect
-        let kept: Bool; let focused: Bool; let opacity: Double; let tappable: Bool; let hint: String?
+        let kept: Bool; let opacity: Double; let tappable: Bool; let hint: String?
         /// For VoiceOver: kept, on the ground.
         var selected: Bool = false
         /// The hand: how far the label stands off its ruled place (a chip on the ground stands a little higher).
@@ -86,6 +86,19 @@ struct WalkLayout: Equatable {
             let pole = CGRect(x: poleX - WalkLayout.sidePoleWidth / 2 + min(0, reach), y: poleTop,
                               width: WalkLayout.sidePoleWidth + abs(reach), height: poleFoot - poleTop)
             return (pill.map { [$0] } ?? []) + [pole] + pennants.map(\.frame) + (extraFrame.map { [$0] } ?? [])
+        }
+
+        /// The small shadow at the pole's foot (`WalkLayout.sideFootShadow`).
+        var footShadow: CGRect {
+            CGRect(x: poleX - WalkLayout.sideFootShadow.width / 2, y: poleFoot - WalkLayout.sideFootShadow.height / 2,
+                   width: WalkLayout.sideFootShadow.width, height: WalkLayout.sideFootShadow.height)
+        }
+
+        /// Where the post takes a tap: everything it draws (its boxes and its foot's shadow), made at
+        /// least `touch` square about its middle (`WalkStage.touch`: 44 real points on any window).
+        func touchFrame(touch: CGFloat) -> CGRect {
+            let drawn = boxes.reduce(footShadow) { $0.union($1) }
+            return drawn.insetBy(dx: -max(0, touch - drawn.width) / 2, dy: -max(0, touch - drawn.height) / 2)
         } }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let sides: [Side]; let needleDown: Bool
     /// The spoken flag's place (S25) while the light is speaking or finishing on steps 1 to 5: one

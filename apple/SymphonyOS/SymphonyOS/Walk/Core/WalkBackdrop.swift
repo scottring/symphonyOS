@@ -33,12 +33,34 @@ struct WalkBackdrop: Equatable {
     /// Per step, the held shade on a stretched stage (one with wings), where the enlarged picture
     /// brings brighter paint up behind the words than the phone has there (nil: as `shade`).
     let stretchedShade: [Double?]
+    /// Where a small side post may stand (P29), as fractions of the painting's width and height: below
+    /// the skyline and off the water. `skyline`: left to right, a straight line between points, the
+    /// lowest the sky reaches near each (measured from the painting's pixels, so a post never stands
+    /// in the gap between two peaks). `water`: boxes over the river.
+    var skyline: [CGPoint] = []
+    var water: [CGRect] = []
     static let shadeFade: CGFloat = 50
     /// The bundled picture's pixels across its width, and the most it is ever enlarged past them on a 3x screen.
     static let pixelsAcross: CGFloat = 2048
     static let sharpest: CGFloat = 1.6
 
     func bandY(_ level: WalkLevel) -> CGFloat { (bands[level] ?? 0) * size.height }
+
+    /// The skyline's height at `x` (fractions), between its two nearest points.
+    func skylineY(at x: CGFloat) -> CGFloat {
+        guard let first = skyline.first, let last = skyline.last else { return 0 }
+        if x <= first.x { return first.y }
+        if x >= last.x { return last.y }
+        let i = skyline.firstIndex { $0.x >= x }!
+        let a = skyline[i - 1], b = skyline[i]
+        return a.y + (b.y - a.y) * (x - a.x) / max(0.000001, b.x - a.x)
+    }
+
+    /// Whether a point of the painting (fractions) is land a small post may stand on: below the
+    /// skyline, off the water, on the painting.
+    func standsOnLand(_ p: CGPoint) -> Bool {
+        (0...1).contains(p.x) && p.y <= 1 && p.y > skylineY(at: p.x) && !water.contains { $0.contains(p) }
+    }
 
     /// The stage point the picture is enlarged about on a wider window, so what stands there keeps
     /// its ground: the standing post's foot on Year to Today, the mountain's own places on Welcome
@@ -91,7 +113,7 @@ struct WalkBackdrop: Equatable {
         }
         let lookBack = square.stops[6]
         let yearOnLookBack = (square.bandY(.year) - lookBack.y) * lookBack.k
-        return WalkBackdrop(
+        var backdrop = WalkBackdrop(
             imageName: "WalkOverlookTall",
             size: size,
             bands: bands,
@@ -121,6 +143,32 @@ struct WalkBackdrop: Equatable {
             // Look back up, enlarged about the year's flats, has the peak's snow behind its heading.
             stretchedShade: [nil, nil, nil, nil, nil, nil, 0.6]
         )
+        // The skyline: for each x, the lowest row of a band 0.02 wide at which twelve rows of pixels
+        // in a row are no longer the sky's blue (red < 12, green < 130, blue > 140), on the bundled picture.
+        let sky: [CGFloat] = [0.2933, 0.2965, 0.2956, 0.2972, 0.2969, 0.2905, 0.2839, 0.2824, 0.2845, 0.2814,
+                              0.2865, 0.2933, 0.2985, 0.2979, 0.2992, 0.2998, 0.2996, 0.2992, 0.2982, 0.2985,
+                              0.2995, 0.3018, 0.3018, 0.3026, 0.3018, 0.3008, 0.2998, 0.3001, 0.3005, 0.2988,
+                              0.2985, 0.2992, 0.2982, 0.2969, 0.2988, 0.2988, 0.2962, 0.2931, 0.2962, 0.2965,
+                              0.2923, 0.2904, 0.2939, 0.2949, 0.2972, 0.2962, 0.2962, 0.2935, 0.2913, 0.2923, 0.2936]
+        backdrop.skyline = sky.enumerated().map { CGPoint(x: CGFloat($0.offset) / 50, y: $0.element) }
+        // The water: the river from the upper valley down past the month band, traced by eye as boxes
+        // on a grid (0.05 across, 0.01 down) drawn over the bundled picture, each box over pale water
+        // with its flow lines and none over the fields, the tree lines or the hill between. The pale
+        // braided flats under the peaks are not water here: they are the year's own ground
+        // (`land[.year]`), where the year's standing post stands.
+        func box(_ x0: CGFloat, _ x1: CGFloat, _ y0: CGFloat, _ y1: CGFloat) -> CGRect { CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0) }
+        backdrop.water = [
+            // The thin upper channel, left to right, and where it meets the river.
+            box(0.15, 0.33, 0.4605, 0.466), box(0.33, 0.40, 0.464, 0.4705), box(0.40, 0.55, 0.4665, 0.4725),
+            box(0.55, 0.665, 0.4715, 0.4835),
+            // The S below the hill: its upper bend and the channel along the tree line.
+            box(0.40, 0.45, 0.4825, 0.490), box(0.45, 0.55, 0.482, 0.4995), box(0.55, 0.60, 0.4855, 0.4935),
+            box(0.55, 0.65, 0.493, 0.500), box(0.65, 0.75, 0.497, 0.5035), box(0.75, 0.90, 0.500, 0.5085),
+            // The broad river right of the wooded spit, and its lower curve.
+            box(0.72, 0.75, 0.510, 0.523), box(0.75, 0.97, 0.5085, 0.530), box(0.55, 0.73, 0.524, 0.532),
+            box(0.40, 0.80, 0.530, 0.545),
+        ]
+        return backdrop
     }()
 }
 

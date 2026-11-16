@@ -62,7 +62,7 @@ extension WalkLayout {
             let kept = s.kept.contains(area.id)
             return Label(id: area.id, name: area.name,
                          frame: CGRect(x: x, y: bottom[row[i]]! - heights[i] + rise, width: width, height: heights[i]),
-                         kept: kept, focused: false, opacity: 1, tappable: true, hint: WalkCopy.areaHint(s, area.id),
+                         kept: kept, opacity: 1, tappable: true, hint: WalkCopy.areaHint(s, area.id),
                          selected: kept, footing: rise, ground: true, lines: lines[i], words: words[i])
         }
     }
