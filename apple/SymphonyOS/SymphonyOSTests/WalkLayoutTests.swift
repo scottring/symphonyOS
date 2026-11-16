@@ -1,6 +1,9 @@
 import Testing
 import Foundation
 import CoreGraphics
+#if canImport(UIKit)
+import UIKit
+#endif
 @testable import Symphony
 
 private func day(_ y: Int, _ m: Int, _ d: Int) -> Date {
@@ -137,47 +140,84 @@ struct WalkLayoutTests {
         #expect(zip(layout.banners, layout.banners.dropFirst()).allSatisfy { near($1.frame.minY - $0.frame.maxY, 4, 0.01) })
     }
 
-    /// A goal above and four two-line titles. The stack is counted by the board's numbers: a pill
-    /// (23, and 6 under it), the goal above (26), then 53 a flag, 4 between cloths and 22 for "+n
-    /// more", in the 250 between the question and the lowest cloth's place.
-    /// - In a named area: four flags would need 283 and three with "+1 more" 252, two points too
-    ///   many, so two stand in full with "+2 more" (195).
-    /// - On the nameless post (no pill, 29 less): three with "+1 more" (223).
-    /// No title is ever cut to make room.
+    /// A goal above and four two-line titles in a named area: three stand in full with "+1 more".
+    /// By the numbers (F31): a pill (23, and 6 under it), the goal above (26), 52 a flag, 4 between
+    /// cloths and 22 for "+n more" come to 249 of the 250 between the question and the lowest
+    /// cloth's place; four flags would need 279. No title is cut to make room.
     @Test func fewerFlagsRatherThanCutTitles() {
-        let titles = ["Plan a pancake Sunday", "Book train tickets to Gran", "Pick a date for dinner", "Call Mum about Sunday lunch"]
+        let titles = ["Plan a pancake Sunday", "Book train tickets to Gran", "Sleep seven hours most nights", "Call Mum about Sunday lunch"]
         #expect(titles.allSatisfy { WalkLayout.lines(for: $0, width: 150) == 2 })
-        for (areaName, shown) in [("People", 2), (nil, 3)] as [(String?, Int)] {
-            let above = flag(.season, "Slow Sundays", in: areaName)
-            let goals = titles.map { flag(.month, $0, in: areaName, parent: above.id) }
-            let s = state(3, kept: ["Health", "People"], items: [above] + goals, standing: areaName, focus: above)
-            let layout = ruled(s)
-            #expect(layout.banners(.parent).first?.lines == 1)
-            let full = layout.banners(.full)
-            #expect(full.count == shown, "\(areaName ?? "nameless"): \(full.count)")
-            #expect(layout.mores.map(\.kind) == [.more(4 - shown)])
-            #expect(full.allSatisfy { $0.lines == 2 && near($0.frame.height, 53, 0.01) })
-            #expect(full.compactMap(\.itemId) == goals.suffix(shown).map(\.id))
-            #expect(layout.banners.last?.frame.maxY == 532)
-            let top = layout.standingLabel?.frame.minY ?? layout.banners.first!.frame.minY
-            #expect(near(top, areaName == nil ? 532 - 223 : 532 - 195, 0.01), "\(top)")
-        }
-        // With a shorter newest title the same four leave room for three in a named area.
         let above = flag(.season, "Slow Sundays", in: "People")
-        let goals = (titles.prefix(3) + ["Ring Dad"]).map { flag(.month, $0, in: "People", parent: above.id) }
-        let layout = ruled(state(3, kept: ["People"], items: [above] + goals, standing: "People", focus: above))
-        #expect(layout.banners(.full).count == 3 && layout.mores.map(\.kind) == [.more(1)])
+        let goals = titles.map { flag(.month, $0, in: "People", parent: above.id) }
+        let s = state(3, kept: ["Health", "People"], items: [above] + goals, standing: "People", focus: above)
+        let layout = ruled(s)
+        #expect(layout.banners(.parent).first?.lines == 1)
+        let full = layout.banners(.full)
+        #expect(full.count == 3 && layout.mores.map(\.kind) == [.more(1)])
+        #expect(full.allSatisfy { $0.lines == 2 && near($0.frame.height, 52, 0.01) })
+        #expect(full.compactMap(\.itemId) == goals.suffix(3).map(\.id))
+        #expect(layout.banners.last?.frame.maxY == 532 && near(layout.standingLabel!.frame.minY, 532 - 249, 0.01))
+        // With one more line to carry (a tagged Week flag is 14 taller) the third no longer fits: two, in full.
+        let month = flag(.month, "Slow Sundays", in: "People")
+        let tasks = titles.map { flag(.week, $0, in: "People", parent: month.id, day: day(2026, 11, 17)) }
+        let week = ruled(state(4, kept: ["People"], items: [month] + tasks, standing: "People", focus: month))
+        #expect(week.banners(.full).count == 2 && week.mores.map(\.kind) == [.more(2)])
+        #expect(week.banners(.full).allSatisfy { $0.lines == 2 && near($0.frame.height, 66, 0.01) })
+    }
+
+    /// F31: the goal above gives up lines before a flag is dropped. It keeps its lines only while
+    /// that costs no flag: giving it one more line would always cost one, or it already has all it needs.
+    @Test func aGoalAboveGivesWayBeforeAFlagIsDropped() {
+        // A 44-character goal above (three lines of its own) and four month goals of about 44 (three lines each).
+        let above = flag(.season, "Lift twice a week with the trainer at my gym", in: "Health")
+        let titles = ["Book eight sessions and buy proper shoes", "Find a gym close enough to walk to after work",
+                      "Buy proper running shoes from the shop on Main", "No screens in the bedroom after ten at night"]
+        let goals = titles.map { flag(.month, $0, in: "Health", parent: above.id) }
+        let s = state(3, kept: ["Health", "Home"], items: [above] + goals, standing: "Health", focus: above)
+        #expect(above.title.count == 44 && WalkLayout.lines(for: above.title, width: 126, face: .parent) == 3)
+        // A phone: with its three lines the goal above would leave room for one flag (255 for two);
+        // on two it leaves room for two (241). A third flag would not fit even with it on one.
+        let phone = ruled(s)
+        #expect(phone.banners(.full).count == 2 && phone.mores.map(\.kind) == [.more(2)])
+        #expect(phone.banners(.full).allSatisfy { $0.lines == 3 })
+        #expect(phone.banners(.parent).first?.lines == 2 && near(phone.banners(.parent)[0].frame.height, 40, 0.01))
+        #expect(phone.banners(.parent)[0].label.contains(above.title))
+        // The half window: the goals take two lines each; the goal above gives up its second line and the third flag stands.
+        let half = ruled(s, wing: 110.3)
+        #expect(WalkLayout.lines(for: above.title, width: 202.5, face: .parent) == 2)
+        #expect(half.banners(.full).count == 3 && half.mores.map(\.kind) == [.more(1)] && half.banners(.parent).first?.lines == 1)
+        // Four two-line goals under it: it goes down to one line before the third flag is dropped (249 of 250).
+        let twoLine = ["Plan a pancake Sunday", "Book train tickets to Gran", "Sleep seven hours most nights", "Call Mum about Sunday lunch"]
+        let three = state(3, kept: ["Health"], items: [above] + twoLine.map { flag(.month, $0, in: "Health", parent: above.id) },
+                          standing: "Health", focus: above)
+        #expect(ruled(three).banners(.full).count == 3 && ruled(three).banners(.parent).first?.lines == 1)
+        #expect(near(ruled(three).standingLabel!.frame.minY, 283, 0.01))
+        // Over the generated states: one more line for the goal above would not fit, or it has all its lines.
+        var gaveWay = 0
+        for wing in wings {
+            for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) where (2...5).contains(s.step) && !s.ground {
+                guard let goal = layout.banners(.parent).first, let item = s.item(goal.itemId) else { continue }
+                let own = WalkLayout.lines(for: item.title, width: WalkLayout.parentWidth(wing: wing), face: .parent)
+                #expect(goal.lines <= own)
+                guard goal.lines < own else { continue }
+                gaveWay += 1
+                let top = layout.standingLabel?.frame.minY ?? goal.frame.minY
+                #expect(top - 14 < 282 - 0.01, "\(Generated.describe(s)), wing \(wing): the goal above is on \(goal.lines) of \(own) with \(top - 282) to spare")
+            }
+        }
+        #expect(gaveWay > 100)
     }
 
     /// Over the generated states: never more than four in full; each in full (unless it is the only
     /// one shown, which may be cut to fit); "+n more" exactly when flags are not shown, n of them.
     @Test func atMostFourEachInFull() {
-        let states = Generated.all.filter { (1...5).contains($0.step) && !$0.ground }
+        let states = Generated.all
         var checked = 0
         for wing in wings {
+            let layouts = Generated.level(wing: wing)
             let found = Generated.parallel(states.count) { i -> [String] in
-                let s = states[i]
-                let layout = WalkLayout.make(s, today: today, footing: .level, wing: wing)
+                let s = states[i], layout = layouts[i]
+                guard (1...5).contains(s.step), !s.ground else { return [] }
                 let full = layout.banners(.full)
                 var problems: [String] = []
                 if full.count > 4 { problems.append("\(full.count) in full") }
@@ -199,7 +239,7 @@ struct WalkLayoutTests {
                 checked += 1
             }
         }
-        #expect(checked > 8000)
+        #expect(checked > 40_000)
     }
 
     /// Review Focus 2: a 200-character title and a 60-letter word are each cut at three lines, on
@@ -215,7 +255,7 @@ struct WalkLayoutTests {
                     let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
                     let b = layout.banner(for: item)!
                     #expect(b.kind == .full && b.lines == 3)
-                    #expect(near(b.frame.width, WalkLayout.standingWidth(wing: wing), 0.01) && near(b.frame.height, 70, 0.01))
+                    #expect(near(b.frame.width, WalkLayout.standingWidth(wing: wing), 0.01) && near(b.frame.height, 69, 0.01))
                     let edges = WalkLayout.edges(wing: wing)
                     #expect(b.drawn.minX >= edges.lowerBound && b.drawn.maxX <= edges.upperBound, "\(b.drawn)")
                     #expect(b.drawn.minY >= 282 && b.drawn.maxY <= 532.5, "\(footing) \(b.drawn)")
@@ -247,6 +287,52 @@ struct WalkLayoutTests {
         let bare = ruled(state(1, kept: ["Health"], standing: "Health"))
         #expect(bare.posts.first?.top == 520 && bare.posts.first?.banners.isEmpty == true)
         #expect(bare.standingLabel?.frame == CGRect(x: 195 - 37.5, y: 497, width: 75, height: 23))
+    }
+
+    /// F34: the caret (10 × 7, 2 above the standing pill) has a frame of its own and never rises into
+    /// the question: it stands only where the 9 points over the pill are clear, and the stack is never
+    /// made shorter for it. Planted by hand it is there exactly where the ruled layout has it.
+    @Test func theCaretNeverRisesIntoTheQuestion() {
+        var present = 0, absent = 0
+        for wing in wings {
+            let states = Generated.all, boards = Generated.level(wing: wing)
+            let found = Generated.parallel(states.count) { i -> (Bool?, String?) in
+                let s = states[i]
+                guard (1...6).contains(s.step), !s.ground else { return (nil, nil) }
+                // Planted by hand: on a phone from the layouts built once, on the widest stage afresh
+                // (the sweep measures the caret itself on every wing, `Invariants.check` (c)).
+                let board = boards[i]
+                let hand = wing == 0 ? Generated.naturalLayouts[i] : (wing == 110.3 ? WalkLayout.make(s, today: today, footing: .natural, wing: wing) : board)
+                guard let pill = board.standingLabel else { return (nil, nil) }
+                let room = pill.frame.minY - (s.step == 6 ? WalkLayout.lookBackHeader : WalkLayout.question)
+                if (pill.caret != nil) != (room >= 9) { return (nil, "\(room) over the pill, caret \(String(describing: pill.caret))") }
+                if let caret = pill.caret, caret != CGRect(x: pill.frame.midX - 5, y: pill.frame.minY - 9, width: 10, height: 7) {
+                    return (nil, "the caret \(caret) is not over \(pill.frame)")
+                }
+                guard let lifted = hand.standingLabel, (lifted.caret != nil) == (pill.caret != nil) else { return (nil, "the hand changed the caret") }
+                if let caret = lifted.caret, caret.minY < (s.step == 6 ? WalkLayout.lookBackHeader : WalkLayout.question) - 0.01 {
+                    return (nil, "planted by hand the caret rises to \(caret.minY)")
+                }
+                return (pill.caret != nil, nil)
+            }
+            for (s, result) in zip(states, found) {
+                if let problem = result.1 { Issue.record("wing \(wing), \(Generated.describe(s)): \(problem)"); return }
+                if let has = result.0 { if has { present += 1 } else { absent += 1 } }
+            }
+        }
+        #expect(present > 5000 && absent > 500, "\(present) with a caret, \(absent) without")
+        print("The caret: \(present) posts with one, \(absent) without")
+        // Present: Health's Month on the full plan (the pill's top at 307). Absent: a stack that reaches 283.
+        #expect(ruled(plan(DemoStress.full, step: 3, standing: "Health")).standingLabel?.caret == CGRect(x: 190, y: 298, width: 10, height: 7))
+        let above = flag(.season, "Slow Sundays", in: "People")
+        let goals = ["Plan a pancake Sunday", "Book train tickets to Gran", "Sleep seven hours most nights", "Call Mum about Sunday lunch"]
+            .map { flag(.month, $0, in: "People", parent: above.id) }
+        let tight = state(3, kept: ["People"], items: [above] + goals, standing: "People", focus: above)
+        #expect(ruled(tight).standingLabel?.frame.minY == 283 && ruled(tight).standingLabel?.caret == nil)
+        #expect(WalkLayout.make(tight, today: today).standingLabel?.caret == nil)
+        // The ground's chips carry their mark inside their frame: no caret.
+        var ground = WalkState(); ground.areas = ridge; ground.step = 1; ground.ground = true
+        #expect(ruled(ground).labels.allSatisfy { $0.caret == nil })
     }
 
     /// Only the goal above and the step's own level are drawn: on Month season and month, on Week
@@ -282,12 +368,14 @@ struct WalkLayoutTests {
         for side in layout.sides {
             #expect(side.pennants.count == min(4, side.count) && side.extra == 0)
             #expect(side.pennants.allSatisfy { $0.level == .month })
-            #expect(side.area == area(side.name).id && side.id == area(side.name).id.uuidString && side.taps)
+            #expect(side.area == area(side.name).id && side.id == area(side.name).id.uuidString && side.extraFrame == nil)
         }
         // More than four: three pennants and the rest as "+n".
         let many = (1...6).map { flag(.year, "Goal \($0)", in: "Home") }
         let home = ruled(state(1, kept: ["Health", "Home"], items: many, standing: "Health")).sides
         #expect(home.count == 1 && home[0].pennants.count == 3 && home[0].extra == 3 && home[0].count == 6)
+        // "+3" has the fourth pennant's place: 14 under the third, on the pole (Health stands; Home is right, inner low).
+        #expect(home[0].extraFrame == CGRect(x: 301.75, y: 462 + 3 * 14, width: 20, height: 13))
         #expect(home[0].label == "Home, 6 goals this year")
         #expect(WalkCopy.sideLabel(name: "Work", count: 1, level: .year, periods: WalkPeriods.pick(now: today)) == "Work, 1 goal this year")
         #expect(WalkCopy.sideLabel(name: "Home", count: 3, level: .week, periods: WalkPeriods.pick(now: today)) == "Home, 3 tasks this week")
@@ -305,7 +393,7 @@ struct WalkLayoutTests {
         #expect(ruled(state(3, kept: kept, items: [year, season, month], standing: "Work", focus: season)).sides.isEmpty)
         let onYear = ruled(state(1, kept: kept, items: [year, season, month], standing: "Work")).sides
         #expect(onYear.map(\.name) == ["Home", "Health"])
-        #expect(onYear.allSatisfy { $0.pennants.isEmpty && $0.count == 0 && $0.taps })
+        #expect(onYear.allSatisfy { $0.pennants.isEmpty && $0.count == 0 && WalkLayout.tapEvent($0) == .areaTapped($0.area!) })
         #expect(onYear.first?.label == "Home, no goals this year")
         // An area with only a goal above, or only a flag on this level, has one.
         let above = flag(.season, "Lift twice a week", in: "Health"), own = flag(.month, "Hire a skip", in: "Home")
@@ -314,10 +402,11 @@ struct WalkLayoutTests {
     }
 
     /// F4 as a rule: over the generated first walks on steps 2 to 5, the named side posts are exactly
-    /// the other kept areas with a flag on this level or the one above (Today: a week task).
+    /// the other kept areas with a flag on this level or the one above (Today: a week task). (On a
+    /// walk down only the walked goal's line is on the mountain: `aWalkDownShowsOnlyItsLine`.)
     @Test func sidePostsStandForAreasWithSomethingHere() {
         var checked = 0
-        for (s, layout) in zip(Generated.all, Generated.levelLayouts) where (2...5).contains(s.step) && !s.ground {
+        for (s, layout) in zip(Generated.all, Generated.levelLayouts) where (2...5).contains(s.step) && !s.ground && s.walkingDown.isEmpty {
             let level = s.level!, own: WalkLevel = level == .today ? .week : level
             let above = WalkLevel(rawValue: level.rawValue - 1)!
             let expected = s.keptAreas.filter { a in
@@ -348,7 +437,7 @@ struct WalkLayoutTests {
                         let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
                         #expect(layout.sides.count == 8 && layout.sides.filter { $0.area == nil }.count == 1)
                         let nameless = layout.sides.first { $0.area == nil }!
-                        #expect(nameless.pill == nil && nameless.count == 2 && nameless.pennants.count == 2 && !nameless.taps)
+                        #expect(nameless.pill == nil && nameless.count == 2 && nameless.pennants.count == 2 && WalkLayout.tapEvent(nameless) == nil)
                         #expect(nameless.label.hasPrefix(step == 4 ? "No area, 2 tasks this week" : "No area, 2 goals this "))
                         let problems = Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7)
                         #expect(problems.isEmpty, "step \(step) in \(standing), wing \(wing), \(footing): \(problems.prefix(3))")
@@ -364,31 +453,69 @@ struct WalkLayoutTests {
         #expect(sides.map { $0.pill!.minY } == [524, 506, 438, 420, 524, 506, 438])
     }
 
-    /// A side post is a button only if a tap on it walks there, and every named one drawn can be
-    /// walked to: the tap it sends stands the walk in that area.
+    /// Every named side post drawn can be walked to: the tap it sends stands the walk in that area,
+    /// on a first walk, a whole-year walk and a walk down alike. The nameless post sends nothing yet.
     @Test func everySidePostCanBeWalkedTo() {
         let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
-        var named = 0
+        var named = 0, onAWalkDown = 0
         for (s, layout) in zip(Generated.all, Generated.levelLayouts) {
             for side in layout.sides {
                 guard let id = side.area else {
-                    #expect(WalkLayout.tapEvent(side) == nil && !side.taps, "\(Generated.describe(s)): the nameless post")
+                    #expect(WalkLayout.tapEvent(side) == nil, "\(Generated.describe(s)): the nameless post")
                     continue
                 }
-                #expect(side.taps && s.walksThere(id), "\(Generated.describe(s)): \(side.name)")
+                #expect(s.walksThere(id), "\(Generated.describe(s)): \(side.name)")
                 #expect(WalkLayout.tapEvent(side) == .areaTapped(id))
                 var after = s
                 _ = after.apply(.areaTapped(id), env)
                 #expect(after.standing == id, "\(Generated.describe(s)): a tap on \(side.name) did not walk there")
                 #expect(!side.label.contains(", tap "))
                 named += 1
+                if !s.walkingDown.isEmpty { onAWalkDown += 1 }
             }
         }
-        #expect(named > 5000)
-        // A post the walk cannot stand in sends nothing.
-        var dead = Generated.levelLayouts.lazy.flatMap(\.sides).first { $0.area != nil }!
-        dead.taps = false
-        #expect(WalkLayout.tapEvent(dead) == nil)
+        #expect(named > 5000 && onAWalkDown > 10)
+    }
+
+    /// F35: on a walk down only the walked goal's line is on the mountain. An area whose goals above
+    /// are off that line has no post, on Today too, where its week tasks are off the line; an area the
+    /// line reaches has one. (An area holding a flag on the step's own level can still be stood in, as
+    /// the reducer has it, so it keeps its post.)
+    @Test func aWalkDownShowsOnlyItsLine() {
+        let walked = flag(.year, "Finish the bathroom", in: "Home"), other = flag(.year, "Feel strong again", in: "Health")
+        let tile = flag(.season, "Tile the floor", in: "Home", parent: walked.id)
+        let shop = flag(.season, "Ask the shop to deliver", in: "Work", parent: walked.id)       // the line reaches Work
+        let lift = flag(.season, "Lift twice a week", in: "Health", parent: other.id)             // off the line
+        var s = WalkState()
+        s.areas = ridge
+        s.kept = ["Health", "Home", "Work"].map { area($0).id }
+        s.step = 3
+        s.items = [walked, other, tile, shop, lift]
+        s.walkingDown = [walked.id]
+        s.focus[.month] = tile.id
+        s = s.settled
+        let layout = ruled(s)
+        #expect(s.standing == area("Home").id && layout.banners(.parent).first?.itemId == tile.id)
+        #expect(layout.sides.map(\.name) == ["Work"])
+        #expect(!s.walksThere(area("Health").id))
+        #expect(Invariants.check(layout, s).isEmpty)
+        // The same plan on a first walk: Health has its post.
+        var first = s
+        first.walkingDown = []
+        #expect(ruled(first.settled).sides.map(\.name) == ["Health", "Work"])
+        // On Today, Health's week task is off the line: no post, and no way to stand there.
+        let gym = flag(.month, "Find a gym", in: "Health", parent: lift.id), tour = flag(.week, "Tour the gym", in: "Health", parent: gym.id)
+        let grout = flag(.month, "Buy the grout", in: "Home", parent: tile.id), call = flag(.week, "Call the tiler", in: "Home", parent: grout.id)
+        var day = s
+        day.step = 5
+        day.items += [gym, tour, grout, call]
+        day.focus = [:]
+        day = day.settled
+        #expect(day.standing == area("Home").id && ruled(day).sides.isEmpty && !day.walksThere(area("Health").id))
+        // On Month, a month goal of Health's own is a flag on the step's level: the walk can stand there, so it has a post.
+        var month = s
+        month.items.append(gym)
+        #expect(month.settled.walksThere(area("Health").id) && ruled(month.settled).sides.map(\.name) == ["Health", "Work"])
     }
 
     // MARK: Which flags
@@ -407,12 +534,16 @@ struct WalkLayoutTests {
         #expect(layout.mores.map(\.kind) == [.more(3)])
     }
 
-    /// Examples, while on: the newest `4 − e` flags, then `e` examples, `e = min(examples, max(2, 4 −
-    /// flags))`; fewer where they do not fit. Year in Health has three examples (one of two lines).
+    /// Examples, while on (F36): `e` examples, from `min(examples, max(2, 4 − flags))`, with the newest
+    /// `min(flags, 4 − e)` of the person's flags; where that does not fit the person's flags give way
+    /// first, down to one, then the examples, down to one. Year in Health has three examples (49, 66
+    /// and 49 high with their tag line); a one-line flag is 35.
     @Test func examplesTakeTheRoomLeft() {
         #expect(WalkCopy.examples(.year, area: "Health").count == 3)
         // own flags → (own shown, examples shown, "+n more")
-        for (own, expected) in [(0, (0, 3, 0)), (1, (1, 3, 0)), (3, (2, 1, 1)), (5, (2, 1, 3))] {
+        // 0: three examples (201). 1: the flag and three (240). 3 and 5: two flags and two examples
+        // would need 252, so one flag, two examples and "+n more" (213).
+        for (own, expected) in [(0, (0, 3, 0)), (1, (1, 3, 0)), (3, (1, 2, 2)), (5, (1, 2, 4))] {
             let goals = (0..<own).map { flag(.year, "Goal \($0)", in: "Health") }
             var s = state(1, kept: ["Health", "Home"], items: goals, standing: "Health")
             s.examplesOn = [1]
@@ -429,21 +560,77 @@ struct WalkLayoutTests {
             #expect(Invariants.check(layout, s).isEmpty)
             #expect(layout.posts.first?.pale == (own == 0))
         }
-        // With room for both (the half window: every example on one line), three own flags show two and two examples.
+        // With room for both (the half window: every example on one line), three own flags show two and two examples (235).
         let goals = (0..<3).map { flag(.year, "Goal \($0)", in: "Health") }
         var s = state(1, kept: ["Health"], items: goals, standing: "Health")
         s.examplesOn = [1]
         let roomy = ruled(s, wing: 110.3)
         #expect(roomy.banners(.full).count == 2 && roomy.banners(.ghost).count == 2 && roomy.mores.map(\.kind) == [.more(1)])
-        // An example's cloth carries its tag on a line of its own (the long tag where the cloth holds
-        // it), and plants its own words.
-        let ghost = ruled(s).banners(.ghost)[0], wider = roomy.banners(.ghost)[0]
-        #expect(ghost.tag == WalkCopy.exampleTagShort && near(ghost.frame.height, 19 + 17 * CGFloat(ghost.lines) + 14, 0.01))
-        #expect(wider.tag == WalkCopy.exampleTag && near(wider.frame.height, 19 + 17 + 14, 0.01))
+        // An example's cloth carries its tag on a line of its own, and plants its own words.
+        let ghost = ruled(s).banners(.ghost)[0]
+        #expect(ghost.tag == WalkCopy.exampleTag && near(ghost.frame.height, 18 + 17 * CGFloat(ghost.lines) + 14, 0.01))
         #expect(WalkLayout.tapEvent(ghost, on: roomy.posts[0]) == .exampleTapped(WalkCopy.examples(.year, area: "Health")[0]))
         // Examples off again: none, and the flags as they stood.
         s.examplesOn = []
         #expect(ruled(s).banners(.ghost).isEmpty && ruled(s).banners(.full).count == 3)
+    }
+
+    /// F36: while examples are on and the area has one left, one shows, whatever else stands on the
+    /// post: over the generated states, a chosen flag and long titles among them.
+    @Test func anExampleAlwaysShowsWhileExamplesAreOn() {
+        var on = 0, withAChosenFlag = 0
+        for (s, layout) in zip(Generated.all, Generated.levelLayouts) where (1...4).contains(s.step) && !s.ground && s.examplesOn.contains(s.step) {
+            let left = s.examplesLeft(today: today)
+            #expect(layout.banners(.ghost).isEmpty == left.isEmpty, "\(Generated.describe(s)): \(left.count) left, \(layout.banners(.ghost).count) shown")
+            #expect(layout.banners(.ghost).map(\.text) == Array(left.prefix(layout.banners(.ghost).count)))
+            guard !left.isEmpty else { continue }
+            on += 1
+            if let chosen = s.selected, layout.banners.contains(where: { $0.itemId == chosen }) { withAChosenFlag += 1 }
+        }
+        #expect(on > 500 && withAChosenFlag > 50, "\(on) with examples showing, \(withAChosenFlag) beside a chosen flag")
+        // A chosen flag with little room: three-line goals under a three-line goal above. One example
+        // still shows, beside the chosen flag; the newer flags give way and are counted.
+        let above = flag(.season, "Lift twice a week with the trainer at my gym", in: "Health")
+        let goals = (0..<4).map { flag(.month, "Write the first chapter of the memoir I keep putting off \($0)", in: "Health", parent: above.id) }
+        var s = state(3, kept: ["Health"], items: [above] + goals, standing: "Health", focus: above)
+        s.examplesOn = [3]
+        s.selected = goals[0].id
+        let layout = ruled(s)
+        #expect(layout.banners(.ghost).count == 1 && layout.banners(.full).map(\.itemId) == [goals[0].id])
+        #expect(layout.banners(.full)[0].glows && layout.mores.map(\.kind) == [.more(3)] && Invariants.check(layout, s).isEmpty)
+    }
+
+    /// F36: examples never take the person's last flag. Whenever the area holds a flag on this level,
+    /// at least one of them shows, in full unless one flag and one example cannot both stand in full
+    /// (then the flag is cut to the lines that fit: a three-line dated task beside a three-line example).
+    @Test func examplesNeverTakeThePersonsLastFlag() {
+        var checked = 0, cut = 0
+        for wing in wings {
+            for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) where !layout.banners(.ghost).isEmpty {
+                let here = s.items(on: s.level!).filter { s.column(of: $0) == s.standing }
+                guard !here.isEmpty else { continue }
+                let full = layout.banners(.full)
+                #expect(!full.isEmpty, "wing \(wing), \(Generated.describe(s)): examples took every flag")
+                if let chosen = s.selected, here.contains(where: { $0.id == chosen }) {
+                    #expect(full.contains { $0.itemId == chosen }, "wing \(wing), \(Generated.describe(s)): the chosen flag gave way")
+                }
+                let whole = full.allSatisfy { $0.lines == WalkLayout.lines(for: $0.text, width: WalkLayout.standingWidth(wing: wing)) }
+                if !whole {
+                    cut += 1
+                    #expect(full.count == 1 && layout.banners(.ghost).count == 1, "wing \(wing), \(Generated.describe(s)): a title cut with more than one flag or example")
+                }
+                checked += 1
+            }
+        }
+        #expect(checked > 1000)
+        print("Examples: \(checked) posts with a flag and an example; the flag cut on \(cut)")
+        // Seven goals and examples on: the newest stands with two examples; the rest are counted.
+        let goals = (0..<7).map { flag(.year, "Goal \($0)", in: "Health") }
+        var s = state(1, kept: ["Health"], items: goals, standing: "Health")
+        s.examplesOn = [1]
+        #expect(ruled(s).banners(.full).map(\.itemId) == [goals[6].id] && ruled(s).mores.map(\.kind) == [.more(6)])
+        s.selected = goals[2].id
+        #expect(ruled(s).banners(.full).map(\.itemId) == [goals[2].id] && ruled(s).banners(.ghost).count == 2)
     }
 
     @Test func aPlantedExampleDoesNotComeBack() {
@@ -519,16 +706,18 @@ struct WalkLayoutTests {
         let post = layout.posts[0]
         #expect(post.base == CGPoint(x: 195, y: 556) && post.lean == 0 && post.pole == 24)
         #expect(layout.banners.last?.frame.maxY == 532)
-        // The goal above "Run three times a week" (two lines of 15), then the newest three of four month goals and "+1 more".
+        // The goal above "Run three times a week" (two lines at 11 pt in its 126), then Health's four month
+        // goals, each on its one line (18 + 17 = 35), 4 between cloths.
         let frames = layout.banners.map(\.frame)
-        #expect(layout.banners.map(\.kind) == [.parent, .full, .full, .full, .more(1)])
-        #expect(frames == [CGRect(x: 132, y: 329, width: 126, height: 40), CGRect(x: 120, y: 373, width: 150, height: 36),
-                           CGRect(x: 120, y: 413, width: 150, height: 53), CGRect(x: 120, y: 470, width: 150, height: 36),
-                           CGRect(x: 156, y: 510, width: 78, height: 22)], "\(frames)")
+        #expect(layout.banners.map(\.kind) == [.parent, .full, .full, .full, .full])
+        #expect(frames == [CGRect(x: 132, y: 336, width: 126, height: 40), CGRect(x: 120, y: 380, width: 150, height: 35),
+                           CGRect(x: 120, y: 419, width: 150, height: 35), CGRect(x: 120, y: 458, width: 150, height: 35),
+                           CGRect(x: 120, y: 497, width: 150, height: 35)], "\(frames)")
         #expect(layout.banners.allSatisfy { $0.turn == 0 && $0.shift == 0 && $0.drawn == $0.frame })
-        // The pill: "HEALTH" at 8.4 a capital and 24, 23 high, 6 above the goal above.
-        #expect(layout.standingLabel?.frame == CGRect(x: 195 - 37.5, y: 300, width: 75, height: 23))
-        #expect(post.top == 329)
+        // The pill: "HEALTH" at 8.4 a capital and 24, 23 high, 6 above the goal above; its caret 2 above it.
+        #expect(layout.standingLabel?.frame == CGRect(x: 195 - 37.5, y: 307, width: 75, height: 23))
+        #expect(layout.standingLabel?.caret == CGRect(x: 190, y: 298, width: 10, height: 7))
+        #expect(post.top == 336)
 
         // The side posts: Home, People, Work and Money all to the right of Health, inner low first.
         #expect(layout.sides.map(\.name) == ["Home", "People", "Work", "Money"])
@@ -596,14 +785,19 @@ struct WalkLayoutTests {
 
     /// A goal above of 44 characters stands whole on three lines, in its own narrower cloth.
     @Test func aParentOfFortyFourLettersStandsWhole() {
+        // The long plan's Week in Home: a 44-character month goal above two week tasks. Its three lines
+        // cost no flag (240 of 250): both tasks stand in full under it.
         let s = plan(DemoStress.long, step: 4, standing: "Home")
         let layout = ruled(s)
         let above = layout.banners(.parent).first!
         #expect(above.text == "Pick the tile and pay the contractor deposit" && above.text.count == 44)
-        #expect(above.lines == min(3, WalkLayout.lines(for: above.text, width: 126)) && above.lines == 3)
+        #expect(above.lines == WalkLayout.lines(for: above.text, width: 126, face: .parent) && above.lines == 3)
         #expect(near(above.frame.width, 126, 0.01) && near(above.frame.height, 12 + 14 * 3, 0.01))
         #expect(above.frame.minX >= 4 && above.frame.maxX <= 386 && above.frame.minY >= 282 && above.frame.maxY <= 532)
         #expect(above.level == .month && above.label.hasPrefix("Month: Pick the tile and pay the contractor deposit"))
+        let tasks = s.items(on: .week).filter { $0.areaId == s.standing }
+        #expect(tasks.count == 2 && layout.banners(.full).compactMap(\.itemId) == tasks.map(\.id) && layout.mores.isEmpty)
+        #expect(near(layout.standingLabel!.frame.minY, 532 - 240, 0.01))
     }
 
     /// Standing in "Side projects and making": the pill takes two lines at the same size, the name
@@ -626,15 +820,15 @@ struct WalkLayoutTests {
                 #expect(Invariants.check(layout, s).isEmpty)
             }
         }
-        // The taller pill counts in the stack: four week tasks that fill a one-line pill's post to the
-        // point (23 + 6 + 50 + 3 × 53 + 3 × 4 = 250) are one too many under a two-line pill.
-        let titles = ["Call Mum", "Plan a pancake Sunday", "Book train tickets to Gran", "Pick a date for dinner"]
+        // The taller pill counts in the stack: four week tasks that stand under a one-line pill
+        // (23 + 6 + 49 + 3 × 52 + 3 × 4 = 246) are one too many under a two-line pill (260).
+        let titles = ["Call Mum", "Plan a pancake Sunday", "Book train tickets to Gran", "Call Mum about Sunday lunch"]
         func tasks(_ name: String) -> [WalkItem] {
             titles.enumerated().map { flag(.week, $0.element, in: name, day: $0.offset == 0 ? day(2026, 11, 17) : nil) }
         }
         let short = ruled(state(4, kept: ["Fun"], items: tasks("Fun"), standing: "Fun"))
         let long = ruled(state(4, kept: [longName], items: tasks(longName), standing: longName))
-        #expect(short.banners(.full).count == 4 && short.standingLabel?.frame.minY == 282)
+        #expect(short.banners(.full).count == 4 && short.standingLabel?.frame.minY == 286)
         #expect(long.banners(.full).count == 3 && long.mores.map(\.kind) == [.more(1)])
     }
 
@@ -670,8 +864,10 @@ struct WalkLayoutTests {
         let word = String(repeating: "x", count: 60)
         let drawn = WalkLayout.drawnTitle(word, width: 150)
         #expect(drawn.contains("\u{00AD}") && drawn.replacingOccurrences(of: "\u{00AD}", with: "") == word)
-        // 19 characters a line at 150: a soft hyphen after every 18.
-        #expect(drawn.components(separatedBy: "\u{00AD}").map(\.count) == [18, 18, 18, 6])
+        // Each line of it is as many letters as fit with their hyphen in the cloth's 134: 17 of these.
+        let pieces = drawn.components(separatedBy: "\u{00AD}")
+        #expect(pieces.map(\.count) == [17, 17, 17, 9])
+        #expect(pieces.dropLast().allSatisfy { WalkLayout.textWidth($0 + "-", face: .flag) <= 134 && WalkLayout.textWidth($0 + "x-", face: .flag) > 134 })
         #expect(WalkLayout.lines(for: word, width: 150) == 3 && WalkLayout.lines(for: drawn, width: 150) == 3)
         #expect(WalkLayout.drawnTitle("Call Mum about Sunday lunch", width: 150) == "Call Mum about Sunday lunch")
         #expect(WalkLayout.drawnTitle(drawn, width: 150) == drawn)
@@ -680,21 +876,122 @@ struct WalkLayoutTests {
         #expect(b.text.contains("\u{00AD}") && b.lines == 3 && b.label == "Year: Say \(word), tap to move or remove")
     }
 
-    /// Lines are counted as the words wrap (at their spaces and soft hyphens, 7.0 a character), never
-    /// by the character count alone: three ten-letter words take three lines of 19, not two.
+    /// Lines are counted as the words wrap, by the face's own widths at the cloth's size (F33): a
+    /// title of 20 or 21 ordinary letters is one line of a flag, not two; a goal above is set
+    /// smaller, in a narrower cloth. (`theLinesAreTheRealFaces` measures the count against the font.)
     @Test func linesCountTheWrappedWords() {
         #expect(WalkLayout.lines(for: "Gym", width: 150) == 1)
-        #expect(WalkLayout.lines(for: "Feel strong again", width: 150) == 1)                    // 17
-        #expect(WalkLayout.lines(for: "Run a 10k in the fall", width: 150) == 2)                // 21
-        #expect(WalkLayout.lines(for: "Understand everything about investing", width: 150) == 3)  // 37: 10 / 16 / 9
+        #expect(WalkLayout.lines(for: "Feel strong again", width: 150) == 1)
+        #expect(WalkLayout.lines(for: "No screens after ten", width: 150) == 1)                 // 128 of 134
+        #expect(WalkLayout.lines(for: "Run a 10k in the fall", width: 150) == 1)
+        #expect(WalkLayout.lines(for: "Sleep seven hours most nights", width: 150) == 2)
+        #expect(WalkLayout.lines(for: "Understand everything about investing", width: 150) == 3)  // a word a line
         #expect(WalkLayout.lines(for: "Lift twice a week with the trainer at my gym", width: 150) == 3)
         #expect(WalkLayout.lines(for: String(repeating: "Walk more every day. ", count: 10), width: 150) == 3)
-        #expect(WalkLayout.lines(for: "Lift twice a week", width: 126) == 2)                    // 15 a line
         #expect(WalkLayout.lines(for: "Lift twice a week with the trainer at my gym", width: 226.5) == 2)
+        // The goal above: 11 pt, 6 either side of its 126.
+        #expect(WalkLayout.lines(for: "Lift twice a week", width: 126, face: .parent) == 1)       // 89 of 114
+        #expect(WalkLayout.lines(for: "Run three times a week", width: 126, face: .parent) == 2)
+        #expect(WalkLayout.lines(for: "Pick the tile and pay the contractor deposit", width: 126, face: .parent) == 3)
+        // Widths: the sum of the face's own, at the size, and the tracking after each letter of a tag.
+        #expect(near(WalkLayout.textWidth("No screens after ten", face: .flag), 127.985, 0.01))
+        #expect(near(WalkLayout.textWidth("No screens after ten", face: .parent), 108.295, 0.01))
+        #expect(near(WalkLayout.textWidth(WalkCopy.exampleTag, face: .tag), 131.306, 0.01))
+        #expect(WalkLayout.glyphWidth("é") == WalkLayout.glyphWidth("e") && WalkLayout.glyphWidth("好") == 1000)
+        #expect(WalkLayout.glyphWidths.count == 95)
         for title in Generated.titles {
             #expect(WalkLayout.lines(for: title, width: 226.5) <= WalkLayout.lines(for: title, width: 150))
         }
+        // A hyphen of the word's own is a place a line may end.
+        #expect(WalkLayout.lines(for: "Book a mid-afternoon check-up", width: 150) == 2)
     }
+
+    #if canImport(UIKit)
+    /// How many lines a string really takes in a face at a width: TextKit's own line fragments.
+    @MainActor private static func realLines(_ text: String, font: UIFont, width: CGFloat) -> Int {
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+        var lines = 0
+        manager.enumerateLineFragments(forGlyphRange: manager.glyphRange(for: container)) { _, _, _, _, _ in lines += 1 }
+        return lines
+    }
+
+    /// The titles the count is held to: every title of the two stress plans and of the demo's preview
+    /// plan as the walk plants them, every example, and the generator's titles (a 200-character title
+    /// and a 60-letter word among them).
+    static var corpus: [String] {
+        var out: [String] = []
+        for plan in [DemoStress.full, DemoStress.long] {
+            out += plan.script.map { WalkWords.said($0.1, level: $0.0, today: today)?.title ?? $0.1 }
+        }
+        for level in [WalkLevel.year, .season, .month, .week] {
+            for name in ["Health", "Home", "People", "Work", "Money", "Fun"] { out += WalkCopy.examples(level, area: name) }
+        }
+        out += ["Feel strong again", "Finish the bathroom", "More slow weekends together", "Bathroom done by February",
+                "Lift twice a week", "Pick the tile and pay the deposit", "Send the contractor the deposit", "Choose the tile"]
+        out += Generated.titles
+        var seen = Set<String>()
+        return out.filter { seen.insert($0).inserted }
+    }
+
+    /// The titles the count gives a line more than the face sets them on, by cloth: a blank band, never
+    /// a cut. Listed so that a change which adds one is seen. One: on the outside screen's 183-wide flag
+    /// the face's kerning draws this example a hair inside the line that its letters' widths just pass.
+    static let blankBands: Set<String> = ["flag at 183: Book the first camping trip"]
+
+    /// F33: the lines the layout counts are the lines the bundled face really sets, on every cloth
+    /// (a flag at 13 pt, the goal above at 11, a Look back up cloth at 12; a phone, the outside screen
+    /// and the half window). Never fewer (that would cut a title); and for this corpus never more (a
+    /// blank band in the cloth), but for `blankBands`. And no string is counted narrower than it is set.
+    @Test @MainActor func theLinesAreTheRealFaces() throws {
+        let corpus = Self.corpus
+        #expect(corpus.count > 120 && corpus.contains { $0.count == 200 })
+        var cloths: [(face: WalkLayout.Face, width: CGFloat)] = [(.lookBack, 150)]
+        for wing: CGFloat in [0, 42.3, 110.3] {
+            cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.parent, WalkLayout.parentWidth(wing: wing))]
+        }
+        var short: [String] = [], narrow: [String] = [], bands = Set<String>()
+        var checked = 0, twoOrMore = 0
+        for (face, width) in cloths {
+            let font = try #require(UIFont(name: "DMSans-SemiBold", size: face.size), "the bundled face is not there")
+            for title in corpus {
+                let drawn = WalkLayout.drawnTitle(title, width: width, face: face)
+                let real = min(3, Self.realLines(drawn, font: font, width: width - face.inset))
+                let counted = WalkLayout.lines(for: title, width: width, face: face)
+                if counted < real { short.append("\(face) \(width): “\(title.prefix(50))” counted \(counted), set on \(real)") }
+                if counted > real { bands.insert("\(face) at \(Int(width)): \(title)") }
+                let across = (title as NSString).size(withAttributes: [.font: font]).width
+                if WalkLayout.textWidth(title, face: face) < across - 0.01 {
+                    narrow.append("\(face): “\(title.prefix(50))” counted \(WalkLayout.textWidth(title, face: face)), set \(across)")
+                }
+                checked += 1
+                if real > 1 { twoOrMore += 1 }
+            }
+        }
+        #expect(short.isEmpty, "counted on fewer lines than the face sets them: \(short.prefix(5))")
+        #expect(narrow.isEmpty, "counted narrower than the face sets them: \(narrow.prefix(5))")
+        #expect(bands == Self.blankBands, "a line more than the face needs: \(bands.sorted())")
+        #expect(checked > 800 && twoOrMore > 200)
+        print("The faces: \(corpus.count) titles on \(cloths.count) cloths, \(checked) counts, \(twoOrMore) of them on two lines or more; a line more on \(bands.count)")
+        // The tag line: no tag is wider than counted, and each fits the line of the cloth it is given.
+        let tagFont = try #require(UIFont(name: "DMSans-SemiBold", size: WalkLayout.Face.tag.size))
+        let days = (0..<9).map { WalkWords.tag(for: PlanCalendar.calendar.date(byAdding: .day, value: $0, to: today)!, today: today) }
+        for tag in [WalkCopy.exampleTag, WalkCopy.exampleTagShort, WalkCopy.firstThingTag] + days {
+            let across = (tag as NSString).size(withAttributes: [.font: tagFont, .kern: WalkLayout.Face.tag.tracking]).width
+            #expect(across <= WalkLayout.textWidth(tag, face: .tag) + 0.01, "\(tag): set \(across)")
+            #expect(across <= 150 - WalkLayout.Face.tag.inset || tag == WalkCopy.exampleTag, "\(tag) does not fit a phone's cloth")
+        }
+        for width: CGFloat in [150, WalkLayout.standingWidth(wing: 42.3), 226.5] {
+            let tag = WalkLayout.exampleTag(forWidth: width)
+            let across = (tag as NSString).size(withAttributes: [.font: tagFont, .kern: WalkLayout.Face.tag.tracking]).width
+            #expect(across <= width - WalkLayout.Face.tag.inset, "\(tag) at \(width): \(across)")
+        }
+    }
+    #endif
 
     // MARK: Tags, Today
 
@@ -705,13 +1002,13 @@ struct WalkLayoutTests {
         let loose = flag(.week, "Measure the floor twice", in: "Home", parent: month.id)
         let layout = ruled(state(4, kept: ["Home"], items: [month, dated, loose], standing: "Home", focus: month))
         let a = layout.banner(for: dated)!, b = layout.banner(for: loose)!
-        #expect(a.tag == "TUESDAY" && a.lines == 1 && near(a.frame.height, 19 + 17 + 14, 0.01))
-        #expect(b.tag == nil && b.lines == 2 && near(b.frame.height, 19 + 34, 0.01))
+        #expect(a.tag == "TUESDAY" && a.lines == 1 && near(a.frame.height, 18 + 17 + 14, 0.01))
+        #expect(b.tag == nil && b.lines == 2 && near(b.frame.height, 18 + 34, 0.01))
         #expect(layout.banner(for: month)?.tag == nil && layout.banner(for: month)?.kind == .parent)
         #expect(a.label == "Week: Call the tile shop, Tuesday, tap to move or remove")
-        // The long tag only where the cloth holds it.
-        #expect(WalkLayout.exampleTag(forWidth: 150) == WalkCopy.exampleTagShort)
-        #expect(WalkLayout.exampleTag(forWidth: 161) == WalkCopy.exampleTag && WalkLayout.exampleTag(forWidth: 226.5) == WalkCopy.exampleTag)
+        // An example's long tag where the cloth holds it on its line (131 at 11 pt, tracked: a phone's 150 does).
+        #expect(WalkLayout.exampleTag(forWidth: 150) == WalkCopy.exampleTag && WalkLayout.exampleTag(forWidth: 226.5) == WalkCopy.exampleTag)
+        #expect(WalkLayout.exampleTag(forWidth: 147) == WalkCopy.exampleTagShort)
     }
 
     /// On Today the goal above is the focused week task (the `parent` flag) and the one flag in full
@@ -724,7 +1021,7 @@ struct WalkLayoutTests {
         #expect(layout.posts.first?.key == WalkPostKey(level: .today, column: area("Home").id))
         #expect(layout.banners.map(\.kind) == [.parent, .full])
         let first = layout.banner(for: deposit)!
-        #expect(first.level == .today && first.tag == WalkCopy.firstThingTag && near(first.frame.height, 19 + 17 + 14, 0.01))
+        #expect(first.level == .today && first.tag == WalkCopy.firstThingTag && near(first.frame.height, 18 + 17 + 14, 0.01))
         #expect(first.label == WalkCopy.bannerLabel(deposit.title, level: .today, tag: WalkCopy.firstThingTag, role: .firstThingMine))
         #expect(layout.banner(for: shop)?.level == .week && layout.banner(for: shop)?.taps == true)       // the next one here
         #expect(layout.needleDown)
@@ -925,6 +1222,7 @@ struct WalkLayoutTests {
         let layout = ruled(s)
         #expect(layout.posts.isEmpty && layout.camera == art.stops[6])
         #expect(layout.standingLabel?.frame.minY == 110 && layout.standingLabel?.name == "People")
+        #expect(layout.standingLabel?.caret == CGRect(x: 190, y: 101, width: 10, height: 7))
         #expect(layout.sides.map(\.name) == ["Home", "Health", "Work", "Money"])
         // A pennant for each of an area's flags, newest first, in its own level's colour.
         #expect(layout.sides[0].count == 14 && layout.sides[0].pennants.count == 3 && layout.sides[0].extra == 11)
@@ -1361,9 +1659,10 @@ struct WalkLayoutTests {
 /// Standing states, each settled as the reducer settles it (so `standing` is what the walk would
 /// have): steps 1 to 6; 0 to 8 kept areas; with and without flags of no area; 0, 1, 3, 4, 5 or 7
 /// flags on the standing post (other posts between 0 and 7); titles of 8, 22, 44, 60 and 200
-/// characters and one 60-letter word; plain, with a flag chosen, with examples on; standing in
-/// each kept area in turn; on Today a first thing in the standing area,
-/// in another, or on the nameless post. Then the ground and Welcome. Ids, titles and counts are fixed.
+/// characters and one 60-letter word; plain, with a flag chosen, with examples on, with both; standing
+/// in each kept area in turn; on Today a first thing in the standing area, in another, or on the
+/// nameless post. Then the ground and Welcome, whole-year walks part-way round (`tours`) and walks
+/// down one goal (`walkDowns`). Ids, titles and counts are fixed.
 enum Generated {
     static let titles = [
         "Call Mum",
@@ -1373,16 +1672,19 @@ enum Generated {
         String(String(repeating: "Walk more every day. ", count: 10).prefix(200)),
         String(repeating: "x", count: 60),
     ]
-    static let counts = [0, 1, 3, 4, 5, 7]
+    static let counts = [0, 1, 2, 3, 4, 5, 6, 7]
 
     static func states() -> [WalkState] {
         var out: [WalkState] = []
         out += ground()
+        out += tours()
+        out += walkDowns()
         for step in 1...6 {
             for keptCount in 0...WalkLoad.maxAreas {
                 for loose in [false, true] {
                     for perPost in counts {
-                        for variant in 0..<3 {
+                        // A flag chosen while examples are on (3): where examples are, and on every other count.
+                        for variant in 0..<((1...4).contains(step) && perPost % 2 == 1 ? 4 : 3) {
                             for standing in 0..<max(1, keptCount) {
                                 out.append(make(step: step, keptCount: keptCount, loose: loose, perPost: perPost,
                                                 variant: variant, standing: standing))
@@ -1404,6 +1706,13 @@ enum Generated {
     static let levelLayouts: [WalkLayout] = build(.level)
 
     static func layouts(_ footing: WalkFooting) -> [WalkLayout] { footing == .natural ? naturalLayouts : levelLayouts }
+
+    /// The ruled layouts on each of the wings the layout is measured on, built once.
+    static let levelByWing: [CGFloat: [WalkLayout]] = Dictionary(uniqueKeysWithValues: wings.map { wing in
+        let states = all
+        return (wing, wing == 0 ? levelLayouts : parallel(states.count) { WalkLayout.make(states[$0], today: today, footing: .level, wing: wing) })
+    })
+    static func level(wing: CGFloat) -> [WalkLayout] { levelByWing[wing] ?? [] }
 
     private static func build(_ footing: WalkFooting) -> [WalkLayout] {
         let states = all
@@ -1458,8 +1767,86 @@ enum Generated {
         return out
     }
 
+    /// A whole-year walk part-way round: on Year standing in each kept area with the areas after it
+    /// still ahead (`tour`), on Season on each year goal with the goals after it still ahead.
+    static func tours() -> [WalkState] {
+        var out: [WalkState] = []
+        for step in 1...2 {
+            for keptCount in 2...4 {
+                for perPost in [1, 3] {
+                    for standing in 0..<keptCount {
+                        var s = make(step: step, keptCount: keptCount, loose: false, perPost: perPost, variant: 0, standing: standing)
+                        s.depth = .full
+                        if step == 1 {
+                            s.tour = Array(s.kept.drop { $0 != s.standing }.dropFirst())
+                        } else {
+                            let stops = s.keptAreas.flatMap { a in s.items(on: .year).filter { $0.areaId == a.id } }.map(\.id)
+                            if let at = stops.firstIndex(where: { $0 == s.focus[.season] }) { s.tour = Array(stops[(at + 1)...]) }
+                        }
+                        out.append(s.settled)
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /// Walks down one year goal ("Walk another one down"), on Season to Today, with one to three
+    /// areas kept: the walked goal's line in its own area, or reaching a second area too; a skipped
+    /// step (no month goal: the week task was said with no goal above, so it starts a line of the
+    /// walk down's own); other areas holding another goal's whole chain, off the line; on Today a
+    /// first thing on the line, and one off it.
+    static func walkDowns() -> [WalkState] {
+        var out: [WalkState] = []
+        var n = 90_000
+        func item(_ level: WalkLevel, _ title: Int, _ area: UUID?, _ parent: UUID? = nil, dated: Bool = false) -> WalkItem {
+            n += 1
+            return WalkItem(id: uid(n), level: level, title: titles[title % titles.count], areaId: area, parentId: parent,
+                            day: dated ? today : nil)
+        }
+        for step in 2...5 {
+            for keptCount in 1...3 {
+                for twoAreas in keptCount > 1 ? [false, true] : [false] {
+                    for skipped in [false, true] {
+                        for firstOff in step == 5 && keptCount > 1 ? [false, true] : [false] {
+                            var s = WalkState()
+                            s.areas = ridge
+                            s.kept = ridge.prefix(keptCount).map(\.id)
+                            s.step = step
+                            let home = s.kept[0]
+                            let walked = item(.year, 1, home)
+                            let season = item(.season, 2, home, walked.id)
+                            var items = [walked, season]
+                            var line = [walked.id]
+                            if twoAreas { items.append(item(.season, 0, s.kept[1], walked.id)) }
+                            var above: UUID? = season.id
+                            if skipped { above = nil } else { let month = item(.month, 3, home, season.id); items.append(month); above = month.id }
+                            let week = item(.week, skipped ? 1 : 0, home, above, dated: true)
+                            items.append(week)
+                            if skipped { line.append(week.id) }
+                            var offLine: WalkItem?
+                            for other in s.kept.dropFirst() {
+                                let year = item(.year, 0, other), lower = item(.season, 1, other, year.id)
+                                let month = item(.month, 2, other, lower.id), task = item(.week, 0, other, month.id, dated: true)
+                                items += [year, lower, month, task]
+                                offLine = offLine ?? task
+                            }
+                            s.items = items.filter { $0.level.rawValue <= min(step, 4) }
+                            s.walkingDown = line.filter { id in s.items.contains { $0.id == id } }
+                            s.focusArea = home
+                            if step == 5 { s.firstThing = firstOff ? offLine?.id : week.id }
+                            out.append(s.settled)
+                        }
+                    }
+                }
+            }
+        }
+        return out
+    }
+
     /// `standing`: the index of the kept area the walk is asked to stand in (it settles where it can).
-    /// `variant`: 0 plain; 1 a flag chosen (the oldest of the walk's own on the standing post); 2 examples on.
+    /// `variant`: 0 plain; 1 a flag chosen (the oldest of the walk's own on the standing post); 2 examples
+    /// on; 3 both.
     static func make(step: Int, keptCount: Int, loose: Bool, perPost: Int, variant: Int, standing: Int) -> WalkState {
         var s = WalkState()
         s.areas = ridge
@@ -1487,7 +1874,7 @@ enum Generated {
             above = planted
         }
         // Flags below the step (a walk backed up): never drawn before Look back up.
-        if variant == 1, step < 4 {
+        if variant == 1 || variant == 3, step < 4 {
             n += 1
             s.items.append(WalkItem(id: uid(n), level: WalkLevel(rawValue: step + 1)!, title: "Below", areaId: columns.first ?? nil))
         }
@@ -1503,14 +1890,14 @@ enum Generated {
             }
         }
         s = s.settled
-        if variant == 1, let level = s.level {
+        if variant == 1 || variant == 3, let level = s.level {
             if level == .today {
                 if let first = s.item(s.firstThing), first.mine, s.column(of: first) == s.standing { s.selected = first.id }
             } else {
                 s.selected = s.items(on: level).first { $0.mine && s.column(of: $0) == s.standing }?.id
             }
         }
-        if variant == 2, (1...4).contains(step) { s.examplesOn = [step] }
+        if variant >= 2, (1...4).contains(step) { s.examplesOn = [step] }
         return s.settled
     }
 
@@ -1519,6 +1906,7 @@ enum Generated {
         let here = s.area(s.standing)?.name ?? "nameless"
         return "step \(s.step) ground \(s.ground) kept \(s.kept.count) items \(counts) standing \(here) "
             + "focus \(s.focus.count) examples \(s.examplesOn) selected \(s.selected != nil) first \(s.firstThing != nil)"
+            + (s.walkingDown.isEmpty ? "" : " walking down") + (s.tour.isEmpty ? "" : " tour \(s.tour.count)")
     }
 }
 
@@ -1551,11 +1939,12 @@ enum Invariants {
         return CGRect(x: post.base.x - 1.5 + min(0, reach), y: post.top, width: 3 + abs(reach), height: post.base.y - post.top)
     }
 
-    /// Every frame the layout makes, by name: cloths, labels, the standing pole, and every side
-    /// post's pill, pole and pennants.
+    /// Every frame the layout makes, by name: cloths, labels, the standing pill's caret, the standing
+    /// pole, and every side post's pill, pole, pennants and "+n".
     static func everything(_ layout: WalkLayout) -> [(String, CGRect)] {
         layout.posts.flatMap { post in post.banners.map { ("cloth \($0.id)", $0.drawn) } + [("pole", pole(post))] }
             + layout.labels.map { ("label \($0.name)", $0.frame) }
+            + layout.labels.compactMap { label in label.caret.map { ("caret \(label.name)", $0) } }
             + layout.sides.flatMap { side in side.boxes.map { ("side \(side.name.isEmpty ? "nameless" : side.name)", $0) } }
     }
 
@@ -1565,9 +1954,9 @@ enum Invariants {
     }
 
     /// The guarantees, for a settled state `s` laid out on a stage with `wing`, where a touch is `touch` across:
-    /// (a) no two cloths' drawn boxes meet;
+    /// (a) no two cloths' drawn boxes meet, nor the caret one;
     /// (b) no side post's pill, pole or pennants meet another side post's, the standing post's cloths or its label;
-    /// (c) nothing above the question (282) on steps 1 to 5, or above the header (92) looking back up;
+    /// (c) nothing (the caret included) above the question (282) on steps 1 to 5, or above the header (92) looking back up;
     /// (d) off the ground, no cloth below the lowest cloth's place (532, and half a point), no pill or
     ///     side post below the standing foot (556); on the ground no chip below it; nothing below 700 looking back up;
     /// (e) everything inside the edges;
@@ -1577,7 +1966,8 @@ enum Invariants {
     ///     touch shapes (F19);
     /// (h) the spoken flag, where there is one, meets none of it.
     /// And the shape of what is drawn: one standing post off the ground and none on it, each cloth as
-    /// tall as its lines, at most four flags in full, an example showing while examples are on.
+    /// tall as its lines, at most four flags in full, an example showing while examples are on and
+    /// never at the cost of the person's last flag, the caret over its pill, "+n" in its place.
     static func check(_ layout: WalkLayout, _ s: WalkState, wing: CGFloat = 0, touch: CGFloat = 44) -> [String] {
         var problems: [String] = []
         let banners = layout.posts.flatMap(\.banners)
@@ -1600,7 +1990,7 @@ enum Invariants {
         for b in banners {
             let size: CGSize
             switch b.kind {
-            case .full, .ghost: size = CGSize(width: width, height: 19 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
+            case .full, .ghost: size = CGSize(width: width, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
             case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines))
             case .more: size = CGSize(width: 78, height: 22)
             case .compact: size = b.frame.size
@@ -1614,20 +2004,33 @@ enum Invariants {
         let more = banners.filter { if case .more = $0.kind { return true }; return false }.count
         if full > 4 || above > 1 || more > 1 { problems.append("\(full) in full, \(above) above, \(more) more") }
         if full + banners.filter({ $0.kind == .ghost }).count > 4 { problems.append("more than four flags and examples") }
-        if (1...4).contains(s.step), !s.ground, s.examplesOn.contains(s.step), !s.examplesLeft(today: today).isEmpty,
-           !banners.contains(where: { $0.kind == .ghost }) {
-            problems.append("examples on, none shows")
+        if (1...4).contains(s.step), !s.ground, s.examplesOn.contains(s.step), !s.examplesLeft(today: today).isEmpty {
+            // F36: an example always shows, and never at the cost of the person's last flag.
+            if !banners.contains(where: { $0.kind == .ghost }) { problems.append("examples on, none shows") }
+            if full == 0, let level = s.level, s.items(on: level).contains(where: { s.column(of: $0) == s.standing }) {
+                problems.append("examples took the person's last flag")
+            }
         }
         for side in layout.sides {
             if side.pennants.count > 4 || side.pennants.count + side.extra != side.count || (side.extra > 0 && side.pennants.count != 3) {
                 problems.append("\(side.id): \(side.pennants.count) pennants and +\(side.extra) for \(side.count)")
             }
             if (side.area == nil) != (side.pill == nil) { problems.append("\(side.id): only the nameless post has no pill") }
+            if (side.extra > 0) != (side.extraFrame != nil) { problems.append("\(side.id): +\(side.extra) with \(String(describing: side.extraFrame))") }
         }
 
-        // (a)
-        for i in cloths.indices { for j in cloths.indices where j > i && overlap(cloths[i].box, cloths[j].box) {
-            problems.append("(a) \(cloths[i].id) \(cloths[i].box) meets \(cloths[j].id) \(cloths[j].box)")
+        // The caret: 10 × 7, 2 above its pill, on the pill's middle; only the standing pill has one.
+        for label in layout.labels {
+            guard let caret = label.caret else { continue }
+            let place = CGRect(x: label.frame.midX - 5, y: label.frame.minY - 9, width: 10, height: 7)
+            if !label.standing || abs(caret.minX - place.minX) > 0.01 || abs(caret.minY - place.minY) > 0.01 || caret.size != place.size {
+                problems.append("the caret \(caret) is not over its pill \(label.frame)")
+            }
+        }
+        // (a): the cloths, and the caret with them.
+        let hung = cloths + layout.labels.compactMap { label in label.caret.map { (id: "caret", box: $0) } }
+        for i in hung.indices { for j in hung.indices where j > i && overlap(hung[i].box, hung[j].box) {
+            problems.append("(a) \(hung[i].id) \(hung[i].box) meets \(hung[j].id) \(hung[j].box)")
         } }
         // (b)
         let standing = cloths.map(\.box) + layout.labels.filter(\.standing).map(\.frame)
@@ -1658,7 +2061,7 @@ enum Invariants {
         // (g)
         var taps: [(name: String, frame: CGRect, post: Bool)] = banners.filter(\.taps).map { ($0.id, $0.drawn, true) }
         taps += layout.labels.filter(\.tappable).map { ("label \($0.name)", $0.frame, false) }
-        taps += layout.sides.filter(\.taps).map { ("side \($0.name)", union($0.boxes), false) }
+        taps += layout.sides.filter { $0.area != nil }.map { ("side \($0.name)", union($0.boxes), false) }
         for i in taps.indices { for j in taps.indices where j > i && !(taps[i].post && taps[j].post) {
             let a = taps[i].frame, b = taps[j].frame
             let apart = hypot(a.midX - b.midX, a.midY - b.midY)

@@ -23,12 +23,14 @@ extension WalkLayout {
     static let moreSize = CGSize(width: 78, height: 22)
     /// A post with nothing on it yet: its pole stands this tall, the pill on its top.
     static let barePole: CGFloat = 36
-    /// A flag of the step's level: 19 and 17 a line, 14 more with a tag line. The goal above: 12 and 14 a line.
-    static let flagPad: CGFloat = 19, flagLine: CGFloat = 17, tagLine: CGFloat = 14
+    /// A flag of the step's level: 18 and 17 a line (F31), 14 more with a tag line. The goal above: 12 and 14 a line.
+    static let flagPad: CGFloat = 18, flagLine: CGFloat = 17, tagLine: CGFloat = 14
     static let parentPad: CGFloat = 12, parentLine: CGFloat = 14
-    /// By estimate, so the core needs no fonts: a title's character (13 pt), a capital in the
-    /// standing pill (11 pt, tracked), one in a side pill (9.5 pt, tracked), one in an example's tag.
-    static let titleChar: CGFloat = 7.0, pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3, tagChar: CGFloat = 7.2
+    /// The caret over the standing pill: 10 × 7, 2 above it (F34).
+    static let caretSize = CGSize(width: 10, height: 7), caretGap: CGFloat = 2
+    /// By estimate: a capital in the standing pill (11 pt, tracked) and one in a side pill (9.5 pt,
+    /// tracked). A title's lines are counted from the face itself (`WalkLayout+Lines.swift`).
+    static let pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3
     static let softHyphen = "\u{00AD}"
 
     // MARK: The side posts' numbers
@@ -73,47 +75,6 @@ extension WalkLayout {
 
     // MARK: Words
 
-    /// The title as it is drawn at a cloth's width: inside any word longer than a line holds, a
-    /// soft hyphen after every line's worth less one, so the word breaks there, with a hyphen,
-    /// instead of spilling past its cloth (S20).
-    static func drawnTitle(_ text: String, width: CGFloat) -> String {
-        let perLine = max(2, Int(floor((width - 16) / titleChar)))
-        return text.split(separator: " ", omittingEmptySubsequences: false).map { word -> String in
-            guard word.count > perLine, !word.contains(softHyphen) else { return String(word) }
-            var out = "", run = 0
-            for character in word {
-                if run == perLine - 1 { out += softHyphen; run = 0 }
-                out.append(character)
-                run += 1
-            }
-            return out
-        }.joined(separator: " ")
-    }
-
-    /// How many lines a title takes at a cloth's width, at most 3: its drawn form wrapped at its
-    /// spaces and soft hyphens, by the estimate of 7.0 points a character.
-    static func lines(for text: String, width: CGFloat) -> Int {
-        let perLine = max(2, Int(floor((width - 16) / titleChar)))
-        var lines = 1, used = 0
-        for word in drawnTitle(text, width: width).split(separator: " ") {
-            let pieces = word.components(separatedBy: softHyphen).filter { !$0.isEmpty }
-            for (i, piece) in pieces.enumerated() {
-                let lead = used > 0 && i == 0 ? 1 : 0                       // the space before a word
-                let hyphen = i < pieces.count - 1 ? 1 : 0                   // shown if the line breaks after this piece
-                if used > 0, used + lead + piece.count + hyphen > perLine {
-                    lines += 1
-                    used = 0
-                } else {
-                    used += lead
-                }
-                // A piece longer than a line (a soft hyphen of the person's own) runs on.
-                lines += (piece.count + hyphen - 1) / perLine
-                used += piece.count - ((piece.count + hyphen - 1) / perLine) * perLine
-            }
-        }
-        return min(3, max(1, lines))
-    }
-
     /// An area's name as its pill draws it: in capitals, wrapped at its spaces where a line holds
     /// `width` by the estimate of 8.4 points a capital, on at most two lines; what does not fit
     /// on the second is cut with an ellipsis. A single word longer than a line stays whole on its own.
@@ -130,11 +91,6 @@ extension WalkLayout {
         guard lines.count > 2 else { return lines.isEmpty ? [""] : lines }
         let rest = lines[1...].joined(separator: " ")
         return [lines[0], String(rest.prefix(max(1, perLine - 1))).trimmingCharacters(in: .whitespaces) + "…"]
-    }
-
-    /// An example's tag: the long one where the cloth holds it (7.2 points a character and 16), else the short one.
-    static func exampleTag(forWidth width: CGFloat) -> String {
-        CGFloat(WalkCopy.exampleTag.count) * tagChar + 16 <= width ? WalkCopy.exampleTag : WalkCopy.exampleTagShort
     }
 
     // MARK: Roles
@@ -199,7 +155,7 @@ struct WalkStanding {
         let sides = self.sides()
         // Look back up arrives with its own cloths (Task 8); until then the area's name and the side posts.
         guard let level = s.level else {
-            return (s.area(s.standing).map { label($0, top: L.lookBackPill, dx: 0) }, nil, sides)
+            return (s.area(s.standing).map { label($0, top: L.lookBackPill, dx: 0, caret: true) }, nil, sides)
         }
         let pieces = self.pieces(level)
         let area = s.area(s.standing)
@@ -216,8 +172,11 @@ struct WalkStanding {
         }
         let clothsTop = frames.first?.minY ?? L.standingFoot - L.barePole
         let pillTop = pill.map { clothsTop - (frames.isEmpty ? 0 : L.underPill) - $0.height }
+        // The caret stands over the pill only where it is clear of the question; the stack is never
+        // made shorter for it (F34). Ruled, so the hand does not decide it: the hand keeps under it.
+        let caret = pillTop.map { $0 - L.caretGap - L.caretSize.height >= L.question } ?? false
 
-        let hand = self.hand(frames: frames, who: pieces.map(\.who), pillTop: pillTop, pill: pill, sides: sides)
+        let hand = self.hand(frames: frames, who: pieces.map(\.who), pillTop: pillTop, pill: pill, caret: caret, sides: sides)
         let base = CGPoint(x: L.centreX, y: L.standingFoot)
         let banners = zip(pieces, frames).enumerated().map { i, pair -> L.Banner in
             let (piece, ruled) = pair
@@ -245,7 +204,7 @@ struct WalkStanding {
         if let area, let pillTop {
             // The pill rides the pole's line, at its own height.
             let high = L.standingFoot - (pillTop - hand.lift)
-            name = label(area, top: pillTop - hand.lift, dx: high * CGFloat(sin(hand.lean * .pi / 180)))
+            name = label(area, top: pillTop - hand.lift, dx: high * CGFloat(sin(hand.lean * .pi / 180)), caret: caret)
         }
         return (name, post, sides)
     }
@@ -259,12 +218,14 @@ struct WalkStanding {
                 lines.count > 1 ? L.pillTallHeight : L.pillHeight)
     }
 
-    func label(_ area: WalkArea, top: CGFloat, dx: CGFloat) -> L.Label {
+    func label(_ area: WalkArea, top: CGFloat, dx: CGFloat, caret: Bool) -> L.Label {
         let pill = pillSize(area)
+        let mark = CGRect(x: L.centreX + dx - L.caretSize.width / 2, y: top - L.caretGap - L.caretSize.height,
+                          width: L.caretSize.width, height: L.caretSize.height)
         return L.Label(id: area.id, name: area.name,
                        frame: CGRect(x: L.centreX - pill.width / 2 + dx, y: top, width: pill.width, height: pill.height),
                        kept: true, focused: true, opacity: 1, tappable: false, hint: WalkCopy.areaHint(s, area.id),
-                       standing: true, lines: pill.lines)
+                       standing: true, lines: pill.lines, caret: caret ? mark : nil)
     }
 
     // MARK: Which cloths
@@ -290,26 +251,40 @@ struct WalkStanding {
     ///
     /// How many flags: the newest n, n the largest of 4, 3, 2, 1 for which every shown title stands
     /// in full (up to three lines) and the whole stack, with "+k more" when k are not shown, fits
-    /// between the question and the lowest cloth's place. If not even one fits in full, one is
-    /// shown cut to the lines that fit. A chosen flag is always among those shown: it takes the
-    /// oldest shown one's place.
+    /// between the question and the lowest cloth's place. The goal above gives up lines before a
+    /// flag is dropped (F31): it keeps its three only while that costs no flag, else two, else one
+    /// (the question already quotes it whole). If not even one flag fits in full, one is shown cut
+    /// to the lines that fit. A chosen flag is always among those shown: it takes the oldest shown
+    /// one's place.
     ///
-    /// Examples, while on: the newest `4 − e` flags then `e` examples, `e = min(examples, max(2, 4 −
-    /// flags))`; if they do not fit, fewer examples, then (with one example left) fewer flags.
+    /// Examples, while on (F36): `e` examples, from `min(examples, max(2, 4 − flags))` down to one,
+    /// and with each `e` the newest `min(flags, 4 − e)` of the person's flags, which give way
+    /// first, down to one. So an example always shows, and never at the cost of the person's last
+    /// flag: if one flag and one example do not fit in full, the flag is cut to the lines that fit.
     func pieces(_ level: WalkLevel) -> [Piece] {
-        let above = parent(level).map(parentPiece)
+        let goal = parent(level)
+        let goalLines = goal.map { L.lines(for: $0.title, width: L.parentWidth(wing: wing), face: .parent) } ?? 0
         let flags = self.flags(level)
         let ghosts = s.examplesOn.contains(s.step) ? s.examplesLeft(today: today).map { ghostPiece($0, level) } : []
         let pill = s.area(s.standing).map(pillSize)?.height
         let room = L.lowestCloth - L.question
 
-        func stack(_ own: [Piece], _ examples: [Piece]) -> [Piece] {
+        func stack(_ above: Int, _ own: [Piece], _ examples: [Piece]) -> [Piece] {
             let hidden = flags.count - own.count
-            return (above.map { [$0] } ?? []) + own + examples + (hidden > 0 ? [morePiece(hidden, level)] : [])
+            return (goal.map { [parentPiece($0, lines: above)] } ?? []) + own + examples
+                + (hidden > 0 ? [morePiece(hidden, level)] : [])
         }
         func fits(_ cloths: [Piece]) -> Bool {
             let high = cloths.reduce(0) { $0 + $1.size.height } + L.clothGap * CGFloat(max(0, cloths.count - 1))
             return (pill.map { $0 + (cloths.isEmpty ? 0 : L.underPill) } ?? 0) + high <= room + 0.01
+        }
+        /// These flags and examples with the goal above on the most lines that fit; nil if not even one does.
+        func fitted(_ own: [Piece], _ examples: [Piece]) -> [Piece]? {
+            for above in stride(from: goalLines, through: min(1, goalLines), by: -1) {
+                let cloths = stack(above, own, examples)
+                if fits(cloths) { return cloths }
+            }
+            return nil
         }
         let chosen = flags.first { $0.id == s.selected }
         /// The newest `n`, the chosen one in the oldest's place when it would not show.
@@ -319,38 +294,35 @@ struct WalkStanding {
             return out
         }
         func own(_ n: Int) -> [Piece] { shown(n).map { flagPiece($0, level, lines: nil) } }
+        /// One flag, cut to the most lines that fit beside these examples.
+        func cut(_ examples: [Piece]) -> [Piece]? {
+            guard let one = shown(1).first else { return nil }
+            for lines in stride(from: flagPiece(one, level, lines: nil).lines - 1, to: 0, by: -1) {
+                if let cloths = fitted([flagPiece(one, level, lines: lines)], examples) { return cloths }
+            }
+            return stack(min(1, goalLines), [flagPiece(one, level, lines: 1)], examples)
+        }
 
         if !ghosts.isEmpty {
-            let most = min(ghosts.count, max(2, 4 - flags.count))
-            let mine = min(flags.count, 4 - most)
-            for e in stride(from: most, to: 0, by: -1) {
-                let cloths = stack(own(mine), Array(ghosts.prefix(e)))
-                if fits(cloths) { return cloths }
+            for e in stride(from: min(ghosts.count, max(2, 4 - flags.count)), to: 0, by: -1) {
+                for n in stride(from: min(flags.count, 4 - e), through: min(1, flags.count), by: -1) {
+                    if let cloths = fitted(own(n), Array(ghosts.prefix(e))) { return cloths }
+                }
             }
-            for n in stride(from: mine - 1, through: chosen == nil ? 0 : 1, by: -1) {
-                let cloths = stack(own(n), Array(ghosts.prefix(1)))
-                if fits(cloths) { return cloths }
-            }
+            return cut([ghosts[0]]) ?? stack(min(1, goalLines), [], [ghosts[0]])
         }
         for n in stride(from: min(4, flags.count), to: 0, by: -1) {
-            let cloths = stack(own(n), [])
-            if fits(cloths) { return cloths }
+            if let cloths = fitted(own(n), []) { return cloths }
         }
-        guard let one = shown(1).first else { return stack([], []) }
-        let whole = flagPiece(one, level, lines: nil)
-        for lines in stride(from: whole.lines - 1, to: 0, by: -1) {
-            let cloths = stack([flagPiece(one, level, lines: lines)], [])
-            if fits(cloths) { return cloths }
-        }
-        return stack([flagPiece(one, level, lines: 1)], [])
+        return cut([]) ?? stack(goalLines, [], [])
     }
 
-    func parentPiece(_ item: WalkItem) -> Piece {
+    /// The goal above, on `lines` lines (its own count, or fewer where it gives way to a flag).
+    func parentPiece(_ item: WalkItem, lines: Int) -> Piece {
         let across = L.parentWidth(wing: wing)
-        let lines = L.lines(for: item.title, width: across)
         let role = L.role(item, in: s, firstThing: false)
         return Piece(id: "\(postId)-above-\(item.id.uuidString)", who: item.id.uuidString, kind: .parent, item: item,
-                     level: item.level, text: L.drawnTitle(item.title, width: across), tag: nil, glows: false,
+                     level: item.level, text: L.drawnTitle(item.title, width: across, face: .parent), tag: nil, glows: false,
                      label: WalkCopy.bannerLabel(item.title, level: item.level, tag: nil, role: role), taps: role.taps,
                      lines: lines, size: CGSize(width: across, height: L.parentPad + L.parentLine * CGFloat(lines)))
     }
@@ -392,8 +364,10 @@ struct WalkStanding {
 
     /// Which other areas stand at the side (F4): those the walk can stand in from here
     /// (`WalkState.walksThere`): on Year and on Look back up every other kept area; on steps 2 to
-    /// 5 an area with a flag on this level or a goal above it. Then the nameless post (F12), while
-    /// the walk stands in a named area and loose flags stand on this level or the one above.
+    /// 5 an area with a flag on this level or a goal above it. On a walk down only the walked
+    /// goal's line is on the mountain: an area off it has no post (F35). So every named post drawn
+    /// can be walked to. Then the nameless post (F12), while the walk stands in a named area and
+    /// loose flags stand on this level or the one above.
     ///
     /// Areas before the standing one in ridge order go left, nearest first; those after go right,
     /// the nameless post last; a side that is full (four) spills to the other. On a side the slots
@@ -438,20 +412,23 @@ struct WalkStanding {
             let off = WalkFooting.sideStep * CGFloat(WalkFooting.hand(side.id, "footing") + 1) / 2 * (entry.slot >= 2 ? -1 : 1)
             let foot = side.poleFoot + off
             let sine = CGFloat(sin(lean * .pi / 180))
+            /// Where the leaning pole carries what hangs on it.
+            func hung(_ frame: CGRect) -> CGRect {
+                let moved = frame.offsetBy(dx: 0, dy: off)
+                return moved.offsetBy(dx: (foot - moved.midY) * sine, dy: 0)
+            }
             return L.Side(id: side.id, area: side.area, name: side.name, pill: side.pill?.offsetBy(dx: 0, dy: off),
                           poleX: side.poleX, poleTop: side.poleTop + off, poleFoot: foot,
-                          pennants: side.pennants.map { p in
-                              let moved = p.frame.offsetBy(dx: 0, dy: off)
-                              return L.Pennant(frame: moved.offsetBy(dx: (foot - moved.midY) * sine, dy: 0), level: p.level)
-                          },
-                          extra: side.extra, count: side.count, label: side.label, lean: lean, taps: side.taps)
+                          pennants: side.pennants.map { L.Pennant(frame: hung($0.frame), level: $0.level) },
+                          extra: side.extra, count: side.count, label: side.label, lean: lean,
+                          extraFrame: side.extraFrame.map(hung))
         }
     }
 
     func resized(_ side: L.Side, pill: CGRect) -> L.Side {
         L.Side(id: side.id, area: side.area, name: side.name, pill: pill, poleX: side.poleX, poleTop: side.poleTop,
                poleFoot: side.poleFoot, pennants: side.pennants, extra: side.extra, count: side.count,
-               label: side.label, lean: side.lean, taps: side.taps)
+               label: side.label, lean: side.lean, extraFrame: side.extraFrame)
     }
 
     /// The flags with no kept area. `drawn`: only those that give the nameless post a reason to
@@ -465,8 +442,8 @@ struct WalkStanding {
 
     /// A side post, ruled, in its slot: the pill centred on its pole and slid inside the edges, the
     /// pole from 4 above the pill up 60, a pennant for each of its flags on the step's level
-    /// (newest first; Today's are week tasks; Look back up's are all its flags). A named post is
-    /// drawn only where the walk can stand (`sides`), so it takes a tap; the nameless one takes none yet.
+    /// (newest first; Today's are week tasks; Look back up's are all its flags); with more than
+    /// four, three pennants and the fourth place for "+n" (`extraFrame`).
     func side(_ area: WalkArea?, poleX: CGFloat, pillTop: CGFloat) -> L.Side {
         let flags: [WalkItem]
         if let area {
@@ -483,16 +460,17 @@ struct WalkStanding {
         }
         let foot = pillTop - L.sidePoleGap, top = foot - L.sidePoleHeight
         let shown = flags.count > L.pennantsAtMost ? L.pennantsAtMost - 1 : flags.count
-        let pennants = flags.reversed().prefix(shown).enumerated().map { i, flag in
-            L.Pennant(frame: CGRect(x: poleX + L.pennantOut, y: top + L.pennantDrop + CGFloat(i) * L.pennantPitch,
-                                    width: L.pennantSize.width, height: L.pennantSize.height), level: flag.level)
+        func place(_ i: Int) -> CGRect {
+            CGRect(x: poleX + L.pennantOut, y: top + L.pennantDrop + CGFloat(i) * L.pennantPitch,
+                   width: L.pennantSize.width, height: L.pennantSize.height)
         }
+        let pennants = flags.reversed().prefix(shown).enumerated().map { i, flag in L.Pennant(frame: place(i), level: flag.level) }
         let name = area?.name ?? ""
         let words = s.level.map { WalkCopy.sideLabel(name: area?.name ?? WalkCopy.noArea, count: flags.count, level: $0, periods: periods) }
             ?? WalkCopy.sideLabelWholePlan(name: area?.name ?? WalkCopy.noArea, count: flags.count)
         return L.Side(id: area?.id.uuidString ?? "nameless", area: area?.id, name: name, pill: pill, poleX: poleX,
                       poleTop: top, poleFoot: foot, pennants: pennants, extra: flags.count - shown, count: flags.count,
-                      label: words, lean: 0, taps: area != nil)
+                      label: words, lean: 0, extraFrame: flags.count > shown ? place(shown) : nil)
     }
 
     // MARK: The hand
@@ -509,11 +487,13 @@ struct WalkStanding {
     /// - Across, a cloth keeps only as much lean, shift and tilt as the gap to the side post
     ///   beside it allows (the board leaves 1 point beside a side pill at its widest).
     func hand(frames: [CGRect], who: [String], pillTop: CGFloat?, pill: (lines: Int, width: CGFloat, height: CGFloat)?,
-              sides: [L.Side]) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
+              caret: Bool, sides: [L.Side]) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
         let none = (lift: CGFloat(0), lean: 0.0, tilts: [Double](repeating: 0, count: frames.count),
                     shifts: [CGFloat](repeating: 0, count: frames.count))
         guard footing == .natural else { return none }
-        let top = pillTop ?? frames.first?.minY ?? L.standingFoot - L.barePole
+        // The stack's top: the caret's where there is one, else the pill's, else the top cloth's.
+        let top = (pillTop ?? frames.first?.minY ?? L.standingFoot - L.barePole)
+            - (caret ? L.caretGap + L.caretSize.height : 0)
         let room = max(0, top - L.question)
         // With no pill the top cloth's own corner needs room above it too.
         let above: CGFloat = pillTop == nil && !frames.isEmpty ? WalkFooting.turnRoom : 0

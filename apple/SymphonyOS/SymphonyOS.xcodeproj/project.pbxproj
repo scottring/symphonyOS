@@ -20,6 +20,7 @@
 		08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5CFFF63F2366985E81E3414 /* WalkHintRow.swift */; };
 		08FAC3B23154783D2E60D88E /* DailyGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39CC4B0224C6FC309282FD25 /* DailyGateTests.swift */; };
 		095EB0D565A667604C269A43 /* WalkLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E8E58E265506F189EADDEE /* WalkLoadTests.swift */; };
+		097D52762685314D5D745C57 /* WalkLayout+Lines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C24FAAFF04DE8F7348134 /* WalkLayout+Lines.swift */; };
 		0A595FEC242CD1F5A95A8BEC /* SignUpCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5446B4F26A3BBFDB7B254A4E /* SignUpCopyTests.swift */; };
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
 		0CE48E3DFD5F5A01A8B18529 /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9031A67BD188FEA2743DE71D /* TaskViewModel.swift */; };
@@ -348,6 +349,7 @@
 		112539BA8D97B92C4D064876 /* WalkSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkSceneView.swift; sourceTree = "<group>"; };
 		12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureBar.swift; sourceTree = "<group>"; };
 		14CE7964034D05C26EAF67D9 /* DailyCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyCopy.swift; sourceTree = "<group>"; };
+		156C24FAAFF04DE8F7348134 /* WalkLayout+Lines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WalkLayout+Lines.swift"; sourceTree = "<group>"; };
 		15938703D22CD34580553E2F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
 		15D4A6D0E39EF42BBDAF92B3 /* WalkState+Plant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WalkState+Plant.swift"; sourceTree = "<group>"; };
@@ -1247,6 +1249,7 @@
 				28540258912D55610F1131C4 /* WalkLayout.swift */,
 				6BFB66294E59DCCBA1FCD5D9 /* WalkLayout+Controls.swift */,
 				697FA65198CC4E5C42134D7A /* WalkLayout+Ground.swift */,
+				156C24FAAFF04DE8F7348134 /* WalkLayout+Lines.swift */,
 				A4B7F03BC2B80424CC0A1E8D /* WalkLayout+Standing.swift */,
 				9F94E7B2E225D5637ADCA3E0 /* WalkLayout+Words.swift */,
 				B1105AF4CFEBB15EE2FA9752 /* WalkOrb.swift */,
@@ -1669,6 +1672,7 @@
 				08DDA9901453C20A237E408D /* WalkHintRow.swift in Sources */,
 				E831A1A838CE47BB996920D6 /* WalkLayout+Controls.swift in Sources */,
 				11F3E3F765BE7A5F502835DC /* WalkLayout+Ground.swift in Sources */,
+				097D52762685314D5D745C57 /* WalkLayout+Lines.swift in Sources */,
 				CFEA231B34B5F34489B8CD5D /* WalkLayout+Standing.swift in Sources */,
 				B113E44098CF749BE1A48AF1 /* WalkLayout+Words.swift in Sources */,
 				EBC854E2F35C05C5F2210BEC /* WalkLayout.swift in Sources */,

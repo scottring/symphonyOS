@@ -59,26 +59,31 @@ struct WalkLayout: Equatable {
         /// The one label of the area the walk stands in, on its own post; it takes no tap.
         var standing: Bool = false
         /// A long name takes two lines at the same size (F20): the pill is 37 high, a ground chip 44.
-        var lines: Int = 1 }
+        var lines: Int = 1
+        /// The standing pill's caret (10 × 7, 2 above the pill), where it stands clear of the question;
+        /// nil where the pill reaches too near it (the pill's own outline still marks where you stand),
+        /// and for a chip on the ground, whose mark is inside its frame.
+        var caret: CGRect? = nil }
     /// One wordless flag on a side post, in the colour of the level it stands for.
     struct Pennant: Equatable { let frame: CGRect; let level: WalkLevel }
     /// Another area, as a small post at the side: a name pill, a short pole, a pennant for each of
     /// its flags on the step's level (at most 4; with more, 3 and `extra` as "+n" in the fourth
-    /// place). `area == nil` and `pill == nil` for the nameless post (F12). `poleX` is the pole's
-    /// centre at its foot; the pole leans `lean` degrees clockwise about its foot, and the
-    /// pennants' frames already stand where the leaning pole carries them.
+    /// place, `extraFrame`). `area == nil` and `pill == nil` for the nameless post (F12). `poleX` is
+    /// the pole's centre at its foot; the pole leans `lean` degrees clockwise about its foot, and
+    /// the pennants' frames (and the "+n"'s) already stand where the leaning pole carries them.
+    /// A named post is drawn only where the walk can stand, so a tap on it always walks there.
     struct Side: Equatable, Identifiable { let id: String; let area: UUID?; let name: String; let pill: CGRect?
         let poleX: CGFloat; let poleTop: CGFloat; let poleFoot: CGFloat; let pennants: [Pennant]
         let extra: Int; let count: Int; let label: String; var lean: Double
-        /// A tap walks there (`WalkState.walksThere`); a post that takes none is read, not offered as a button.
-        var taps: Bool = true
+        /// Where "+n" stands when `extra > 0`: the fourth pennant's place.
+        var extraFrame: CGRect? = nil
 
-        /// Everything the post draws, as boxes: its pill, its pole (leaning) and its pennants.
+        /// Everything the post draws, as boxes: its pill, its pole (leaning), its pennants and its "+n".
         var boxes: [CGRect] {
             let reach = (poleFoot - poleTop) * CGFloat(sin(lean * .pi / 180))
             let pole = CGRect(x: poleX - WalkLayout.sidePoleWidth / 2 + min(0, reach), y: poleTop,
                               width: WalkLayout.sidePoleWidth + abs(reach), height: poleFoot - poleTop)
-            return (pill.map { [$0] } ?? []) + [pole] + pennants.map(\.frame)
+            return (pill.map { [$0] } ?? []) + [pole] + pennants.map(\.frame) + (extraFrame.map { [$0] } ?? [])
         } }
     let camera: Camera; let labels: [Label]; let posts: [Post]; let sides: [Side]; let needleDown: Bool
     /// The spoken flag's place (S25) while the light is speaking or finishing on steps 1 to 5: one
@@ -133,15 +138,16 @@ struct WalkLayout: Equatable {
         }
         var made = WalkLayout(camera: stop(art, s.step), labels: labels, posts: posts, sides: sides,
                               needleDown: needleDown(s))
-        made.spokenFlag = spokenFrame(state)
-        made.nextLine = nextFrame(state)
-        made.hintLine = hintFrame(state)
-        made.undoPill = undoFrame(state)
-        made.lesson = teachFrame(state)
-        made.more = moreFrame(state)
-        made.back = backFrame(state, wing: wing)
-        made.leave = leaveFrame(state, wing: wing)
-        made.moveRow = moveRowFrame(state)
+        // The controls too are the settled walk's, so the hint is for the place the picture shows.
+        made.spokenFlag = spokenFrame(s)
+        made.nextLine = nextFrame(s)
+        made.hintLine = hintFrame(s)
+        made.undoPill = undoFrame(s)
+        made.lesson = teachFrame(s)
+        made.more = moreFrame(s)
+        made.back = backFrame(s, wing: wing)
+        made.leave = leaveFrame(s, wing: wing)
+        made.moveRow = moveRowFrame(s)
         return made
     }
 
@@ -178,10 +184,7 @@ struct WalkLayout: Equatable {
         }
     }
 
-    /// What a tap on a side post sends: a named one walks there, only where the walk can stand
-    /// there (`Side.taps`). The nameless one opens the paper (Task 7; nothing until then).
-    static func tapEvent(_ side: Side) -> WalkEvent? {
-        guard side.taps, let area = side.area else { return nil }
-        return .areaTapped(area)
-    }
+    /// What a tap on a side post sends: a named one walks there (it is drawn only where the walk
+    /// can stand). The nameless one opens the paper (Task 7; nothing until then).
+    static func tapEvent(_ side: Side) -> WalkEvent? { side.area.map { .areaTapped($0) } }
 }

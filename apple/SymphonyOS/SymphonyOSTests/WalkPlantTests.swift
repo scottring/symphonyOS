@@ -1152,7 +1152,7 @@ struct WalkPlantTests {
                 // The area taps there are: the side posts the layout draws. Each one's tap walks there.
                 for side in layout.sides {
                     guard let event = WalkLayout.tapEvent(side), case .areaTapped(let id) = event else {
-                        #expect(side.area == nil && !side.taps, "\(seed.name): \(side.name) is drawn and takes no tap")
+                        #expect(side.area == nil, "\(seed.name): \(side.name) is drawn and takes no tap")
                         continue
                     }
                     var after = s
@@ -1163,8 +1163,10 @@ struct WalkPlantTests {
                     if after != s { let i = index(of: after); tapEdges[next].append(i) }
                 }
                 // A kept area with no post takes no walk; and on a first walk every kept area that holds a
-                // week task is where the walk stands or one of the posts drawn (on a walk down only the
-                // areas on its own line are).
+                // week task is where the walk stands or one of the posts drawn. Only on a first walk
+                // (`walkingDown.isEmpty`): on a walk down only the walked goal's line is on the mountain
+                // (F35), so an area holding week tasks off that line has no post, and the reducer does not
+                // let the walk stand there.
                 for id in s.kept where id != s.standing && !layout.sides.contains(where: { $0.area == id }) {
                     let name = s.area(id)?.name ?? "?"
                     var after = s

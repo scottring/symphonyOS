@@ -111,22 +111,29 @@ struct WalkFootingTests {
     /// shrink with the room above the stack, and with none they are gone. Its cloths still sit a
     /// little off the pole each, which costs no room above or below.
     @Test func aFullStackNeitherRisesNorTurns() {
-        // 23 + 6 + 36 + 3 × 53 + 3 × 4 = 236 of 250: 14 of room, the whole hand.
+        // 23 + 6 + 35 + 52 + 52 + 35 + 3 × 4 = 215 of 250: 35 of room (26 under the caret), the whole hand.
         let roomy = year(kept: ["Fun"], standing: "Fun", titles: ["Call Mum", "Plan a pancake Sunday", "Book train tickets to Gran", "Pick a date for dinner"])
-        #expect(ruled(roomy).standingPill?.frame.minY == 296)
+        #expect(ruled(roomy).standingPill?.frame.minY == 317 && ruled(roomy).standingPill?.caret != nil)
         #expect(natural(roomy).posts[0].pole >= 26 && natural(roomy).posts[0].banners.contains { $0.turn != 0 })
-        // The same on Week with a day on the first: 250 of 250.
-        var full = roomy
+        #expect((natural(roomy).standingPill?.caret?.minY ?? 0) >= 282)
+        // Four week tasks, the newest three shown with "+1 more": 23 + 6 + 35 + 69 + 83 + 22 + 3 × 4 = 250 of 250.
+        var full = WalkState()
+        full.areas = ridge
+        full.kept = [area("Fun")]
         full.step = 4
-        full.items = roomy.items.enumerated().map {
-            WalkItem(id: $0.element.id, level: .week, title: $0.element.title, areaId: $0.element.areaId, day: $0.offset == 0 ? today : nil)
+        full.focusArea = area("Fun")
+        let titles = ["Ring Dad", "Call Mum", "Lift twice a week with the trainer at my gym",
+                      "Write the first chapter of the memoir I keep putting off now"]
+        full.items = titles.enumerated().map {
+            WalkItem(id: uid(5100 + $0.offset), level: .week, title: $0.element, areaId: area("Fun"), day: $0.offset == 3 ? today : nil)
         }
         full = full.settled
-        #expect(ruled(full).standingPill?.frame.minY == 282)
+        #expect(ruled(full).standingPill?.frame.minY == 282 && ruled(full).standingPill?.caret == nil)
+        #expect(ruled(full).posts[0].banners.count == 4)
         let post = natural(full).posts[0]
         #expect(post.pole == 24 && post.lean == 0 && post.banners.allSatisfy { $0.turn == 0 && $0.drawn == $0.frame })
         #expect(post.banners.map(\.frame.minY) == ruled(full).posts[0].banners.map(\.frame.minY))
-        #expect(post.banners.allSatisfy { $0.shift != 0 && abs($0.frame.minX - 120) <= WalkFooting.shift })
+        #expect(post.banners.allSatisfy { $0.shift != 0 && abs($0.frame.midX - 195) <= WalkFooting.shift })
         #expect(natural(full).labels == ruled(full).labels)
     }
 
