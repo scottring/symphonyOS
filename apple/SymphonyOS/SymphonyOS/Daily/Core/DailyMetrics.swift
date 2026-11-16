@@ -116,6 +116,9 @@ struct DailyMetrics: Equatable {
     // MARK: Fixed numbers
 
     static let minTouch: CGFloat = 44
+    /// The handle's touch shape's width: the walk's capsule round "See my whole plan", its chevron and 20
+    /// either side (`DailyMetricsTests.theHandlesWordsFitItsCapsule`).
+    static let handleWidth: CGFloat = 188
     /// How many lines a row's title may take: one, as the boards draw it, and three at the
     /// accessibility text sizes, where the row grows in height to hold them.
     static func titleLines(accessibilitySize: Bool) -> Int { accessibilitySize ? 3 : 1 }
@@ -303,7 +306,7 @@ struct DailyMetrics: Equatable {
         let sheetTop: CGFloat
         /// The grabber on the lowered top, centred on the window as `grabber` is.
         let grabber: CGRect
-        /// The handle's frame; its words stand in its bottom `handleWords` points.
+        /// The handle's frame; its capsule stands in its bottom `handleCapsule` points.
         let lookBack: CGRect
         let header: CGRect
         /// The whole lowered sheet down to the safe area's foot: one touch that raises it.
@@ -312,8 +315,8 @@ struct DailyMetrics: Equatable {
 
     /// The lowered sheet's top stands this far above the window's foot (the walk's own peek, 716 of 844).
     static let lookBackPeek: CGFloat = 128
-    /// The handle's words: the bottom 24 points of its frame.
-    static let handleWords: CGFloat = 24
+    /// The handle's capsule (the walk's): the bottom 36 points of its frame.
+    static let handleCapsule: CGFloat = 36
 
     /// Today's or Week's sheet lowered: its top `lookBackPeek` above the window's foot, the
     /// handle and the header where they stand on the sheet, with no waiting line between them,
@@ -401,10 +404,10 @@ struct DailyMetrics: Equatable {
         return CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k)
     }
 
-    /// The handle's words stand at +16…+40 on the sheet, 160 wide and centred; the touch
-    /// shape is 44 high ending at +40, so the waiting line can start right under it.
+    /// The handle (the walk's capsule, 36 high) stands at +4…+40 on the sheet, `handleWidth` wide and
+    /// centred; the touch shape is 44 high ending at +40, so the waiting line can start right under it.
     private static func handle(width: CGFloat, sheetTop: CGFloat) -> CGRect {
-        CGRect(x: width / 2 - 80, y: sheetTop + 40 - minTouch, width: 160, height: minTouch)
+        CGRect(x: width / 2 - handleWidth / 2, y: sheetTop + 40 - minTouch, width: handleWidth, height: minTouch)
     }
 
     private static func sign(width: CGFloat, navTop: CGFloat, shape: Shape) -> Sign {

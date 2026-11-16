@@ -281,6 +281,45 @@ struct WalkBackdropTests {
     private static let lookBackRiver = "Look back up shows the whole mountain at one stop (k 0.30 across the painting's width, the year's flats under the header): its low row of side slots falls on the river's thin channels on this window (Task 8); clearing them would mean moving that picture or the slots, which only a new board can."
     private static let river = "On Month the river's thin channels cross the side slots' two rows on this window; no single stop clears all six windows (k 0.44, x 230 clears the phone's eight slots but not the wider windows')."
 
+    /// P37: looking back up the standing post's foot is the board's 556 where that point is land under
+    /// the step-6 picture, else the nearest land above it on the midline, never nearer than 24 under the
+    /// lowest cloth; with no land in that span, 556. On all six windows, for a short stack (one cloth) and
+    /// a tall one (five, three lines each). Prints where it stands on each window.
+    @Test func lookingBackTheFootStandsOnLand() throws {
+        let areas = ridge(2)
+        func plan(_ tall: Bool) -> WalkState {
+            var s = WalkState()
+            s.areas = areas; s.kept = areas.map(\.id); s.step = 6; s.focusArea = areas[0].id
+            let words = tall ? String(repeating: "Walk more every day. ", count: 10) : "Run a 10k"
+            let levels: [WalkLevel] = tall ? [.year, .season, .month, .week] : [.year]
+            s.items = levels.flatMap { level in (1...2).map { n in
+                WalkItem(id: UUID(), level: level, title: "\(words) \(n)", areaId: areas[0].id, day: level == .week ? Self.today : nil) } }
+                + [WalkItem(id: UUID(), level: .year, title: "Other", areaId: areas[1].id)]
+            return s.settled
+        }
+        var feet: [String] = []
+        for (name, _, stage) in WalkWindows.all {
+            let c = art.backdropCamera(step: 6, stage: stage)!
+            for tall in [false, true] {
+                let layout = WalkLayout.make(plan(tall), today: Self.today, footing: .level, wing: stage.wing, stage: stage)
+                let post = try #require(layout.posts.first)
+                let lowest = try #require(post.banners.last).frame.maxY
+                let foot = post.base.y
+                let land = { (y: CGFloat) in self.backdrop.standsOnLand(self.onPainting(CGPoint(x: 195, y: y), c)) }
+                #expect(foot <= 556 && foot >= lowest + 24 - 0.01, "\(name): the foot at \(foot), the lowest cloth at \(lowest)")
+                if land(556) {
+                    #expect(foot == 556, "\(name): 556 is land, the foot at \(foot)")
+                } else if let nearest = stride(from: CGFloat(556), through: lowest + 24, by: -0.5).first(where: land) {
+                    #expect(abs(foot - nearest) <= 0.5 && land(foot), "\(name): the nearest land above 556 is \(nearest), the foot at \(foot)")
+                } else {
+                    #expect(foot == 556, "\(name): no land between \(lowest + 24) and 556, the foot at \(foot)")
+                }
+                feet.append("\(name) \(tall ? "tall" : "short"): \(foot)\(land(foot) ? "" : " (no land)")")
+            }
+        }
+        print("Look back up's foot: \(feet.joined(separator: "; "))")
+    }
+
     @Test func theHeldShadeIsOnlyWhereThePaintingIsBright() {
         #expect((0...6).map { art.topShade(step: $0) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])
         #expect((0...6).map { art.topShade(step: $0, stage: WalkWindows.phone) } == [nil, nil, 0.6, 0.6, 0.6, 0.5, nil])

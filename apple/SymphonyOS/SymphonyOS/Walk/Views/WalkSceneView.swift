@@ -17,7 +17,7 @@ struct WalkSceneView: View {
     var body: some View {
         let art = model.art
         ZStack(alignment: .topLeading) {
-            WalkWorldView(layout: model.layout(wing: stage.wing), art: art, step: model.state.step, stage: stage,
+            WalkWorldView(layout: model.layout(stage: stage), art: art, step: model.state.step, stage: stage,
                           veilsWords: model.state.veilsWords,
                           onLabel: { model.send(.areaTapped($0.id)) },
                           onBanner: { banner, post in
@@ -286,8 +286,8 @@ struct WalkWorldView: View {
                     .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
                                 camera)
                 // Each cloth takes its tap in its own touch frame (`Post.touchFrames`): the cloth as drawn,
-                // grown to a touch where its neighbours leave room, and never over another cloth.
-                let touches = post.touchFrames(touch: stage.touch)
+                // grown to a touch where its neighbours leave room, never over another cloth, a side post or a control.
+                let touches = layout.touchFrames(post, touch: stage.touch)
                 ForEach(Array(zip(post.banners, touches)), id: \.0.id) { banner, box in
                     Button { onBanner(banner, post) } label: {
                         WalkBannerView(banner: banner, dropsIn: dropsIn && arrived, veiled: veilsWords)

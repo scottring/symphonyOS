@@ -18,6 +18,8 @@ struct WalkSideView: View {
     static let pillSize: CGFloat = 9.5, pillTracking: CGFloat = 1, pillPadding: CGFloat = 7
     /// A pennant's edge: white, thin.
     static let pennantEdge = (width: CGFloat(0.75), opacity: 0.6)
+    /// The "+n" count's dark edge: a tight navy shade, twice.
+    static let extraEdge = (width: CGFloat(0.8), opacity: 0.95)
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.clear
@@ -48,6 +50,9 @@ struct WalkSideView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize()
+                    // A thin dark edge, so the count reads on white snow as on dark forest (as the pennants' light edge).
+                    .shadow(color: WalkPalette.glowShadow.opacity(Self.extraEdge.opacity), radius: Self.extraEdge.width)
+                    .shadow(color: WalkPalette.glowShadow.opacity(Self.extraEdge.opacity), radius: Self.extraEdge.width)
                     .walkGlow()
                     .frame(width: extra.width, height: extra.height, alignment: .leading)
                     .opacity(veiled ? 0 : 1)

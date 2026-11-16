@@ -43,7 +43,7 @@ struct WalkEndingView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilitySortPriority(3)       // read before the flags behind it
             // "Tap a post to see that area", once, while other areas stand at the side and the sheet is down.
-            if let hint = model.layout(wing: device.wing).lookBackHint, !s.sheetRaised {
+            if let hint = model.layout(stage: device).lookBackHint, !s.sheetRaised {
                 Text(WalkCopy.lookBackHint)
                     .font(.custom("DMSans-Regular", fixedSize: 12.5))
                     .foregroundStyle(.white)
@@ -140,20 +140,9 @@ struct WalkEndingSheet: View {
     @ViewBuilder private var handle: some View {
         if let label = model.state.sheetHandleLabel {
             Button { model.send(.sheetHandle) } label: {
-                HStack(spacing: 6) {
-                    Text(label)
-                        .font(.custom("DMSans-SemiBold", size: 14))
-                        .lineLimit(1)
-                    Image(systemName: raised ? "chevron.down" : "chevron.up")
-                        .font(.system(size: 12, weight: .semibold))
-                        .accessibilityHidden(true)
-                }
-                .foregroundStyle(EndingPaper.deepGreen)
-                .padding(.horizontal, 20)
-                .frame(height: 36)
-                .background(Capsule().fill(EndingPaper.walkFill))
-                .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
-                .contentShape(Rectangle())
+                SheetHandleCapsule(label: label, raises: !raised)
+                    .frame(maxWidth: .infinity, minHeight: Self.tapHeight)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
@@ -275,6 +264,30 @@ struct WalkEndingSheet: View {
         .buttonStyle(.plain)
         .accessibilityLabel(WalkCopy.goToToday)
         .accessibilityIdentifier("walk.goToToday")
+    }
+}
+
+/// The sheet's handle (S37), the walk's and the pages' alike: a capsule 36 high, its words in DM Sans
+/// SemiBold 14 and a chevron (up where a tap raises the sheet, down where it lowers it), 20 in from
+/// either end, on the walk's pale green. Only drawn: whoever shows it gives it its touch shape.
+struct SheetHandleCapsule: View {
+    let label: String
+    /// A tap raises the sheet (chevron up); false: it lowers it (chevron down).
+    let raises: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.custom("DMSans-SemiBold", size: 14))
+                .lineLimit(1)
+            Image(systemName: raises ? "chevron.up" : "chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(EndingPaper.deepGreen)
+        .padding(.horizontal, 20)
+        .frame(height: 36)
+        .background(Capsule().fill(EndingPaper.walkFill))
     }
 }
 

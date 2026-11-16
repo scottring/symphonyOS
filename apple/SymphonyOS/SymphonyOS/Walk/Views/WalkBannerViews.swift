@@ -108,8 +108,9 @@ struct WalkBannerView: View {
     static let flagTop: CGFloat = 6, flagNotch: CGFloat = 8
     /// The goal above: 3 above, 9 under, 6 either side: `12 + 14 × lines`.
     static let parentTop: CGFloat = 3, parentNotch: CGFloat = 5
-    /// A Look back up cloth: 4 above, 6 under, 6 either side: `23 + 13 × (lines − 1)`.
-    static let lookBackTop: CGFloat = 4, lookBackNotch: CGFloat = 5
+    /// A Look back up cloth: 4 above, 6 under, 6 either side: `23 + 13 × (lines − 1)`, its words centred where
+    /// the cloth is padded to its least height (`WalkLayout.lookBackWordsTop`, P36).
+    static let lookBackNotch: CGFloat = 5
 
     private var colour: Color { WalkPalette.level(banner.level) }
     /// The words' opacity: none under the veil on words.
@@ -224,7 +225,7 @@ struct WalkBannerView: View {
         }
         .foregroundStyle(.white)
         .opacity(words)
-        .padding(.top, Self.lookBackTop)
+        .padding(.top, WalkLayout.lookBackWordsTop(banner))
         .frame(width: banner.frame.width, height: banner.frame.height, alignment: .top)
         .background(WalkNotchedCloth(notch: Self.lookBackNotch).fill(colour))
         .walkBannerShadow(glows: banner.glows)

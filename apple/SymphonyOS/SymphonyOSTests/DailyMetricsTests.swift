@@ -1,6 +1,9 @@
 import Testing
 import Foundation
 import CoreGraphics
+#if canImport(UIKit)
+import UIKit
+#endif
 @testable import Symphony
 
 // Where everything sits: the approved boards' numbers, stretched to a real window from its safe edges.
@@ -18,6 +21,8 @@ struct DailyMetricsTests {
     private let clearance: CGFloat = 8     // fix round 1 ruling: the sign keeps 8 under the row of words
     private let largestTurn = 1.7          // the signpost's plank turns 0.7…1.7° (`Signpost.hand`)
     private let outsideSheet: CGFloat = 190 // Duo, outside screen: sheet top 190
+    /// The handle's touch shape: 188 wide (the walk's capsule round "See my whole plan", a chevron and 20 either side).
+    private let handle: CGFloat = 188
 
     /// A row's title stands on one line, and wraps to three at the accessibility text sizes, where
     /// the row grows to hold it (Today's rows, Week's tasks, the spread's).
@@ -55,18 +60,18 @@ struct DailyMetricsTests {
         #expect(o.sign.titleSize == 20); #expect(o.navGap == 22); #expect(o.ring == 52)
     }
 
-    /// "See my whole plan" lowers the sheet until only its grabber, the handle's words and the
+    /// "See my whole plan" lowers the sheet until only the handle and the
     /// header show: its top 128 above the window's foot (the walk's own peek, 716 of 844), with no
     /// waiting line. Nothing readable or tappable goes below the safe area's foot (fix round 1):
-    /// the header stands on it where the board's +46 would go past it, the handle's words stay
-    /// under the grabber (+9, 5 high) and above the header, and the strip that raises the sheet
-    /// runs from its top to that foot. Short windows never lower.
+    /// the header stands on it where the board's +46 would go past it, the handle's capsule (36 high)
+    /// stays on the sheet and above the header, and the strip that raises the sheet runs from its top
+    /// to that foot. Short windows lower too (F25).
     @Test func lookingBackLowersTheSheetToItsHeader() throws {
         let m = DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34)
         let low = try #require(m.lowered(safeBottom: 34))
         #expect(low.sheetTop == 716)
         #expect(low.header == CGRect(x: 22, y: 844 - 34 - 56, width: 346, height: 56))
-        #expect(low.lookBack == CGRect(x: 115, y: low.header.minY - touch, width: 160, height: touch))
+        #expect(low.lookBack == CGRect(x: 195 - handle / 2, y: low.header.minY - touch, width: handle, height: touch))
         #expect(low.strip == CGRect(x: 0, y: 716, width: 390, height: 844 - 34 - 716))
         let waiting = DailyMetrics.today(size: phone, safeTop: 44, safeBottom: 34, waiting: true)
         #expect(waiting.lowered(safeBottom: 34) == low)
@@ -98,7 +103,7 @@ struct DailyMetricsTests {
                 #expect(low.sheetTop == size.height - 128, "\(size)")
                 #expect(low.header.maxY <= foot, "\(size) \(top)/\(bottom): the header runs past the safe area")
                 #expect(low.lookBack.maxY <= low.header.minY, "\(size): the handle's words meet the header")
-                #expect(low.lookBack.maxY - 24 >= low.sheetTop + 9 + 5, "\(size): the handle's words meet the grabber")
+                #expect(low.lookBack.maxY - DailyMetrics.handleCapsule >= low.sheetTop, "\(size): the handle's capsule leaves the sheet")
                 #expect(low.strip.minY == low.sheetTop && low.strip.maxY == foot, "\(size)")
                 #expect(low.strip.height >= touch, "\(size)")
             }
@@ -107,7 +112,7 @@ struct DailyMetricsTests {
     }
 
     /// F25 (S40): every phone window, short ones too (the narrow phone, the Duo's outside screen, the
-    /// half window), has "See my whole plan" as a one-line handle: 160 × 44, on the window, among the
+    /// half window), has "See my whole plan" as a one-line handle: 188 × 44, on the window, among the
     /// touch targets and meeting none of the others; Today's and Week's three rows still end above the fade.
     @Test func everyPhoneWindowHasTheHandle() {
         let windows: [(CGSize, CGFloat, CGFloat, TodayLayout)] = [
@@ -121,7 +126,7 @@ struct DailyMetricsTests {
             for (m, isWeek) in [(today, false), (week, true)] {
                 let at = "\(size) \(shape) line \(waiting) \(isWeek ? "week" : "today")"
                 guard let handle = m.lookBack else { Issue.record("\(at): no handle"); continue }
-                #expect(handle.size == CGSize(width: 160, height: touch) && handle.midX == size.width / 2, "\(at)")
+                #expect(handle.size == CGSize(width: self.handle, height: touch) && handle.midX == size.width / 2, "\(at)")
                 #expect(handle.minY >= top && handle.maxY <= size.height - bottom, "\(at)")
                 #expect(m.touchTargets.contains(handle), "\(at)")
                 for other in m.touchTargets where other != handle { #expect(!other.intersects(handle), "\(at): \(other)") }
@@ -140,11 +145,25 @@ struct DailyMetricsTests {
                 let low = try #require(m.lowered(safeBottom: bottom), "\(size)")
                 #expect(low.sheetTop == size.height - 128)
                 #expect(low.header.maxY <= size.height - bottom && low.lookBack.maxY <= low.header.minY, "\(size)")
-                #expect(low.lookBack.maxY - 24 >= low.sheetTop + 9 + 5, "\(size): the handle's words meet the grabber")
+                #expect(low.lookBack.maxY - DailyMetrics.handleCapsule >= low.sheetTop, "\(size): the handle's capsule leaves the sheet")
                 #expect(low.strip.height >= touch)
             }
         }
     }
+
+    #if canImport(UIKit)
+    /// The handle's touch shape holds the walk's capsule round its widest words: the words in DM Sans
+    /// SemiBold 14, 6, the chevron (12 semibold), and 20 either side.
+    @Test @MainActor func theHandlesWordsFitItsCapsule() throws {
+        let font = try #require(UIFont(name: "DMSans-SemiBold", size: 14))
+        let chevron = try #require(UIImage(systemName: "chevron.up",
+                                           withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))).size.width
+        for words in [WalkCopy.lookBackHandle, WalkCopy.showMyDay, DailyCopy.showMyWeek] {
+            let capsule = ceil((words as NSString).size(withAttributes: [.font: font]).width) + 6 + chevron + 40
+            #expect(capsule <= DailyMetrics.handleWidth && DailyMetrics.handleWidth == handle, "\(words): \(capsule)")
+        }
+    }
+    #endif
 
     @Test func theWeekBoard() {
         let m = DailyMetrics.week(size: CGSize(width: 390, height: 844), safeTop: 44, safeBottom: 34)
@@ -160,7 +179,7 @@ struct DailyMetricsTests {
         #expect(week.sheetTop == outsideSheet)
         #expect(week.bar == today.bar)
         #expect(week.bar.field == CGRect(x: 68, y: 604, width: 330, height: 48))
-        #expect(week.lookBack == CGRect(x: 233 - 80, y: outsideSheet + 40 - touch, width: 160, height: touch))
+        #expect(week.lookBack == CGRect(x: 233 - handle / 2, y: outsideSheet + 40 - touch, width: handle, height: touch))
         #expect(week.header.minY == outsideSheet + 44)
         #expect(week.rowsTopNoCard > week.header.maxY)
     }
@@ -179,7 +198,7 @@ struct DailyMetricsTests {
         #expect(DailyMetrics.shape(for: .glance, height: 678, safeTop: 22, safeBottom: 0, waiting: false) == .short)
         let m = DailyMetrics.today(size: small, safeTop: 20, safeBottom: 0, shape: .short)
         #expect(m.rowsTop + 3 * m.row + 2 * m.rowGap <= m.bar.fade.minY)
-        #expect(m.lookBack?.size == CGSize(width: 160, height: touch) && m.header.minY == m.sheetTop + 46)
+        #expect(m.lookBack?.size == CGSize(width: handle, height: touch) && m.header.minY == m.sheetTop + 46)
     }
 
     @Test func aWaitingWalkMakesRoomForItsLine() {
@@ -219,23 +238,27 @@ struct DailyMetricsTests {
                 let at = "\(Int(w))×\(Int(h)) \(Int(top))/\(Int(bottom)) line \(line) \(shape)"
                 // F25 gives short windows the handle, 20 more on the sheet: on windows no iPhone has (580
                 // tall or less, a safe top of 44 or more) with the waiting line, three rows fitting first
-                // (D11) now raises the sheet, and the handle's touch shape 4 above it, into the top inset.
+                // (D11) now raises the sheet into the top inset, or only the handle's touch shape (4 above
+                // the sheet). Only those two are excused there; every other target is still held.
                 let carvedOut = h <= 580 && top >= 44 && line && shape == .short
-                func fail(_ what: String) {
-                    if carvedOut, what == "sheet in the top inset" || what.hasSuffix("in the insets") { intoTheInset.append("\(at): \(what)"); return }
-                    failures.append("\(at): \(what)")
-                }
+                func fail(_ what: String) { failures.append("\(at): \(what)") }
 
                 if m.rowsTop + 3 * m.row + 2 * m.rowGap > m.bar.fade.minY { fail("three rows end below the fade") }
                 let targets = m.touchTargets
                 for r in targets {
                     if r.width < touch || r.height < touch { fail("\(r) under 44") }
-                    if r.minY < top || r.maxY > h - bottom { fail("\(r) in the insets") }
+                    if carvedOut, r == m.lookBack, r.minY < top, r.maxY <= h - bottom {
+                        intoTheInset.append("\(at): the handle \(r) above the top inset")
+                    } else if r.minY < top || r.maxY > h - bottom {
+                        fail("\(r) in the insets")
+                    }
                 }
                 for i in targets.indices { for j in targets.indices where j > i {
                     if !targets[i].intersection(targets[j]).isEmpty { fail("\(targets[i]) meets \(targets[j])") }
                 } }
-                if m.sheetTop < top { fail("sheet in the top inset") }
+                if m.sheetTop < top {
+                    if carvedOut { intoTheInset.append("\(at): the sheet in the top inset") } else { fail("sheet in the top inset") }
+                }
                 if line && m.waiting == nil { fail("no waiting line") }
                 if m.sign != .none {
                     let turn = (m.sign.plank.width + m.sign.point) * CGFloat(sin(largestTurn * .pi / 180))
@@ -254,6 +277,9 @@ struct DailyMetricsTests {
         } } } } }
 
         #expect(failures.isEmpty, "\(failures.count) failures, first: \(failures.prefix(5))")
+        // The carve-out above, counted: 63 handles above the top inset and 35 sheets in it, all on windows ≤ 580 high.
+        let handles = intoTheInset.filter { $0.contains("the handle") }.count, sheets = intoTheInset.filter { $0.contains("the sheet") }.count
+        #expect(handles == 63 && sheets == 35, "\(handles) handles, \(sheets) sheets")
 
         // The accepted carve-out (ruling D11): on windows 604 points tall or less, with a safe top of
         // 44 or more and the waiting line showing, the risen sheet may cover part of the row of words,
@@ -686,7 +712,7 @@ struct DailyMetricsTests {
         #expect(m.bar.field == CGRect(x: 68, y: 604, width: 330, height: 48))
         #expect(m.bar.more.origin == CGPoint(x: 8, y: 600))
         #expect(m.bar.inbox.origin == CGPoint(x: 402, y: 600))
-        #expect(m.lookBack == CGRect(x: 153, y: 186, width: 160, height: 44))
+        #expect(m.lookBack == CGRect(x: 233 - handle / 2, y: 186, width: handle, height: 44))
         #expect(m.header.minY == 236)
         #expect(m.navGap == 22)
     }

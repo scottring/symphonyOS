@@ -2,16 +2,16 @@
 import SwiftUI
 
 /// The paper sheet the day is written on: from `top` to the page's foot, rounded at its
-/// top corners, with a grabber and (on a tall window) the handle's words: the walk's "see
+/// top corners, with the handle (the walk's own capsule, `SheetHandleCapsule`): the walk's "see
 /// my whole plan" (`WalkCopy.lookBackHandle`), or, lowered, what raising it shows
-/// (`DailyLookBack.label`). `content` is laid out in page points over the whole page, so the
+/// (`DailyLookBack.label`); a page with no handle (the spread) has a grabber. `content` is laid out in page points over the whole page, so the
 /// page places everything on the sheet by `DailyMetrics`.
 struct DailySheet<Content: View>: View {
     let top: CGFloat
     let radius: CGFloat
     /// The grabber's frame on the page (`DailyMetrics.grabber`), centred on the window.
     let grabber: CGRect
-    /// The handle's touch shape; nil draws no words (short windows).
+    /// The handle's touch shape; nil: no handle, the grabber instead (the spread).
     let lookBack: CGRect?
     let onLookBack: () -> Void
     /// The handle's words.
@@ -29,12 +29,15 @@ struct DailySheet<Content: View>: View {
                 .shadow(color: DailyPalette.navy.opacity(0.3), radius: 13, x: 0, y: -8)
                 .padding(.top, top)
                 .accessibilityHidden(true)
-            Capsule()
-                .fill(DailyPalette.grabber)
-                .frame(width: grabber.width, height: grabber.height)
-                .offset(x: grabber.minX, y: grabber.minY)
-                .accessibilityHidden(true)
-            if let lookBack { handle(lookBack) }
+            if let lookBack {
+                handle(lookBack)
+            } else {
+                Capsule()
+                    .fill(DailyPalette.grabber)
+                    .frame(width: grabber.width, height: grabber.height)
+                    .offset(x: grabber.minX, y: grabber.minY)
+                    .accessibilityHidden(true)
+            }
             // Lowered, the strip is the one control VoiceOver reads on the sheet; its header is only seen.
             content()
                 .accessibilityHidden(strip != nil)
@@ -43,17 +46,15 @@ struct DailySheet<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// The words sit at +16…+40 on the sheet, the bottom 24 points of the touch shape. Lowered,
-    /// they are only words: the strip over the whole sheet takes the touch.
+    /// The capsule stands at +4…+40 on the sheet, the bottom 36 points of the touch shape, its chevron
+    /// up while lowered (a tap raises) and down while up. Its words keep the large size, as the walk's
+    /// lowered handle does (S27), to stay inside the fixed frame. Lowered, it is only drawn: the strip
+    /// over the whole sheet takes the touch.
     @ViewBuilder private func handle(_ frame: CGRect) -> some View {
-        let words = Text(label)
-            .font(DailyPalette.sansMedium(12))
-            .foregroundStyle(DailyPalette.muted)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .frame(width: frame.width, height: DailyMetrics.handleWords)
+        let words = SheetHandleCapsule(label: label, raises: strip != nil)
+            .frame(width: frame.width, height: DailyMetrics.handleCapsule)
             .frame(width: frame.width, height: frame.height, alignment: .bottom)
-            .dynamicTypeSize(...DailyPalette.largestChrome)        // one line in the handle's fixed frame
+            .dynamicTypeSize(...DynamicTypeSize.large)
         if strip == nil {
             Button(action: onLookBack) { words.contentShape(Rectangle()) }
                 .buttonStyle(.plain)

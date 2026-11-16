@@ -30,7 +30,12 @@ extension Dictation: WalkListening {}
     private(set) var periods: WalkPeriods
     /// The painting the scene draws and the layout measures against.
     let art: WalkArt = .overlookSquare
-    /// The layout on a stage with this much room beside the board (`WalkStage.wing`, from `\.walkStage`).
+    /// The layout on the window the stage stands on (its wing, and the picture under Look back up's foot).
+    func layout(stage: WalkStage) -> WalkLayout {
+        WalkLayout.make(state, today: periods.today, art: art, wing: stage.wing, periods: periods, stage: stage)
+    }
+
+    /// The layout on a window with this wing and no sliver.
     func layout(wing: CGFloat) -> WalkLayout {
         WalkLayout.make(state, today: periods.today, art: art, wing: wing, periods: periods)
     }

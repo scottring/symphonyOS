@@ -28,8 +28,17 @@ extension WalkLayout {
     static let parentPad: CGFloat = 12, parentLine: CGFloat = 14
     /// The caret over the standing pill: 10 × 7, 2 above it (F34).
     static let caretSize = CGSize(width: 10, height: 7), caretGap: CGFloat = 2
-    /// A Look back up cloth: 23 high on one line, 13 a line more (F20), 14 more with "+n more" on its own line.
+    /// A Look back up cloth: 23 high on one line, 13 a line more (F20), 14 more with "+n more" on its own line;
+    /// at least `lookBackLeast` high (a bare one-line cloth padded, its words centred) and `lookBackGap` apart,
+    /// so each cloth's pitch, and its touch frame, is never under 44 (P36).
     static let lookBackFirstLine: CGFloat = 23, lookBackLine: CGFloat = 13, lookBackLines = 3
+    static let lookBackLeast: CGFloat = 36, lookBackGap: CGFloat = 8
+    /// A Look back up cloth's words begin 4 under its top, and lower by half of any padding (P36).
+    static let lookBackWordsPad: CGFloat = 4
+    static func lookBackWordsTop(_ banner: Banner) -> CGFloat {
+        let words = lookBackFirstLine + lookBackLine * CGFloat(banner.lines - 1) + (banner.more == nil ? 0 : tagLine)
+        return lookBackWordsPad + max(0, banner.frame.height - words) / 2
+    }
     /// By estimate: a capital in the standing pill (11 pt, tracked) and one in a side pill (9.5 pt,
     /// tracked). A title's lines are counted from the face itself (`WalkLayout+Lines.swift`).
     static let pillChar: CGFloat = 8.4, sidePillChar: CGFloat = 7.3
@@ -147,7 +156,12 @@ struct WalkStanding {
     let width: CGFloat
     let postId: String
 
-    init(_ s: WalkState, today: Date, periods: WalkPeriods, footing: WalkFooting, wing: CGFloat) {
+    /// Looking back up, the standing post's foot for a stack ending at a given height (P37); else unused.
+    let lookBackFoot: (CGFloat) -> CGFloat
+
+    init(_ s: WalkState, today: Date, periods: WalkPeriods, footing: WalkFooting, wing: CGFloat,
+         lookBackFoot: @escaping (CGFloat) -> CGFloat = { _ in WalkLayout.standingFoot }) {
+        self.lookBackFoot = lookBackFoot
         self.s = s
         self.today = today
         self.periods = periods
@@ -182,14 +196,14 @@ struct WalkStanding {
             pillTop = pill.map { clothsTop - (frames.isEmpty ? 0 : L.underPill) - $0.height }
             ceiling = L.question
         } else {
-            // Look back up (F6): the pill's top at 110, the cloths from 6 under it, year first, 4 apart;
+            // Look back up (F6, P36): the pill's top at 110, the cloths from 6 under it, year first, 8 apart;
             // with no area (the flags with none), the cloths from the pill's place. Nothing rises into
             // the header, nor into the hint under it while there are side posts.
             pillTop = pill.map { _ in L.lookBackPill }
             var y = pill.map { L.lookBackPill + $0.height + L.underPill } ?? L.lookBackPill
             for piece in pieces {
                 frames.append(CGRect(x: L.centreX - piece.size.width / 2, y: y, width: piece.size.width, height: piece.size.height))
-                y += piece.size.height + L.clothGap
+                y += piece.size.height + L.lookBackGap
             }
             ceiling = sides.contains { $0.area != nil } ? L.lookBackWordsFoot : L.lookBackHeader
         }
@@ -197,9 +211,11 @@ struct WalkStanding {
         // made shorter for it (F34). Ruled, so the hand does not decide it: the hand keeps under it.
         let caret = pillTop.map { $0 - L.caretGap - L.caretSize.height >= ceiling } ?? false
 
+        // The foot: 556 on Year to Today; looking back up 556 where that is land, else the nearest land above (P37).
+        let foot = level == nil ? lookBackFoot(frames.last?.maxY ?? L.lookBackPill) : L.standingFoot
         let hand = self.hand(frames: frames, who: pieces.map(\.who), pillTop: pillTop, pill: pill, caret: caret,
-                             sides: sides, ceiling: ceiling)
-        let base = CGPoint(x: L.centreX, y: L.standingFoot)
+                             sides: sides, ceiling: ceiling, foot: foot, turns: level != nil)
+        let base = CGPoint(x: L.centreX, y: foot)
         let banners = zip(pieces, frames).enumerated().map { i, pair -> L.Banner in
             let (piece, ruled) = pair
             var b = L.Banner(id: piece.id, itemId: piece.item?.id, level: piece.level, kind: piece.kind,
@@ -223,12 +239,12 @@ struct WalkStanding {
                           pale: !pieces.isEmpty && pieces.allSatisfy { $0.kind == .ghost }, banners: banners)
         post.lean = hand.lean
         // The bare pole under the lowest cloth: 24 on Year to Today (and the lift); looking back up, down to the foot.
-        post.pole = level == nil ? L.standingFoot - (frames.last.map { $0.maxY } ?? clothsTop) + hand.lift
+        post.pole = level == nil ? foot - (frames.last.map { $0.maxY } ?? clothsTop) + hand.lift
             : (frames.isEmpty ? L.barePole : L.pole) + hand.lift
         var name: L.Label?
         if let area, let pillTop {
             // The pill rides the pole's line, at its own height.
-            let high = L.standingFoot - (pillTop - hand.lift)
+            let high = foot - (pillTop - hand.lift)
             name = label(area, top: pillTop - hand.lift, dx: high * CGFloat(sin(hand.lean * .pi / 180)), caret: caret)
         }
         return (name, post, sides)
@@ -412,7 +428,7 @@ struct WalkStanding {
     func compactPiece(_ item: WalkItem, _ level: WalkLevel, more: Int) -> Piece {
         let words = L.setLines(item.title, face: .lookBack, width: width - L.Face.lookBack.inset, limit: L.lookBackLines)
         let lines = max(1, words.count)
-        let height = L.lookBackFirstLine + L.lookBackLine * CGFloat(lines - 1) + (more > 0 ? L.tagLine : 0)
+        let height = max(L.lookBackLeast, L.lookBackFirstLine + L.lookBackLine * CGFloat(lines - 1) + (more > 0 ? L.tagLine : 0))
         var piece = Piece(id: "\(postId)-lookback-\(level.rawValue)", who: "\(level.rawValue)-\(item.id.uuidString)", kind: .compact,
                           item: item, level: level, text: L.normalised(item.title), tag: nil, glows: false,
                           label: WalkCopy.bannerLabel(item.title, level: level, tag: nil, role: .opensPaper(more)), taps: true,
@@ -566,11 +582,17 @@ struct WalkStanding {
     ///   apart never meet however each is turned.
     /// - Across, a cloth keeps only as much lean, shift and tilt as the gap to the side post
     ///   beside it allows (the board leaves 1 point beside a side pill at its widest).
+    /// `foot`: the pole's foot, which it leans about. `turns`: false looking back up, where each cloth hangs
+    /// square to its pole and nothing leans or shifts: each cloth's touch frame keeps its whole pitch (P36).
     func hand(frames: [CGRect], who: [String], pillTop: CGFloat?, pill: (lines: Int, width: CGFloat, height: CGFloat)?,
-              caret: Bool, sides: [L.Side], ceiling: CGFloat) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
+              caret: Bool, sides: [L.Side], ceiling: CGFloat, foot: CGFloat = WalkLayout.standingFoot,
+              turns: Bool = true) -> (lift: CGFloat, lean: Double, tilts: [Double], shifts: [CGFloat]) {
         let none = (lift: CGFloat(0), lean: 0.0, tilts: [Double](repeating: 0, count: frames.count),
                     shifts: [CGFloat](repeating: 0, count: frames.count))
         guard footing == .natural else { return none }
+        // Looking back up the stack keeps only its lift (P36): a cloth leaning or shifted toward a side post
+        // would reach into that post's touch frame and cut its own short, and turned cloths' drawn boxes grow
+        // unalike, which takes a little off a touch frame between two of them.
         // The stack's top: the caret's where there is one, else the pill's, else the top cloth's.
         let top = (pillTop ?? frames.first?.minY ?? L.standingFoot - L.barePole)
             - (caret ? L.caretGap + L.caretSize.height : 0)
@@ -607,19 +629,19 @@ struct WalkStanding {
         let leanMost = WalkFooting.standingLean * narrow * Double(turning)
         var leanShare: CGFloat = 1
         for frame in frames + (pillFrame.map { [$0] } ?? []) {
-            let reach = (L.standingFoot - frame.minY + lift) * sine(leanMost)
+            let reach = (foot - frame.minY + lift) * sine(leanMost)
             guard reach > 0 else { continue }
             leanShare = min(leanShare, max(0, (gap(frame) - spare) / 2) / reach)
         }
-        let lean = WalkFooting.hand(postId, "lean") * leanMost * Double(leanShare)
-        let tiltMost = WalkFooting.tilt * narrow * Double(turning)
+        let lean = turns ? WalkFooting.hand(postId, "lean") * leanMost * Double(leanShare) : 0
+        let tiltMost = turns ? WalkFooting.tilt * narrow * Double(turning) : 0
         var tilts: [Double] = [], shifts: [CGFloat] = []
         for (i, frame) in frames.enumerated() {
-            let leaned = (L.standingFoot - frame.minY + lift) * sine(abs(lean))
+            let leaned = (foot - frame.minY + lift) * sine(abs(lean))
             let reach = WalkFooting.shift + frame.height * sine(tiltMost)
             let share = min(1, max(0, (gap(frame) - spare - leaned) / reach))
             tilts.append(WalkFooting.hand(who[i], "tilt") * tiltMost * Double(share))
-            shifts.append(CGFloat(WalkFooting.hand(who[i], "shift")) * WalkFooting.shift * share)
+            shifts.append(turns ? CGFloat(WalkFooting.hand(who[i], "shift")) * WalkFooting.shift * share : 0)
         }
         return (lift, lean, tilts, shifts)
     }

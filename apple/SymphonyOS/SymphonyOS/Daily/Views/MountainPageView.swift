@@ -41,7 +41,7 @@ struct MountainStage<Over: View>: View {
         let art = WalkArt.overlookSquare
         GeometryReader { geo in
             let stage = WalkStage(device: geo.size, stage: art.stage)
-            let layout = WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing)
+            let layout = WalkLayout.make(state, today: today, art: art, footing: .natural, wing: stage.wing, stage: stage)
             ZStack(alignment: .topLeading) {
                 WalkWorldView(layout: layout, art: art, step: state.step, stage: stage, actions: actions,
                               onLabel: onLabel, onBanner: onBanner, onSide: onSide)

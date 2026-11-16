@@ -66,6 +66,11 @@ struct WalkBackdrop: Equatable {
         return a.y + (b.y - a.y) * (x - a.x) / max(0.000001, b.x - a.x)
     }
 
+    /// Where a stage point shows on the painting under `camera`, as fractions of its width and height.
+    func point(_ stagePoint: CGPoint, camera c: WalkLayout.Camera) -> CGPoint {
+        CGPoint(x: (c.x + stagePoint.x / c.k) / size.width, y: (c.y + stagePoint.y / c.k) / size.height)
+    }
+
     /// Whether a point of the painting (fractions) is land a small post may stand on: below the
     /// skyline, off the water, on the painting.
     func standsOnLand(_ p: CGPoint) -> Bool {

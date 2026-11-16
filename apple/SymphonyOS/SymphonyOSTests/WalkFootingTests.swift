@@ -51,11 +51,15 @@ struct WalkFootingTests {
             for post in layout.posts {
                 guard post.lean == 0, post.base == CGPoint(x: 195, y: 556), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
                 else { Issue.record("\(Generated.describe(s)): the ruled post is not ruled"); return }
-                // Year to Today hang from the lowest cloth's place; Look back up from 6 under its pill at 110 (or from 110).
+                // Year to Today hang from the lowest cloth's place; Look back up from 6 under its pill at 110 (or from 110), 8 apart.
                 if s.step == 6 {
                     let first = layout.labels.first.map { $0.frame.maxY + 6 } ?? 110
                     if let top = post.banners.first, top.frame.minY != first || layout.labels.first.map({ $0.frame.minY != 110 }) == true {
                         Issue.record("\(Generated.describe(s)): looking back up, the top cloth at \(top.frame.minY)"); return
+                    }
+                    // P36: each at least 36 high, 8 apart.
+                    for (a, b) in zip(post.banners, post.banners.dropFirst()) where b.frame.minY - a.frame.maxY != 8 || a.frame.height < 36 {
+                        Issue.record("\(Generated.describe(s)): looking back up, \(b.frame.minY - a.frame.maxY) between cloths, \(a.frame.height) high"); return
                     }
                 } else if let lowest = post.banners.last, lowest.frame.maxY != 532 { Issue.record("\(Generated.describe(s)): lowest cloth at \(lowest.frame.maxY)"); return }
             }

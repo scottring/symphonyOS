@@ -1659,7 +1659,7 @@ struct WalkLayoutTests {
 
     /// F6: the full plan, standing in Health: the area's name in its pill at 110, then one cloth for
     /// each level, year above season above month above week above today, each centred on the
-    /// midline and a standing flag's width (120…270 on a phone), 6 under the pill and 4 apart; every
+    /// midline and a standing flag's width (120…270 on a phone), 6 under the pill and 8 apart (P36); every
     /// other kept area a side post, nearest first.
     @Test func lookingBackUpReadsOneAreaTopToBottom() throws {
         let s = plan(DemoStress.full, step: 6, standing: "Health")
@@ -1672,7 +1672,7 @@ struct WalkLayoutTests {
             #expect(layout.posts.count == 1 && cloths.allSatisfy { $0.kind == .compact }, "wing \(wing)")
             #expect(cloths.map(\.level) == [.year, .season, .month, .week, .today], "wing \(wing)")
             #expect(cloths.first.map { $0.frame.minY == pill.frame.maxY + 6 } == true)
-            for (a, b) in zip(cloths, cloths.dropFirst()) { #expect(near(b.frame.minY - a.frame.maxY, 4, 0.001), "\(a.id), \(b.id)") }
+            for (a, b) in zip(cloths, cloths.dropFirst()) { #expect(near(b.frame.minY - a.frame.maxY, 8, 0.001), "\(a.id), \(b.id)") }
             let width = WalkLayout.standingWidth(wing: wing)
             for c in cloths { #expect(near(c.frame.midX, 195, 0.001) && near(c.frame.width, width, 0.001), "wing \(wing): \(c.frame)") }
             if wing == 0 { #expect(cloths.allSatisfy { $0.frame.minX == 120 && $0.frame.maxX == 270 }) }
@@ -1706,7 +1706,9 @@ struct WalkLayoutTests {
         // One flag on a level: no count, and the label says only what a tap does.
         let lone = flag(.year, "Run a 10k", in: "Home")
         let one = try #require(ruled(state(6, kept: ["Home"], items: [lone])).banners.first)
-        #expect(one.more == nil && one.frame.height == 23 && one.label == "Year: Run a 10k, tap to read the list")
+        // P36: a bare one-line cloth is padded to 36, its words centred.
+        #expect(one.more == nil && one.frame.height == 36 && one.label == "Year: Run a 10k, tap to read the list")
+        #expect(WalkLayout.lookBackWordsTop(one) == 4 + CGFloat(36 - 23) / 2)
     }
 
     /// A quick walk plants one chain in one area: looking back up reads it top to bottom, with no
@@ -1744,6 +1746,26 @@ struct WalkLayoutTests {
         #expect(ruled(s).posts.count == 1)
     }
 
+    /// P36, P37: the tallest Look back up stack (five cloths of three lines, each with "+n more": 63 high,
+    /// 8 apart) still ends above the foot, 24 or more over it, and above the ending sheet; each cloth's touch
+    /// frame is at least its own height, on every wing and both footings.
+    @Test func theTallestLookBackStillEndsAboveItsFoot() throws {
+        let long = String(String(repeating: "Walk more every day. ", count: 10).prefix(200))
+        var items: [WalkItem] = []
+        for level in [WalkLevel.year, .season, .month] { for n in 1...2 { items.append(flag(level, "\(long) \(n)", in: "Health")) } }
+        for n in 1...2 { items.append(flag(.week, "\(long) \(n)", in: "Health", day: today)) }
+        let s = state(6, kept: ["Health", "Home"], items: items + [flag(.year, "Run a 10k", in: "Home")], standing: "Health")
+        for wing in wings { for footing in [WalkFooting.level, .natural] {
+            let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
+            let post = try #require(layout.posts.first)
+            #expect(post.banners.count == 5 && post.banners.allSatisfy { $0.lines == 3 && $0.more == 1 && $0.frame.height == 63 })
+            let lowest = try #require(post.banners.last)
+            #expect(post.base.y - lowest.drawn.maxY >= 24 - 0.01 && lowest.drawn.maxY <= WalkLayout.lookBackFoot, "wing \(wing) \(footing)")
+            #expect(layout.touchFrames(post, touch: 44).allSatisfy { $0.height >= 63 }, "wing \(wing) \(footing)")
+            #expect(Invariants.check(layout, s, wing: wing, touch: wing == 0 ? 44 : 55.7).isEmpty, "wing \(wing) \(footing)")
+        } }
+    }
+
     /// The hint under the header ("Tap a post to see that area") stands only while other areas stand
     /// at the side, in the reading column 20 in, 84 to 100; nothing on the mountain meets it. The nameless
     /// post alone (only read here) brings no hint.
@@ -1777,7 +1799,7 @@ struct WalkLayoutTests {
                     let words = WalkLayout.setLines(b.text, face: .lookBack, width: width - WalkLayout.Face.lookBack.inset, limit: 3)
                     #expect(b.words == words && b.lines == words.count, "\(standing), wing \(wing): \(b.text)")
                     #expect(b.lines == min(3, WalkLayout.lines(for: b.text, width: width, face: .lookBack)))
-                    #expect(b.frame.height == 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14))
+                    #expect(b.frame.height == max(36, 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14)))
                     #expect(b.frame.maxY <= WalkLayout.lookBackFoot)
                     if b.lines == 3 { threeLines += 1 }
                     checked += 1
@@ -1798,7 +1820,7 @@ struct WalkLayoutTests {
             let touch: CGFloat = wing == 0 ? 44 : 55.7
             for s in states {
                 let layout = WalkLayout.make(s, today: today, footing: footing, wing: wing)
-                let frames = Invariants.everything(layout).map(\.1) + layout.posts.flatMap { $0.touchFrames(touch: touch) }
+                let frames = Invariants.everything(layout).map(\.1) + layout.posts.flatMap { layout.touchFrames($0, touch: touch) }
                     + layout.sides.map { $0.touchFrame(touch: touch) }
                 for f in frames where f.maxY > WalkLayout.lookBackFoot + 0.01 {
                     Issue.record("\(footing), wing \(wing), \(Generated.describe(s)): \(f) ends at \(f.maxY)")
@@ -1889,46 +1911,73 @@ struct WalkLayoutTests {
     }
 
     /// Each cloth on a post takes a tap in a frame of its own (`Post.touchFrames(touch:)`), over every
-    /// generated state on each wing: it holds the cloth as drawn; it is at least a touch high where its
-    /// neighbours leave room, and otherwise reaches the middle of the gap to each neighbour; no two
-    /// overlap, none covers another cloth's centre, and none meets a side post. Prints the smallest.
-    @Test func aClothsTouchFrameIsItsOwn() {
+    /// generated state on each wing, ruled and planted by hand (the app's footing): it holds the cloth as
+    /// drawn; it is at least a touch high where its neighbours and the post's foot leave room, and
+    /// otherwise reaches the middle of the gap to each neighbour; it never reaches below the post's foot;
+    /// no two overlap, none covers another cloth's centre, none meets a side post or a side post's touch
+    /// frame, nor a control (the Move row, the hint, Next, the Undo pill, the lesson, the light's ring), past the cloth itself.
+    /// Looking back up (P36) every cloth's is at least 44 high. Prints the smallest, by footing.
+    @Test(arguments: [WalkFooting.natural, .level]) func aClothsTouchFrameIsItsOwn(_ footing: WalkFooting) {
+        let ring = CGRect(x: WalkOrb.centre.x - 66, y: WalkOrb.centre.y - 66, width: 132, height: 132)
         var smallest: (height: CGFloat, at: String) = (.infinity, ""), smallestBack: (height: CGFloat, at: String) = (.infinity, "")
         var frames = 0
         for wing in wings {
             let touch: CGFloat = wing == 0 ? 44 : 55.7
-            for (s, layout) in zip(Generated.all, Generated.level(wing: wing)) {
+            let states = Generated.all
+            let layouts = footing == .level ? Generated.level(wing: wing)
+                : (wing == 0 ? Generated.naturalLayouts : Generated.parallel(states.count) { WalkLayout.make(states[$0], today: today, footing: .natural, wing: wing) })
+            for (s, layout) in zip(states, layouts) {
+                let controls = [("Move row", layout.moveRow), ("hint", layout.hintLine), ("Next", layout.nextLine),
+                                ("Undo", layout.undoPill), ("lesson", layout.lesson), ("light", (1...5).contains(s.step) ? ring : nil)]
+                    .compactMap { name, frame in frame.map { (name, $0) } }
+                    + layout.sides.map { ("\($0.name)'s touch frame", $0.touchFrame(touch: touch)) }
                 for post in layout.posts {
-                    let touchFrames = post.touchFrames(touch: touch)
+                    let touchFrames = layout.touchFrames(post, touch: touch)
                     guard touchFrames.count == post.banners.count else { Issue.record("\(touchFrames.count) frames for \(post.banners.count)"); return }
                     let drawn = post.banners.map(\.drawn)
                     for (i, frame) in touchFrames.enumerated() {
                         frames += 1
                         let box = drawn[i]
-                        if !frame.insetBy(dx: -0.01, dy: -0.01).contains(box) { Issue.record("\(Generated.describe(s)): \(frame) does not hold \(box)"); return }
-                        if frame.width < min(touch, box.width) - 0.01 { Issue.record("\(Generated.describe(s)): \(frame) narrower than a touch") }
+                        let at = "\(footing), wing \(wing), \(Generated.describe(s))"
+                        if !frame.insetBy(dx: -0.01, dy: -0.01).contains(box) { Issue.record("\(at): \(frame) does not hold \(box)"); return }
+                        if frame.width < min(touch, box.width) - 0.01 { Issue.record("\(at): \(frame) narrower than a touch") }
+                        if frame.maxY > post.base.y + 0.01 { Issue.record("\(at): \(frame) reaches below the foot \(post.base.y)"); return }
                         let above = drawn.filter { $0.maxY <= box.minY + 0.01 }.map(\.maxY).max()
                         let below = drawn.filter { $0.minY >= box.maxY - 0.01 }.map(\.minY).min()
-                        let room = (below.map { ($0 + box.maxY) / 2 } ?? .infinity) - (above.map { ($0 + box.minY) / 2 } ?? -.infinity)
-                        if frame.height < min(touch, room) - 0.01 { Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) is short of \(min(touch, room))"); return }
+                        // What else stands across from the cloth above or below it bounds it too (a side post's touch, a control).
+                        let across = controls.map(\.1).filter { $0.minX < box.maxX && box.minX < $0.maxX }
+                        let room = min(below.map { ($0 + box.maxY) / 2 } ?? .infinity, post.base.y,
+                                       across.map { $0.minY >= box.maxY ? $0.minY : ($0.maxY > box.maxY ? box.maxY : .infinity) }.min() ?? .infinity)
+                            - max(above.map { ($0 + box.minY) / 2 } ?? -.infinity,
+                                  across.map { $0.maxY <= box.minY ? $0.maxY : ($0.minY < box.minY ? box.minY : -.infinity) }.max() ?? -.infinity)
+                        if frame.height < min(touch, room) - 0.01 { Issue.record("\(at): \(frame) is short of \(min(touch, room))"); return }
+                        if s.step == 6, frame.height < 44 - 0.01 { Issue.record("\(at): a Look back up cloth's touch \(frame) is under 44"); return }
                         for (j, other) in drawn.enumerated() where j != i && frame.contains(CGPoint(x: other.midX, y: other.midY)) {
-                            Issue.record("\(Generated.describe(s)): \(frame) covers a neighbour's centre"); return
+                            Issue.record("\(at): \(frame) covers a neighbour's centre"); return
                         }
                         for (j, other) in touchFrames.enumerated() where j > i && Invariants.overlap(frame, other) {
-                            Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) meets \(other)"); return
+                            Issue.record("\(at): \(frame) meets \(other)"); return
                         }
                         for side in layout.sides { for b in side.boxes where Invariants.overlap(frame, b) {
-                            Issue.record("\(Generated.describe(s)), wing \(wing): \(frame) meets \(side.name)'s \(b)"); return
+                            Issue.record("\(at): \(frame) meets \(side.name)'s \(b)"); return
                         } }
-                        let at = "\(post.banners[i].kind) on step \(s.step), wing \(wing), \(post.banners[i].lines) lines"
-                        if frame.height < smallest.height { smallest = (frame.height, at) }
-                        if s.step == 6, frame.height < smallestBack.height { smallestBack = (frame.height, at) }
+                        // A control's touch shape may meet only the cloth itself (a leaning cloth beside a side
+                        // post's pill), never what the cloth's touch frame grows past it.
+                        for (name, control) in controls where Invariants.overlap(frame, control) {
+                            let met = frame.intersection(control)
+                            if met.minY < box.minY - 0.01 || met.maxY > box.maxY + 0.01 {
+                                Issue.record("\(at): \(frame) meets the \(name) \(control) past the cloth \(box)"); return
+                            }
+                        }
+                        let what = "\(post.banners[i].kind) on step \(s.step), wing \(wing), \(post.banners[i].lines) lines"
+                        if frame.height < smallest.height { smallest = (frame.height, what) }
+                        if s.step == 6, frame.height < smallestBack.height { smallestBack = (frame.height, what) }
                     }
                 }
             }
         }
         #expect(frames > 20_000)
-        print("Cloth touch frames: \(frames); smallest \(smallest.height) (\(smallest.at)); looking back up \(smallestBack.height) (\(smallestBack.at))")
+        print("Cloth touch frames, \(footing): \(frames); smallest \(smallest.height) (\(smallest.at)); looking back up \(smallestBack.height) (\(smallestBack.at))")
     }
 
     /// The side pills at their widest: two in one row of one side give way equally and stand 1
@@ -2766,7 +2815,7 @@ enum Invariants {
             case .full, .ghost: size = CGSize(width: width, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
             case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines))
             case .more: size = CGSize(width: 78, height: 22)
-            case .compact: size = CGSize(width: width, height: 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14))
+            case .compact: size = CGSize(width: width, height: max(36, 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14)))
             }
             if !(1...3).contains(b.lines) || abs(b.frame.width - size.width) > 0.01 || abs(b.frame.height - size.height) > 0.01 {
                 problems.append("\(b.id) holds \(b.lines) lines in \(b.frame)")
@@ -2873,8 +2922,13 @@ enum Invariants {
         if banners.map(\.level) != levels || banners.contains(where: { $0.kind != .compact }) {
             problems.append("cloths \(banners.map(\.level)) for levels \(levels)")
         }
-        for (a, b) in zip(banners, banners.dropFirst()) where b.frame.minY < a.frame.maxY {
-            problems.append("\(b.id) stands above \(a.id)")
+        // P36: 8 apart, each at least 36 high, so a cloth's pitch is never under 44.
+        for (a, b) in zip(banners, banners.dropFirst()) where b.frame.minY - a.frame.maxY < 8 - 0.05 {
+            problems.append("\(b.id) stands \(b.frame.minY - a.frame.maxY) under \(a.id)")
+        }
+        // P37: the foot at least 24 under the lowest cloth.
+        if let post = layout.posts.first, let lowest = banners.last, post.base.y - lowest.drawn.maxY < 24 - 0.01 {
+            problems.append("the foot \(post.base.y) is \(post.base.y - lowest.drawn.maxY) under the lowest cloth")
         }
         for b in banners {
             let flags = held(b.level)

@@ -53,19 +53,26 @@ struct WalkLayout: Equatable {
         /// on one side, it takes on the other). Toward a neighbouring cloth it reaches only the middle of
         /// the gap between them, so no two touch frames meet and none covers another cloth: three or five
         /// one-line Look back up cloths 4 apart are each their own height and 4 more.
-        func touchFrames(touch: CGFloat) -> [CGRect] {
+        ///
+        /// It never reaches below the post's foot, nor into `clearOf` (other things' touch shapes: the side
+        /// posts', the controls') past the cloth: above or below the cloth it stops at their edge, and beside
+        /// one the cloth itself reaches into (a leaning cloth by a side post's pill) it does not grow that way.
+        func touchFrames(touch: CGFloat, clearOf obstacles: [CGRect] = []) -> [CGRect] {
             let drawn = banners.map(\.drawn)
             return drawn.map { box in
                 let above = drawn.filter { $0.maxY <= box.minY + 0.01 && $0 != box }.map(\.maxY).max()
                 let below = drawn.filter { $0.minY >= box.maxY - 0.01 && $0 != box }.map(\.minY).min()
-                let ceiling = above.map { ($0 + box.minY) / 2 } ?? -.infinity
-                let floor = below.map { ($0 + box.maxY) / 2 } ?? .infinity
+                let across = obstacles.filter { $0.minX < box.maxX && box.minX < $0.maxX }
+                let ceiling = max(above.map { ($0 + box.minY) / 2 } ?? -.infinity,
+                                  across.map { $0.maxY <= box.minY ? $0.maxY : ($0.minY < box.minY ? box.minY : -.infinity) }.max() ?? -.infinity)
+                let floor = min(below.map { ($0 + box.maxY) / 2 } ?? .infinity, max(box.maxY, base.y),
+                                across.map { $0.minY >= box.maxY ? $0.minY : ($0.maxY > box.maxY ? box.maxY : .infinity) }.min() ?? .infinity)
                 let grow = max(0, touch - box.height) / 2
                 var top = box.minY - grow, foot = box.maxY + grow
                 if top < ceiling { foot += ceiling - top; top = ceiling }
                 if foot > floor { top = max(ceiling, top - (foot - floor)); foot = floor }
-                let across = max(0, touch - box.width) / 2
-                return CGRect(x: box.minX - across, y: top, width: box.width + 2 * across, height: foot - top)
+                let wide = max(0, touch - box.width) / 2
+                return CGRect(x: box.minX - wide, y: top, width: box.width + 2 * wide, height: foot - top)
             }
         } }
     /// An area's name: a choice on the ground (`ground`), or the pill on the standing post
@@ -175,7 +182,8 @@ struct WalkLayout: Equatable {
     /// The walk is laid out where it stands once settled (`WalkState.settled`), so a place opened
     /// mid-walk (a resume, a page) is drawn where the next touch would find it.
     static func make(_ state: WalkState, today: Date, art: WalkArt = .overlookSquare,
-                     footing: WalkFooting = .natural, wing: CGFloat = 0, periods: WalkPeriods? = nil) -> WalkLayout {
+                     footing: WalkFooting = .natural, wing: CGFloat = 0, periods: WalkPeriods? = nil,
+                     stage: WalkStage? = nil) -> WalkLayout {
         let s = state.settled
         var labels: [Label] = [], posts: [Post] = [], sides: [Side] = []
         // Look back up with the sheet or the paper raised over the mountain: nothing stands (the area's pill,
@@ -184,8 +192,13 @@ struct WalkLayout: Equatable {
             if s.ground {
                 labels = groundLabels(s, footing: footing, wing: wing)
             } else {
+                // The window the stage stands on, for the picture under Look back up's foot (P37): the one
+                // given, else a window with this wing and no sliver.
+                let window = stage ?? WalkStage(device: CGSize(width: WalkArt.stageSize.width + 2 * max(0, wing),
+                                                                height: WalkArt.stageSize.height))
                 let standing = WalkStanding(s, today: today, periods: periods ?? WalkPeriods.pick(now: today),
-                                        footing: footing, wing: wing).layout()
+                                            footing: footing, wing: wing,
+                                            lookBackFoot: { lookBackStandingFoot(art, window, lowest: $0) }).layout()
                 labels = standing.label.map { [$0] } ?? []
                 posts = standing.post.map { [$0] } ?? []
                 sides = standing.sides
@@ -219,6 +232,22 @@ struct WalkLayout: Equatable {
     /// How far Look back up's header and hint stand in from the reading column's edges.
     static let lookBackInset: CGFloat = 20
 
+    /// Look back up's standing foot (P37): the board's 556 where that point of the midline is land under
+    /// the step-6 picture on this window (`WalkBackdrop.standsOnLand`), else the nearest land above it, a
+    /// half point at a time, never nearer than `pole` (24) under the lowest cloth; with no land in that
+    /// span, or no picture, 556.
+    static func lookBackStandingFoot(_ art: WalkArt, _ window: WalkStage, lowest: CGFloat) -> CGFloat {
+        guard let backdrop = art.backdrop, let camera = art.backdropCamera(step: 6, stage: window) else { return standingFoot }
+        let highest = lowest + pole
+        var y = standingFoot
+        while y >= highest {
+            if backdrop.standsOnLand(backdrop.point(CGPoint(x: centreX, y: y), camera: camera)) { return y }
+            y -= 0.5
+        }
+        return standingFoot
+    }
+
+
     /// The art's stop for a step (never a zoom); an art with too few stops falls back to its last one.
     static func stop(_ art: WalkArt, _ step: Int) -> Camera {
         guard let last = art.stops.last else { return Camera(x: 0, y: 0, k: 1) }
@@ -239,6 +268,17 @@ struct WalkLayout: Equatable {
         case .speaking, .finishing: return spokenFlagRect
         case .idle, .holding, .open: return nil
         }
+    }
+
+    /// Where each cloth of a post takes a tap on this layout (`Post.touchFrames`), clear of every other
+    /// thing that takes one: the side posts' touch frames, and on Year to Today the Move row, the hint,
+    /// Next, the Undo pill, the lesson and the light's ring.
+    func touchFrames(_ post: Post, touch: CGFloat) -> [CGRect] {
+        let centre = WalkOrb.centre, reach = WalkLayout.ring
+        let lookingBack = post.banners.contains { $0.kind == .compact }
+        let light = lookingBack ? nil : CGRect(x: centre.x - reach, y: centre.y - reach, width: 2 * reach, height: 2 * reach)
+        let controls = [moveRow, hintLine, nextLine, undoPill, lesson, light].compactMap { $0 }
+        return post.touchFrames(touch: touch, clearOf: sides.map { $0.touchFrame(touch: touch) } + controls)
     }
 
     /// What a tap on a banner sends: an example plants its words; a flag of the step's level or the
