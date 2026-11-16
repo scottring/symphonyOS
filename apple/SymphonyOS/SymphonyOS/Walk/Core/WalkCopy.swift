@@ -314,6 +314,8 @@ enum WalkCopy {
     static func moveLabel(_ title: String, to area: String) -> String { "Move “\(short(title))” to \(area)" }
     static func removeLabel(_ title: String) -> String { "Remove “\(short(title))”" }
 
+    /// A chosen flag's tap: it lets the choice go.
+    static let tapToLetGo = "tap to let go"
     static let undo = "Undo"; static let moveTo = "Move to"; static let pullUp = "Remove"
     /// The typing field (F22): its placeholder, its gold Add, and its X (to VoiceOver).
     static let typeAdd = "Add", typeClose = "Close without adding"
@@ -401,6 +403,8 @@ enum WalkCopy {
         /// On Today, the goal above when the next one in the round is not here but the nameless post's
         /// first thing: a tap goes to the first thing.
         case focusedThenFirstThing
+        /// Today's first thing planted by the walk, already chosen for Remove: a tap lets it go.
+        case firstThingChosen
         /// Today's first thing on the Today step: `firstThingFocused` while it is the goal above (a
         /// tap goes on to the next week task here); `firstThingFocusable`, not planted by this walk,
         /// while another is (a tap makes it the goal above).
@@ -410,7 +414,7 @@ enum WalkCopy {
         var taps: Bool {
             switch self {
             case .plain, .firstThing, .focused: return false
-            case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingFocusable, .firstThingFocused,
+            case .mine, .focusedOfSeveral, .focusedThenFirstThing, .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
                  .example, .stub:
                 return true
             }
@@ -426,6 +430,7 @@ enum WalkCopy {
         case .focused: return "\(withTag), the goal this step is about"
         case .focusedOfSeveral: return "\(withTag), the goal this step is about, tap for the next one here"
         case .focusedThenFirstThing: return "\(withTag), the goal this step is about, tap for the first thing"
+        case .firstThingChosen: return "Today: \(text), first thing, chosen, \(tapToLetGo)"
         case .firstThing: return "Today: \(text), first thing"
         case .firstThingMine: return "Today: \(text), first thing, tap to remove"   // planted by the walk
         case .firstThingFocusable: return "Today: \(text), first thing, tap to focus"

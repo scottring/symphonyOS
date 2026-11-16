@@ -95,10 +95,12 @@ extension WalkLayout {
     }
 
     /// The quiet Undo pill, centred above the light where the hint was, while it shows at rest; a note
-    /// (the hint) is drawn instead, and a chosen flag's Move row takes its place.
+    /// (the hint) is drawn instead, a chosen flag's Move row takes its place, and it is not drawn under
+    /// the keyboard while typing.
     static let undoPillFrame = CGRect(x: 152, y: 564, width: 86, height: 36)
     static func undoFrame(_ s: WalkState) -> CGRect? {
-        guard (1...5).contains(s.step), s.showsUndoPill, s.orb == .idle, s.note == nil, s.selected == nil else { return nil }
+        guard (1...5).contains(s.step), s.showsUndoPill, s.orb == .idle, s.note == nil, s.selected == nil,
+              s.typing == nil else { return nil }
         return undoPillFrame
     }
 

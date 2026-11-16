@@ -1002,10 +1002,9 @@ struct WalkPlantTests {
                             #expect(after.focus[.today] == s.nextGoalAbove() && after.selected == s.selected,
                                     "\(seed.name): \(banner.label) did not walk the round")
                         case .firstThingMine?:
-                            // Chosen for Remove; a second tap lets it go again (its label says so only once
-                            // a chosen flag's label does: `bannersSayWhatATapDoes`, the standing layout's).
-                            let chosen = s.selected == banner.itemId ? nil : banner.itemId
-                            #expect(after.selected == chosen, "\(seed.name): \(banner.label) was not chosen")
+                            #expect(after.selected == banner.itemId, "\(seed.name): \(banner.label) was not chosen")
+                        case .firstThingChosen?:
+                            #expect(after.selected == nil, "\(seed.name): \(banner.label) was not let go")
                         case .firstThingFocusable?:
                             #expect(after.focus[.today] == banner.itemId, "\(seed.name): \(banner.label) is not the goal above")
                         default:
@@ -1066,7 +1065,7 @@ struct WalkPlantTests {
     /// The role a drawn flag's label names (nil for a stub or a "+n" flag).
     private static func role(of banner: WalkLayout.Banner) -> WalkCopy.BannerRole? {
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
-                                            .firstThingMine, .firstThingFocusable, .firstThingFocused, .example]
+                                            .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused, .example]
         return roles.first { WalkCopy.bannerLabel(banner.text, level: banner.level, tag: banner.tag, role: $0) == banner.label }
     }
 

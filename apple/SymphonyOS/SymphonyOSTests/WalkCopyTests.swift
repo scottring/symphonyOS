@@ -396,7 +396,8 @@ struct WalkCopyTests {
                  WalkCopy.areaHint(ground: true, kept: true, focused: false), WalkCopy.areaHint(ground: false, kept: true, focused: false),
                  WalkCopy.areaHint(ground: false, kept: true, focused: true)]
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
-                                            .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
+                                            .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
+                                            .example, .stub(2)]
         said += roles.map { WalkCopy.bannerLabel("Run a 5K", level: .week, tag: "TODAY", role: $0) }
         return said
     }
@@ -641,6 +642,10 @@ struct WalkCopyTests {
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThing) == "Today: Gym induction, first thing")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingMine)
                 == "Today: Gym induction, first thing, tap to remove")
+        // Already chosen for Remove: a tap lets it go (Today rule e: the label says what the tap does).
+        #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingChosen)
+                == "Today: Gym induction, first thing, chosen, tap to let go")
+        #expect(WalkCopy.tapToLetGo == "tap to let go")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingFocusable)  // not planted by the walk
                 == "Today: Gym induction, first thing, tap to focus")
         #expect(b("Gym induction", .today, WalkCopy.firstThingTag, .firstThingFocused)    // the goal above
@@ -659,7 +664,8 @@ struct WalkCopyTests {
     /// Only a banner whose label says what a tap does takes a tap; the rest are read as plain text.
     @Test func aBannerTakesATapOnlyWhenItsLabelSaysSo() {
         let roles: [WalkCopy.BannerRole] = [.mine, .plain, .focused, .focusedOfSeveral, .focusedThenFirstThing, .firstThing,
-                                            .firstThingMine, .firstThingFocusable, .firstThingFocused, .example, .stub(2)]
+                                            .firstThingMine, .firstThingChosen, .firstThingFocusable, .firstThingFocused,
+                                            .example, .stub(2)]
         for role in roles {
             let label = WalkCopy.bannerLabel("Gym", level: .week, tag: nil, role: role)
             #expect(role.taps == label.contains(", tap "), "\(role)")

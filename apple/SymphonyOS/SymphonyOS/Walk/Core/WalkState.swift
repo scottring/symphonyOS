@@ -114,9 +114,10 @@ struct WalkState: Equatable {
         case .nextTapped:
             guard let line = WalkCopy.nextLine(self, env.periods) else { return [] }
             return respond(to: line.action, env)
-        // The top row: Back and Leave for now do what backing up and leaving do.
-        case .backTapped: return respond(to: WalkAction.back, env)
-        case .leaveTapped: return respond(to: WalkAction.leave, env)
+        // The top row: Back and Leave for now do what backing up and leaving do, only while the row
+        // shows (never while typing, F10, nor on Welcome or Look back up).
+        case .backTapped: return showsTopRow ? respond(to: WalkAction.back, env) : []
+        case .leaveTapped: return showsTopRow ? respond(to: WalkAction.leave, env) : []
         // "More" opens the choices when they are closed (as a tap on the light opens them, with speech
         // off too, where a tap types) and closes them when they are open. While the light is taught,
         // More (which the lesson points to) puts the lesson away and opens them. Not while the light is held.

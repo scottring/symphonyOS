@@ -791,7 +791,7 @@ private struct Builder {
             guard s.step == 5 else { return .firstThing }
             // The goal above walks the round, whoever planted it; else the walk's own is chosen for Remove.
             if s.focus[.today] == item.id { return s.nextGoalAbove() != nil ? .firstThingFocused : .firstThing }
-            if item.mine { return .firstThingMine }
+            if item.mine { return s.selected == item.id ? .firstThingChosen : .firstThingMine }
             return s.goalAboveAfterTap(on: item.id) != nil ? .firstThingFocusable : .firstThing
         }
         guard s.step < 6, !s.ground, let level else { return .plain }

@@ -1074,6 +1074,19 @@ struct WalkLayoutTests {
         #expect(WalkCopy.hint(s) == WalkCopy.nothingToPlant && WalkLayout.hintFrame(s)?.minY == 572)
     }
 
+    /// The Undo pill is not drawn under the keyboard: typing hides it (Undo itself stays; the pill may
+    /// show again when the field closes).
+    @Test func theUndoPillHidesWhileTyping() {
+        var s = state(1, kept: ["Health"])
+        s.focusArea = area("Health").id
+        _ = s.plant("run a 5K", WalkEnv(periods: WalkPeriods.pick(now: today), now: today))
+        _ = s.act(.type, WalkEnv(periods: WalkPeriods.pick(now: today), now: today))
+        #expect(s.typing == "" && s.undoShowing && !s.undo.isEmpty)
+        #expect(WalkLayout.undoFrame(s) == nil)
+        s.typing = nil
+        #expect(WalkLayout.undoFrame(s) == CGRect(x: 152, y: 564, width: 86, height: 36))
+    }
+
     /// F11: while a flag is chosen its Move to / Remove row stands above the light where the hint was,
     /// clear of the ring; neither hint nor pill then.
     @Test func theMoveRowStandsAboveTheLight() {

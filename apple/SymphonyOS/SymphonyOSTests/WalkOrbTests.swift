@@ -439,6 +439,21 @@ struct WalkOrbTests {
         #expect(year.step == 0)
     }
 
+    /// The top row's taps obey the top row (a view holds no rule): no Back or Leave for now while typing
+    /// (F10: the words stay), on Welcome or on Look back up.
+    @Test func topRowTapsObeyTheTopRow() {
+        for event: WalkEvent in [.backTapped, .leaveTapped] {
+            var typing = state(step: 2, planted: true); typing.typing = "half a thought"
+            let before = typing
+            #expect(typing.apply(event, env) == [] && typing == before, "\(event) while typing")
+            for step in [0, 6] {
+                var s = state(step: step, planted: true)
+                let was = s
+                #expect(s.apply(event, env) == [] && s == was, "\(event) on step \(step)")
+            }
+        }
+    }
+
     /// More opens the choices when they are closed and closes them when they are open; while the
     /// light is held or speaking it does nothing.
     @Test func moreTogglesTheChoices() {
@@ -463,9 +478,11 @@ struct WalkOrbTests {
         #expect(s.orb == .finishing(live: "Book the plumber"))
         let effects = s.apply(.backTapped, env)
         let create = try #require(effects.firstIndex { Self.creates($0, "Book the plumber") })
-        let save = try #require(effects.lastIndex(of: .save))
-        #expect(create < save)
-        #expect(s.step == 1 && s.items.contains { $0.title == "Book the plumber" })
+        let save = try #require(effects.firstIndex(of: .save))
+        #expect(create < save)                                  // planted (and saved) before Back moves and saves
+        let planted = try #require(s.items.first { $0.title == "Book the plumber" })
+        #expect(planted.level == .season && planted.parentId == s.items[0].id)   // on Season, where it was said
+        #expect(s.step == 1)
     }
 
     @Test func leavingPlantsAWaitingFlagFirst() throws {
@@ -475,9 +492,11 @@ struct WalkOrbTests {
         #expect(s.orb == .finishing(live: "Book the plumber"))
         let effects = s.apply(.leaveTapped, env)
         let create = try #require(effects.firstIndex { Self.creates($0, "Book the plumber") })
-        let end = try #require(effects.firstIndex(of: .end(.paused)))
-        #expect(create < end)
-        #expect(s.ended && s.items.contains { $0.title == "Book the plumber" })
+        let save = try #require(effects.firstIndex(of: .save)), end = try #require(effects.firstIndex(of: .end(.paused)))
+        #expect(create < save && save < end)                    // planted and saved, then the walk closes
+        let planted = try #require(s.items.first { $0.title == "Book the plumber" })
+        #expect(planted.level == .season && planted.parentId == s.items[0].id)
+        #expect(s.ended && s.step == 2)
     }
 
     private static func creates(_ effect: WalkEffect, _ title: String) -> Bool {
