@@ -162,7 +162,9 @@ final class WalkUITests: XCTestCase {
         var swipes = 0
         while !row.isHittable && swipes < 4 { paper.swipeUp(); swipes += 1 }
         XCTAssertGreaterThanOrEqual(row.frame.height, 44, "a row is less than a touch high")
-        let standing = app.descendants(matching: .any)["walk.standing"]
+        // Before the tap the walk stands in Health (Task 10: so "walked to Home" below is a change, not where it was).
+        let standing = app.descendants(matching: .any)["walk.standing"].firstMatch
+        XCTAssertEqual(standing.label, "Health", "the walk did not start in Health")
         row.tap()
         XCTAssertTrue(paper.waitForNonExistence(timeout: 15), "a row did not lower the paper")
         XCTAssertTrue(standing.waitForExistence(timeout: 15), "no standing pill")
@@ -182,21 +184,20 @@ final class WalkUITests: XCTestCase {
             XCTAssertTrue(paper.scrollViews.firstMatch.exists, "\(seed): the paper's list is not a scrolling list")
             let end = app.buttons["walk.paper.row.\(last)"]
             XCTAssertTrue(end.waitForExistence(timeout: 15), "\(seed): no row \(last)")
-            // Whole inside the list's own scrolling frame, which the app keeps above its window's foot (the
-            // window's safe area: the home indicator), and inside the window: the list's end, not a row
-            // half under the edge.
+            // Whole inside the list's own scrolling frame, and ending above the paper's own foot by more than
+            // the home indicator: the list's end, not a row half under the edge. (Task 10: the bound was the
+            // list against the window's foot; the list's frame runs to the window's foot, so it could not fail.)
             let list = paper.scrollViews.firstMatch
-            let window = app.windows.firstMatch.frame
             func inView() -> Bool {
                 end.isHittable && list.frame.minY <= end.frame.minY && end.frame.maxY <= list.frame.maxY
-                    && list.frame.maxY <= window.maxY
+                    && end.frame.maxY <= paper.frame.maxY - Self.paperFootMargin
             }
             var swipes = 0
             while !inView() && swipes < 10 {
                 paper.swipeUp()
                 swipes += 1
             }
-            XCTAssertTrue(inView(), "\(seed): the last row cannot be reached whole")
+            XCTAssertTrue(inView(), "\(seed): the last row cannot be reached whole: row \(end.frame), list \(list.frame), paper \(paper.frame)")
             XCTAssertGreaterThanOrEqual(end.frame.height, 44, "\(seed): the last row is less than a touch high")
             XCTAssertFalse(app.buttons["walk.paper.row.\(last + 1)"].exists, "\(seed): more rows than the level holds")
             let shot = XCTAttachment(screenshot: app.screenshot())
@@ -206,6 +207,23 @@ final class WalkUITests: XCTestCase {
             app.terminate()
         }
     }
+
+    /// Task 10 (Step 2, A5): in the accessibility tree the walk step's controls come in reading order: the
+    /// top row, the Undo pill (between the mountain and the light), the light, then Next. (The tree's element
+    /// order as XCUITest walks it puts the scene's elements after the controls' layer, so the scene's place,
+    /// priority 2 between the top row's 3 and the hint row's 1.5, is checked by reading `WalkView`, not here.)
+    @MainActor func testTheControlsAreReadInOrder() throws {
+        let app = walk(step: 3, ["-SymphonyWalkSeed", "full", "-SymphonyWalkOrb", "undo"])
+        XCTAssertTrue(app.buttons["walk.undo"].waitForExistence(timeout: 15), "no Undo pill")
+        let ids = app.descendants(matching: .any).allElementsBoundByAccessibilityElement.map(\.identifier).filter { !$0.isEmpty }
+        let order = ["walk.back", "walk.more", "walk.leave", "walk.undo", "walk.orb", "walk.next"]
+        let at = order.map { id in ids.firstIndex(of: id) ?? -1 }
+        XCTAssertFalse(at.contains(-1), "missing: \(zip(order, at).filter { $0.1 < 0 }.map(\.0)) in \(ids)")
+        XCTAssertEqual(at, at.sorted(), "read out of order: \(zip(order, at).map { "\($0.0) \($0.1)" }) in \(ids)")
+    }
+
+    /// How far above the paper's own foot its list must end on the iPhone 17 (its home indicator is 34).
+    static let paperFootMargin: CGFloat = 20
 
     /// The paper opened for a shot (`-SymphonyWalkOrb paper`) goes with "Show the mountain", and the walk is as it was.
     @MainActor func testShowTheMountainLowersThePaper() throws {

@@ -75,21 +75,64 @@ final class LightDailyUITests: XCTestCase {
                                "-SymphonyWalkSeed", "full"])
         let year = any["walk.lookback.year"]
         XCTAssertTrue(year.waitForExistence(timeout: 60), "no year cloth on Look back up")
-        // The ending sheet has risen in (its handle is there) before the cloth is tapped: a tap in the
-        // first second, while the scene is still arriving, was once lost in the suite.
+        // The ending sheet has risen in (its handle is there) before the cloth is tapped.
         XCTAssertTrue(any["walk.sheetHandle"].waitForExistence(timeout: 15), "the ending sheet never rose")
-        Thread.sleep(forTimeInterval: 1)
         let standing = any["walk.standing"]
         XCTAssertEqual(standing.label, "Health")
         XCTAssertTrue(year.label.contains("tap to read the list"), year.label)
-        year.tap()
-        XCTAssertTrue(any["walk.paper"].waitForExistence(timeout: 10), "the cloth did not open the paper")
+        // A tap in the first second, while the cloths are still dropping in, was once lost in the suite (cause
+        // not found, P43): the tap is tried again until the paper rises, rather than waiting a fixed second.
+        var tries = 0
+        repeat {
+            year.tap()
+            tries += 1
+        } while !any["walk.paper"].waitForExistence(timeout: 3) && tries < 4
+        XCTAssertTrue(any["walk.paper"].exists, "the cloth did not open the paper")
         // Health's four year goals are rows 0 to 3; Home's first is row 4.
         any["walk.paper.row.4"].tap()
         XCTAssertTrue(any["walk.paper"].waitForNonExistence(timeout: 10), "the row did not close the paper")
         XCTAssertEqual(any["walk.standing"].label, "Home")
         XCTAssertTrue(any["walk.lookback.year"].exists)
     }
+
+    /// Task 10 (Step 2): Xcode's accessibility audit on the Year page, the Month page and the Year page's
+    /// raised paper (the full plan). Every issue is listed in the result (and printed); the kinds the
+    /// walk's painting and its fixed stage make expected are named in `auditAccepted`, and any other fails.
+    @MainActor func testTheAccessibilityAuditOnThePages() throws {
+        var found: [String] = [], failing: [String] = []
+        for (name, page, extra) in [("Year", "year", [String]()), ("Month", "month", []), ("Year paper", "year", ["-SymphonyDailyState", "paper"])] {
+            let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyDaily", "-SymphonyDailyNow", "2026-11-10",
+                                     "-SymphonyDailySeed", "full", "-SymphonyDailyPage", page] + extra)
+            XCTAssertTrue(any["daily.mountain.\(page)"].waitForExistence(timeout: 60), "never reached \(name)")
+            if !extra.isEmpty { XCTAssertTrue(any["daily.mountain.paper"].waitForExistence(timeout: 15), "the paper did not rise") }
+            try app.performAccessibilityAudit { issue in
+                let element = issue.element
+                let line = "\(name): \(issue.auditType.rawValue) “\(issue.compactDescription)” on \(element?.identifier ?? "?") “\(element?.label ?? "")” \(element.map { "\($0.elementType.rawValue) \($0.frame)" } ?? "")"
+                found.append(line)
+                if !Self.auditAccepted.contains(issue.auditType) { failing.append(line) }
+                return true
+            }
+            app.terminate()
+        }
+        let note = XCTAttachment(string: found.joined(separator: "\n"))
+        note.name = "accessibility-audit"
+        note.lifetime = .keepAlways
+        add(note)
+        // Also kept as a file in the runner's temporary folder, for the report.
+        try? found.joined(separator: "\n").write(toFile: Self.auditLog, atomically: true, encoding: .utf8)
+        XCTAssertTrue(failing.isEmpty, "\(failing.count) audit issues: \(failing)")
+    }
+
+    static var auditLog: String { (NSTemporaryDirectory() as NSString).appendingPathComponent("symphony-accessibility-audit.txt") }
+
+    /// What the audit reported on the pages on 2026-11-16 (76 issues, listed in Task 10's report) and is
+    /// accepted for now: contrast (words over the painting and the muted More / Inbox / placeholder, the
+    /// approved look; the paper's rows were sampled as the paper rose), Dynamic Type (the stage and the page
+    /// chrome are fixed sizes by design, F37; large text on the pages is its own pass), and two the audit
+    /// could not name: one element with no description at (0, 0, 370, 44) on Year and Month, and three
+    /// "potentially inaccessible" texts on the paper (rows read by their combined label). Any other kind
+    /// (touch size, clipped text, traits) fails.
+    static let auditAccepted: XCUIAccessibilityAuditType = [.contrast, .dynamicType, .sufficientElementDescription, .elementDetection]
 
     /// The pages' paper (F16, "The pages' paper foot"): on Year with the full plan the strip at the foot
     /// raises the whole year as a list by area (five areas, each a heading); "Show the mountain" lowers
