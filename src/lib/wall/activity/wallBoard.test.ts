@@ -77,20 +77,26 @@ describe('boardNews: the newest school digest, as announcements', () => {
   })
 })
 
-describe('wallHome: which of the three screens leads', () => {
-  const anchors = { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } }
+describe('wallHome: which of the three screens leads — today first', () => {
   const at = (h: number, m = 0) => new Date(2026, 10, 10, h, m)
   const pick = (screen: KioskScreen) => ({ screen, title: '', dark: false })
   it('the day, from the morning through after school', () => {
-    for (const s of ['out-the-door', 'home', 'rest', 'weekend'] as KioskScreen[]) expect(wallHome(pick(s), anchors, at(10))).toBe('day')
+    for (const s of ['out-the-door', 'home', 'rest', 'weekend'] as KioskScreen[]) expect(wallHome(pick(s), at(10))).toBe('day')
   })
   it('dinner at dinner time', () => {
-    expect(wallHome(pick('dinner'), anchors, at(18))).toBe('dinner')
+    expect(wallHome(pick('dinner'), at(18))).toBe('dinner')
   })
-  it('tomorrow once dinner is over, and through the night', () => {
-    expect(wallHome(pick('rest'), anchors, at(19, 5))).toBe('night')
-    expect(wallHome(pick('bedtime'), anchors, at(19, 40))).toBe('night')
-    expect(wallHome(pick('night'), anchors, at(23))).toBe('night')
+  it('still today after dinner and through bedtime (Scott, 2026-11-17: "we need information for today")', () => {
+    expect(wallHome(pick('rest'), at(19, 5))).toBe('day')
+    expect(wallHome(pick('bedtime'), at(19, 40))).toBe('day')
+  })
+  it('tomorrow only once bedtime is over, until midnight', () => {
+    expect(wallHome(pick('night'), at(21, 15))).toBe('night')
+    expect(wallHome(pick('night'), at(23, 59))).toBe('night')
+  })
+  it('from midnight to the morning routine it is today again, not the day after', () => {
+    expect(wallHome(pick('night'), at(0, 5))).toBe('day')
+    expect(wallHome(pick('night'), at(6, 30))).toBe('day')
   })
 })
 

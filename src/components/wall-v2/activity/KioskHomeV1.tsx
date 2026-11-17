@@ -131,6 +131,12 @@ export interface KioskHomeV1Props {
   /** The waits both ways and the newest digest's news (the calm wall,
    *  KioskWallHome, 2026-11-10). */
   board?: WallBoardData
+  /** Today's page on the wall (the agenda): "Open the day", the untimed things. */
+  onOpenDay?: () => void
+  /** The School place: the digest's cards. */
+  onOpenSchool?: () => void
+  /** The Dinner place: tonight's dinner, large. */
+  onOpenDinner?: () => void
 }
 
 const SHARED = '__shared'

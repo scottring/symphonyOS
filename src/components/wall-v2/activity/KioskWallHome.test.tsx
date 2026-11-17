@@ -41,71 +41,113 @@ function props(screen_: KioskScreen, over: Partial<KioskHomeV1Props> = {}): Kios
   }
 }
 
-describe('the calm wall: the day', () => {
-  it('leads with today’s appointments, large, and no kids’ checklists — even in the morning', () => {
-    const p = props('out-the-door')
+describe('the wall, today first: the day', () => {
+  it('leads with getting out the door, then today’s rows; no kids’ checklists', () => {
+    const p = props('out-the-door', { now: new Date(2026, 10, 10, 7, 0), onOpenDay: vi.fn() })
     render(<KioskWallHome {...p} />)
+    expect(screen.getByRole('button', { name: /Out the door at 7:20/ })).toBeInTheDocument()
     const today = screen.getByRole('region', { name: 'Today' })
-    expect(within(today).getAllByRole('button').map((b) => b.querySelector('.kh-ev-w')?.textContent)).toEqual(['Boxing', 'Marta', 'Ukulele Club'])
+    expect([...today.querySelectorAll('.kh-row-t')].map((n) => n.textContent)).toEqual(['Boxing', 'Marta', 'Ukulele Club'])
     expect(screen.queryByText('Get dressed')).toBeNull()
-    expect(today).toHaveTextContent('Ella Library · Kaleb Art')
-    expect(today).toHaveTextContent('In the bag Ella: Library book')
     fireEvent.click(within(today).getByRole('button', { name: /Boxing/ }))
     expect(p.onTapRow).toHaveBeenCalledWith('box')
   })
 
-  it('beside them: dinner, then what waits — what others wait on us for first', () => {
-    const p = props('rest')
+  it('specials and the bag are chips that open the kid', () => {
+    const p = props('rest', { now: new Date(2026, 10, 10, 10, 0) })
+    render(<KioskWallHome {...p} />)
+    const chips = screen.getByRole('group', { name: 'All day' })
+    expect(chips).toHaveTextContent('EllaLibraryLibrary book')
+    fireEvent.click(within(chips).getByRole('button', { name: /Kaleb/ }))
+    expect(p.onOpenKid).toHaveBeenCalledWith(kaleb)
+  })
+
+  it('the banner is the next thing on the clock, and opens it', () => {
+    const rows = [row('box', 'Boxing', '9:00a', ['s']), { ...row('uke', 'Ukulele Club', '2:10p', ['e', 'k']), startsAt: new Date(2026, 10, 10, 14, 10).getTime() }]
+    const p = props('rest', { now: new Date(2026, 10, 10, 12, 0), weekend: { rows: [{ ...rows[0], past: true }, rows[1]], anytime: [], tomorrow: [], tomorrowLabel: 'Wednesday' } })
+    render(<KioskWallHome {...p} />)
+    const lead = screen.getByRole('button', { name: /Ukulele Club at 2:10/ })
+    expect(lead).toHaveTextContent('Next · in 2 hours 10 min')
+    fireEvent.click(lead)
+    expect(p.onTapRow).toHaveBeenCalledWith('uke')
+  })
+
+  it('beside the day: dinner, then what waits — what others wait on us for first; each opens', () => {
+    const onOpenDinner = vi.fn()
+    const p = props('rest', { now: new Date(2026, 10, 10, 10, 0), onOpenDinner })
     render(<KioskWallHome {...p} />)
     const side = screen.getByRole('complementary', { name: 'Also today' })
-    expect(within(side).getByText('Sheet-Pan Pesto Salmon')).toBeInTheDocument()
+    fireEvent.click(within(side).getByRole('button', { name: 'Dinner: Sheet-Pan Pesto Salmon' }))
+    expect(onOpenDinner).toHaveBeenCalled()
     const waits = within(side).getByRole('region', { name: 'Waiting for' })
-    expect(within(waits).getAllByRole('button').map((b) => b.querySelector('.kh-line-t')?.textContent)).toEqual(['FFG tuition', 'Winter trip dates'])
+    expect([...waits.querySelectorAll('.kh-li-t')].map((n) => n.textContent)).toEqual(['FFG tuition', 'Winter trip dates'])
     fireEvent.click(within(waits).getByRole('button', { name: /FFG tuition/ }))
     expect(p.onOpenWork).toHaveBeenCalledWith('fee')
   })
 
+  it('untimed things are chips that open the day', () => {
+    const onOpenDay = vi.fn()
+    render(<KioskWallHome {...props('rest', { now: new Date(2026, 10, 10, 10, 0), onOpenDay, weekend: { rows: [], anytime: [{ title: 'Kids’ laundry', owners: [] }], tomorrow: [], tomorrowLabel: 'Wednesday' } })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Kids’ laundry/ }))
+    expect(onOpenDay).toHaveBeenCalled()
+  })
+
   it('a day with nothing on the clock says so, and lets the room be empty', () => {
-    render(<KioskWallHome {...props('weekend', { weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' }, dinner: null, board: { waits: { theirs: [], ours: [] }, news: null } })} />)
-    expect(screen.getByRole('heading', { name: 'Nothing on the clock today.' })).toBeInTheDocument()
+    render(<KioskWallHome {...props('weekend', { kids: [], weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' }, dinner: null, board: { waits: { theirs: [], ours: [] }, news: null } })} />)
+    expect(screen.getByRole('region', { name: 'Today' })).toHaveTextContent('Nothing on the clock today.')
     expect(screen.queryByRole('complementary')).toBeNull()
   })
 
-  it('shows four appointments and counts the rest: nothing scrolls', () => {
-    const rows = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => row(id, `Thing ${id}`, `${i + 9}:00a`))
-    render(<KioskWallHome {...props('rest', { weekend: { rows, anytime: [], tomorrow: [], tomorrowLabel: 'Wednesday' } })} />)
-    const today = screen.getByRole('region', { name: 'Today' })
-    expect(today.querySelectorAll('.kh-ev')).toHaveLength(4)
-    expect(today).toHaveTextContent('+2 more')
+  it('shows what fits and counts the rest: nothing scrolls', () => {
+    // A list box 200px tall and rows 56px each: three fit.
+    const proto = HTMLElement.prototype
+    const saved = (['clientHeight', 'offsetTop', 'offsetHeight'] as const).map((k) => [k, Object.getOwnPropertyDescriptor(proto, k)] as const)
+    Object.defineProperty(proto, 'clientHeight', { configurable: true, get(this: HTMLElement) { return this.classList.contains('kh-day') ? 200 : 0 } })
+    Object.defineProperty(proto, 'offsetTop', { configurable: true, get(this: HTMLElement) { return this.parentElement ? [...this.parentElement.children].indexOf(this) * 56 : 0 } })
+    Object.defineProperty(proto, 'offsetHeight', { configurable: true, get() { return 56 } })
+    try {
+      const rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id, i) => row(id, `Thing ${id}`, `${i + 9}:00a`))
+      render(<KioskWallHome {...props('rest', { kids: [], onOpenDay: vi.fn(), weekend: { rows, anytime: [], tomorrow: [], tomorrowLabel: 'Wednesday' } })} />)
+      const today = screen.getByRole('region', { name: 'Today' })
+      expect([...today.querySelectorAll('.kh-day > li')].filter((li) => !(li as HTMLElement).hidden)).toHaveLength(3)
+      expect(within(today).getByRole('button', { name: '5 more today: open the day' })).toBeInTheDocument()
+    } finally {
+      for (const [k, d] of saved) { if (d) Object.defineProperty(proto, k, d); else delete (proto as unknown as Record<string, unknown>)[k] }
+    }
+  })
+
+  it('early in the morning, before the routine starts, the wall is today — not the day after', () => {
+    render(<KioskWallHome {...props('night', { now: new Date(2026, 10, 10, 6, 30) })} />)
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Tomorrow' })).toBeNull()
   })
 })
 
-describe('the calm wall: dinner and night', () => {
-  it('at dinner time, dinner leads with Step by step and Recipe; tomorrow sits beside it', () => {
+describe('the wall, today first: dinner and night', () => {
+  it('at dinner time, dinner leads with Step by step and Recipe; today stays, tomorrow is one small card', () => {
     const p = props('dinner', { now: new Date(2026, 10, 10, 17, 35) })
     render(<KioskWallHome {...p} />)
     expect(screen.getByRole('heading', { level: 1, name: 'Sheet-Pan Pesto Salmon' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Step by step' }))
     expect(p.onStartCooking).toHaveBeenCalled()
-    const tomorrow = screen.getByRole('region', { name: 'Tomorrow' })
-    expect(tomorrow).toHaveTextContent('Nothing on the clock')
-    expect(tomorrow).toHaveTextContent('Ella Music · Kaleb Library')
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Tomorrow' })).toHaveTextContent('Tomorrow · Wednesday')
   })
 
-  it('after dinner, tomorrow: a free day says so, with what goes in the bag', () => {
+  it('after dinner, before bedtime ends, it is still today', () => {
+    render(<KioskWallHome {...props('bedtime', { now: new Date(2026, 10, 10, 19, 40) })} />)
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
+  })
+
+  it('after bedtime, tomorrow leads: a free day says so, with what goes in the bag', () => {
     render(<KioskWallHome {...props('night', { now: new Date(2026, 10, 10, 21, 20) })} />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Wednesday is free.' })).toBeInTheDocument()
-    expect(screen.getByText(/Kaleb: Library book/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Wednesday' })).toHaveTextContent('Wednesday is free.Ella Music · Kaleb Library · In the bag: Kaleb: Library book')
+    expect(screen.getByRole('region', { name: 'Tomorrow' })).toHaveTextContent('Nothing on the clock on Wednesday.')
   })
 
-  it('the evening after dinner is already tomorrow’s screen', () => {
-    render(<KioskWallHome {...props('rest', { now: new Date(2026, 10, 10, 19, 10) })} />)
-    expect(screen.getByRole('region', { name: 'Tomorrow' })).toBeInTheDocument()
-  })
-
-  it('More takes the side column; the day stays, dimmed', () => {
-    render(<KioskWallHome {...props('rest', { aside: <section aria-label="More">tiles</section> })} />)
+  it('More takes the side; the day stays, dimmed', () => {
+    const { container } = render(<KioskWallHome {...props('rest', { aside: <section aria-label="More">tiles</section> })} />)
     expect(screen.getByRole('region', { name: 'More' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Today' })).toHaveClass('is-dim')
+    expect(container.querySelector('.kh-main')).toHaveClass('is-dim')
   })
 })

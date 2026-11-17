@@ -11,7 +11,7 @@ import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { dayLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { localYmd } from '@/lib/cadence/config'
 import type { V1Kid } from '@/components/wall-v2/activity/KioskHomeV1'
-import type { DayAnchors, KioskScreenPick } from './kioskScreen'
+import type { KioskScreenPick } from './kioskScreen'
 
 export interface BoardPerson { name: string; member?: FamilyMember }
 export interface BoardWait { id: string; title: string; from: BoardPerson; to: BoardPerson; when: string | null; late: boolean }
@@ -108,16 +108,18 @@ export interface WallBoardData {
   news: BoardNews | null
 }
 
-// ─── The calm wall (Scott, 2026-11-10) ───────────────────────────────────
-// Three screens, no kids' checklists: the day (morning through after
-// school), dinner at dinner time, and tomorrow once dinner is over.
+// ─── The calm wall (Scott, 2026-11-10; today first 2026-11-17) ───────────
+// Three screens, no kids' checklists: the day, dinner at dinner time, and
+// tomorrow — but tomorrow only once bedtime is over, and only until
+// midnight. Scott, 2026-11-17: "it focuses on tomorrow mostly, when we need
+// information for today." From midnight, and through the evening before
+// bedtime, the wall is today.
 export type WallHome = 'day' | 'dinner' | 'night'
 
-export function wallHome(pick: Pick<KioskScreenPick, 'screen'>, anchors: Pick<DayAnchors, 'dinner'>, now: Date): WallHome {
+export function wallHome(pick: Pick<KioskScreenPick, 'screen'>, now: Date): WallHome {
   if (pick.screen === 'dinner') return 'dinner'
-  if (pick.screen === 'bedtime' || pick.screen === 'night') return 'night'
-  const dinner = typeof anchors?.dinner === 'number' ? anchors.dinner : 18 * 60
-  return now.getHours() * 60 + now.getMinutes() >= dinner + 60 ? 'night' : 'day'
+  if (pick.screen === 'night' && now.getHours() >= 12) return 'night'
+  return 'day'
 }
 
 export interface DigestCard { source: string; title: string; when: string | null; details: string | null }

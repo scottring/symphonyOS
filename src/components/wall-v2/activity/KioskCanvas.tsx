@@ -56,6 +56,7 @@ import { localYmd } from '@/lib/cadence/config'
 import { WallConversation, WallTalkLead, WallTalkStage, type WallTalkWeek } from './WallTalk'
 import { KioskHome } from './KioskHome'
 import type { KioskHomeV1Props } from './KioskHomeV1'
+import { greeting } from '@/lib/home/bearings'
 import { KioskWallHome } from './KioskWallHome'
 import { useDragScroll } from './useDragScroll'
 import { KioskPaged } from './KioskPaged'
@@ -433,6 +434,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
           talk={talkInSide && !bandMoment ? convo : undefined}
           math={math}
           onOpenMath={(m) => openMath(m.id)}
+          onOpenDay={p.agenda && p.onSetDone ? () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) } : undefined}
+          onOpenSchool={p.schoolDigests ? () => { setMoreOpen(false); p.onRefreshDigests?.(); dispatch({ type: 'OPEN', stage: { kind: 'digest' } }) } : undefined}
+          onOpenDinner={() => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'dinner' } }) }}
         />
       ) : (
         <KioskHome
@@ -577,13 +581,23 @@ export function KioskCanvas(p: KioskCanvasProps) {
     const copy = dockCopy(moreOpen ? 'more' : screen)
     // Home only away from Home: an activity, an answer, More, the week.
     const away = stage.kind !== 'home' || moreOpen || takeover || talk.active || !!tell.answer
+    const wallNow = v1.at ?? p.now
     const ampm = /PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''
     return (
       <div ref={wallRef} className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
         {wash && <div className={`kv-wash is-woodblock ${moreOpen ? 'is-faint' : ''}`} aria-hidden="true"><img src={wash} alt="" /></div>}
-        <header className="kw-top">
-          <span className="kw-clock" {...pressClock}>{p.clock.replace(/\s?[AP]M$/i, '')}<small>{ampm}</small></span>
-          <span className="kw-date">{p.dateLabel}</span>
+        <header className={`kw-top ${stage.kind === 'home' ? 'is-home' : ''}`}>
+          {/* Home's masthead (2026-11-17): the day's numeral, a greeting, the
+              date and the weather; the clock keeps the right edge everywhere. */}
+          {stage.kind === 'home' ? (
+            <span className="kw-mast">
+              <span className="kw-num" aria-hidden="true">{wallNow.getDate()}</span>
+              <span className="kw-mast-words">
+                <b className="kw-greet">{greeting(wallNow)}</b>
+                <span className="kw-date">{p.dateLabel}{W ? ` · ${Math.round(W.temp)}° and ${W.condition.toLowerCase()}` : ''}</span>
+              </span>
+            </span>
+          ) : <span className="kw-date">{p.dateLabel}</span>}
           {p.freshness}
           {stage.kind === 'agenda'
             ? <span className="kw-grow ka-band"><AgendaViews view={stage.view} onView={(view) => dispatch({ type: 'OPEN', stage: { kind: 'agenda', view } })} /></span>
@@ -591,8 +605,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
             // which lays them out large in its lead, unless the kids' school
             // work takes that room.
             : <span className="kw-grow" />}
-          {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
+          {W && stage.kind !== 'home' && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
           <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
+          <span className="kw-clock" {...pressClock}>{p.clock.replace(/\s?[AP]M$/i, '')}<small>{ampm}</small></span>
         </header>
 
         <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
