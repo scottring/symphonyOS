@@ -100,15 +100,15 @@ struct WalkPosition: Codable, Equatable {
             guard let level = Int(key), level <= newStep else { return false }
             return existing.contains(id)
         }
-        // Landing on Season in a whole-year walk, `apply` rebuilds the tour; landing on Year ends it.
+        // Landing on Season, Month or Week, `apply` rebuilds the tour; landing on Year ends it.
         out.tour = stepChanged ? [] : tour.filter { newStep == 1 ? kept.contains($0) : existing.contains($0) }
         if let thing = out.firstThing, !existing.contains(thing) { out.firstThing = nil }
         out.walkingDown = walkingDown.filter(existing.contains)
         return out
     }
 
-    /// Puts the saved place into a state, whose items must already be loaded: on Season
-    /// in a whole-year walk the tour is rebuilt as entering Season would. Undo is left
+    /// Puts the saved place into a state, whose items must already be loaded: on Season,
+    /// Month and Week the tour is rebuilt as entering the step would. Undo is left
     /// empty by design.
     func apply(to state: inout WalkState) {
         state.depth = depth; state.step = min(max(step, 0), 6); state.ground = ground
@@ -125,7 +125,7 @@ struct WalkPosition: Codable, Equatable {
         state.taught = taught
         state.undo = []
         state.undoShowing = false
-        if state.depth == .full, state.step == 2, !state.ground { state.resumeSeasonTour() }
+        state.resumeTour()
     }
 
     private static func dayString(_ date: Date) -> String {

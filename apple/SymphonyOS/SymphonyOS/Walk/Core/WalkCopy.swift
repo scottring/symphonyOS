@@ -194,10 +194,15 @@ enum WalkCopy {
         if level == .today, let focused = s.focus[.today], focused != s.firstThing { return (startWithThis, .startThere) }
         // Year goes area by area through the areas kept, whether or not this one was given a goal.
         if level == .year, let stop = s.tour.first, let area = s.area(stop) { return (next(cut(area.name, 14)), .next) }
+        // Season, Month and Week go goal by goal through the goals above before they move down: the
+        // line names the area the next one stands in, or reads "Next goal" where it is this one.
+        if let stop = s.tour.first, let goal = s.item(stop) {
+            let there = s.column(of: goal)
+            if there != s.standing, let area = s.area(there) { return (next(cut(area.name, 14)), .next) }
+            return (nextGoal, .next)
+        }
         let added = level == .today ? s.firstThing != nil : !s.items(on: level).isEmpty
         guard added else { return (skipStep, .next) }
-        // A whole-year walk goes goal by goal on Season before it moves down.
-        if let stop = s.tour.first, s.item(stop) != nil { return (nextGoal, .next) }
         switch level {
         case .year: return (next("this \(p.seasonWord)"), .next)
         case .season: return (next(p.monthName), .next)

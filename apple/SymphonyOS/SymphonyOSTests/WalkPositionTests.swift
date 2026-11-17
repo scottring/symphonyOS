@@ -546,7 +546,7 @@ private struct Saved {
         #expect(fresh.step == 3)
         #expect(fresh.standing == work.id)
         #expect(fresh.focus[.month] == launch.id)
-        #expect(fresh.tour == [strong.id])
+        #expect(fresh.tour.isEmpty)                 // Month's stops are the season goals: the stale Season stop is dropped
     }
 
     /// Fix round 1: a walk down's own lines survive a save and resume, a deleted one is dropped,

@@ -393,7 +393,8 @@ struct WalkCopyTests {
         let wg = item(.week, "Gym induction")
         var t = state(step: 5); t.items = [wg]; t.focus[.today] = wg.id
         #expect(WalkCopy.nextLine(t, p) == WalkCopy.NextLine(text: "Start with this one", action: .startThere, skip: false))
-        // A whole-year walk names its next stop: the next area on Year, the next goal on Season.
+        // A walk names its next stop: the next area on Year; below it the area the next goal above
+        // stands in, or "Next goal" where that is this one, whether or not this stop was given anything.
         let home = WalkArea(id: UUID(), name: "Home"), people = WalkArea(id: UUID(), name: "People")
         var tour = state(step: 1, depth: .full); tour.areas = [home, people]; tour.kept = [home.id, people.id]
         tour.items = [WalkItem(id: UUID(), level: .year, title: "Fix the roof", areaId: home.id)]
@@ -403,6 +404,15 @@ struct WalkCopyTests {
         let goal = item(.year, "Fix the roof"), second = item(.year, "See friends")
         season.items = [goal, second, item(.season, "Get quotes")]; season.focus[.season] = goal.id; season.tour = [second.id]
         #expect(WalkCopy.nextLine(season, p)?.text == "Next goal")
+        var winter = state(step: 2); winter.areas = [home, people]; winter.kept = [home.id, people.id]
+        let roof = WalkItem(id: UUID(), level: .year, title: "Fix the roof", areaId: home.id)
+        let friends = WalkItem(id: UUID(), level: .year, title: "See friends", areaId: people.id)
+        winter.items = [roof, friends]; winter.focusArea = home.id; winter.focus[.season] = roof.id; winter.tour = [friends.id]
+        #expect(WalkCopy.nextLine(winter, p) == WalkCopy.NextLine(text: "Next: People", action: .next, skip: false))
+        winter.focusArea = people.id; winter.focus[.season] = friends.id; winter.tour = []
+        #expect(WalkCopy.nextLine(winter, p)?.text == "Skip this step")       // the last stop, nothing added anywhere
+        winter.items.append(WalkItem(id: UUID(), level: .season, title: "Get quotes", areaId: home.id, parentId: roof.id))
+        #expect(WalkCopy.nextLine(winter, p)?.text == "Next: December")
         // A long area name is cut, so Next stays one line.
         let long = WalkArea(id: UUID(), name: "Creative work and play")
         tour.areas.append(long); tour.kept.append(long.id); tour.tour = [long.id]

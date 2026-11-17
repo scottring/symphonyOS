@@ -21,7 +21,7 @@ struct WalkState: Equatable {
     var items: [WalkItem] = []             // in planting order
     var focusArea: UUID?                   // off the ground, the area the walk stands in (`standing`)
     var focus: [WalkLevel: UUID] = [:]     // a step's level → the focused item one level up
-    var tour: [UUID] = []                  // whole-year stops still ahead on this step
+    var tour: [UUID] = []                  // the stops still ahead on this step (`tourStops`)
     /// A walk down one chosen goal ("Walk another one down"): that goal first, then each flag
     /// this walk down planted with no goal above. Only lines that start at one of these give
     /// the goal above on the lower steps. Empty on a first walk.
@@ -304,7 +304,7 @@ struct WalkState: Equatable {
         settle()
         teachOnce()
         guard let level, level != .year else { return [] }
-        if level == .season, depth == .full { resumeSeasonTour() }
+        resumeTour()
         guard level == .today else { return [] }
         calendarOffer = env.canAskCalendar
         return []
@@ -318,28 +318,41 @@ struct WalkState: Equatable {
         tour = Array(kept.dropFirst())
     }
 
-    /// Season in a whole-year walk: the first time, the tour starts at the first
-    /// year goal; after that it picks up at the remembered focus. A focus that is
-    /// no longer a stop (its goal was pulled up) starts it again.
-    mutating func resumeSeasonTour() {
+    /// Season, Month and Week: the first time, the tour starts at the first stop; after that it
+    /// picks up at the remembered focus. A focus that is gone (its goal was pulled up or deleted)
+    /// starts it again; one that is a place of the person's own choosing and not a stop (a goal
+    /// from before this walk, the area's flags under no goal) stays, with the stops left as they
+    /// were. Nothing on a step with no tour (Today, a walk down) or no stop.
+    mutating func resumeTour() {
+        guard let level, toursGoalsAbove else { return }
         let stops = tourStops
-        if let current = focus[.season], let index = stops.firstIndex(of: current) {
-            tour = Array(stops[(index + 1)...])
-        } else {
-            focus[.season] = stops.first
-            tour = Array(stops.dropFirst())
+        guard !stops.isEmpty else { return }
+        if let current = focus[level] {
+            if let index = stops.firstIndex(of: current) {
+                tour = Array(stops[(index + 1)...])
+                return
+            }
+            if current == Self.noGoalAbove || item(current)?.level.rawValue == level.rawValue - 1 { return }
         }
+        focus[level] = stops.first
+        tour = Array(stops.dropFirst())
     }
 
-    /// A tour's full order: kept areas in kept order on Year (every walk); year goals in column
-    /// order on Season (a whole-year walk only). Derived, so only the stops still ahead are stored.
+    /// Season, Month and Week go goal by goal through the goals above before Next moves down (the
+    /// owner, 2026-11-17: with two areas, the other one's goal was never given its winter). Not
+    /// Today, which asks for one first thing; not a walk down, which follows one line.
+    var toursGoalsAbove: Bool { !ground && (2...4).contains(step) && walkingDown.isEmpty }
+
+    /// A tour's full order: kept areas in kept order on Year; on Season, Month and Week the goals
+    /// one level up in column order (`toursGoalsAbove`): every one in a whole-year walk, in a
+    /// quick start the ones this walk planted (a quick start over a plan already made takes what
+    /// is added now down to today; it does not go through the rest). Derived, so only the stops
+    /// still ahead are stored.
     private var tourStops: [UUID] {
         guard !ground else { return [] }
-        switch step {
-        case 1: return kept
-        case 2: return depth == .full ? yearGoalsInColumnOrder().map(\.id) : []
-        default: return []
-        }
+        if step == 1 { return kept }
+        guard toursGoalsAbove else { return [] }
+        return goalsAboveInColumnOrder().filter { depth == .full || $0.mine }.map(\.id)
     }
 
     /// A tap that moves the focus during a tour moves the tour with it: the stops
@@ -351,12 +364,13 @@ struct WalkState: Equatable {
         tour = Array(stops[(index + 1)...])
     }
 
-    /// Columns follow `areas`; the unlabeled post is last; planting order inside a column.
-    private func yearGoalsInColumnOrder() -> [WalkItem] {
+    /// The goals one level above the step's. Columns follow `areas`; the unlabeled post is last;
+    /// planting order inside a column.
+    private func goalsAboveInColumnOrder() -> [WalkItem] {
         let column = { (item: WalkItem) -> Int in
-            item.areaId.flatMap { id in areas.firstIndex { $0.id == id } } ?? Int.max
+            self.column(of: item).flatMap { id in areas.firstIndex { $0.id == id } } ?? Int.max
         }
-        return items(on: .year).enumerated()
+        return parentsAnywhere().enumerated()
             .sorted { (column($0.element), $0.offset) < (column($1.element), $1.offset) }
             .map(\.element)
     }

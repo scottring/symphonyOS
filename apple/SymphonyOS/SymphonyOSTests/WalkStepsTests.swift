@@ -120,16 +120,24 @@ struct WalkStepsTests {
 
     // MARK: Quick start
 
-    @Test func quickWalksOneGoalDown() {
-        // Given a quick walk on Year with "Feel strong again" planted last…
+    @Test func quickWalksEveryGoalDown() {
+        // Given a quick walk on Year standing in People, its goal planted last…
         var s = m.at(1)
-        s.focusArea = m.health.id
-        s.lastPlanted[.year] = m.strong.id
-        // …walking on focuses it on Season, so the next flag links to it.
+        s.focusArea = m.people.id
+        s.lastPlanted[.year] = m.weekends.id
+        // …walking on starts Season at the first column's goal, the others waiting their turn (the
+        // owner, 2026-11-17: Next went down to the month and the other area never had its winter).
         let effects = s.act(.next, m.env)
         #expect(s.step == 2)
-        #expect(s.focus[.season] == m.strong.id)
+        #expect(s.focus[.season] == m.strong.id && s.focusArea == m.health.id)
+        #expect(s.tour == [m.bathroom.id, m.weekends.id])
         #expect(effects == [.save])
+        _ = s.act(.next, m.env)
+        #expect(s.step == 2 && s.focus[.season] == m.bathroom.id && s.focusArea == m.home.id)
+        _ = s.act(.next, m.env)
+        #expect(s.step == 2 && s.focus[.season] == m.weekends.id && s.tour.isEmpty)
+        _ = s.act(.next, m.env)
+        #expect(s.step == 3)
 
         // With nothing planted on Year there is nothing to focus.
         var empty = m.at(1)
@@ -202,24 +210,41 @@ struct WalkStepsTests {
         #expect(s.step == 3)
     }
 
-    @Test func wholeYearFocusesTheLastPlantedFromMonthDown() {
-        var s = m.at(2, depth: .full)
-        s.lastPlanted[.season] = m.lift.id
-        _ = s.act(.next, m.env)
-        #expect(s.step == 3)
-        #expect(s.focus[.month] == m.lift.id)
+    @Test func everyWalkGoesGoalByGoalOnMonthAndWeek() {
+        for depth in [WalkDepth.quick, .full] {
+            var s = m.at(2, depth: depth)
+            s.lastPlanted[.season] = m.bathroomByFebruary.id       // the newest does not decide: the first column does
+            _ = s.act(.next, m.env)
+            #expect(s.step == 3 && s.focus[.month] == m.lift.id && s.focusArea == m.health.id)
+            #expect(s.tour == [m.bathroomByFebruary.id])
+            _ = s.act(.next, m.env)
+            #expect(s.step == 3 && s.focus[.month] == m.bathroomByFebruary.id && s.focusArea == m.home.id)
+            #expect(s.tour.isEmpty)
 
-        s.items.append(m.tile)
-        s.lastPlanted[.month] = m.tile.id
+            let gym = WalkItem(id: UUID(), level: .month, title: "Join the gym", areaId: m.health.id, parentId: m.lift.id)
+            s.items += [m.tile, gym]                               // planted Home first: Health is still the first column
+            _ = s.act(.next, m.env)
+            #expect(s.step == 4 && s.focus[.week] == gym.id && s.tour == [m.tile.id])
+            _ = s.act(.next, m.env)
+            #expect(s.step == 4 && s.focus[.week] == m.tile.id && s.tour.isEmpty)
+
+            // Today asks for one first thing: no tour, the last planted task as before.
+            s.items += [m.deposit, m.chooseTile]
+            s.lastPlanted[.week] = m.chooseTile.id
+            _ = s.act(.next, m.env)
+            #expect(s.step == 5 && s.focus[.today] == m.chooseTile.id && s.tour.isEmpty)
+        }
+    }
+
+    /// A walk down follows one goal's own line: Next goes down, never to another goal.
+    @Test func aWalkDownHasNoTour() {
+        var s = m.at(2)
+        s.walkingDown = [m.bathroom.id]
+        s.focus[.season] = m.bathroom.id
+        _ = s.act(.next, m.env)
+        #expect(s.step == 3 && s.focus[.month] == m.bathroomByFebruary.id && s.tour.isEmpty)
         _ = s.act(.next, m.env)
         #expect(s.step == 4)
-        #expect(s.focus[.week] == m.tile.id)
-
-        s.items.append(m.chooseTile)
-        s.lastPlanted[.week] = m.chooseTile.id
-        _ = s.act(.next, m.env)
-        #expect(s.step == 5)
-        #expect(s.focus[.today] == m.chooseTile.id)
     }
 
     @Test func aRememberedFocusIsNotReplacedByTheLastPlanted() {
@@ -235,6 +260,7 @@ struct WalkStepsTests {
 
     @Test func backRemembersFocus() {
         var s = m.at(3)
+        s.focus[.season] = m.weekends.id        // Season's round was finished on the way down
         s.focusArea = m.home.id
         _ = s.apply(.areaTapped(m.health.id), m.env)
         #expect(s.focus[.month] == m.lift.id)
@@ -632,18 +658,35 @@ struct WalkStepsTests {
         #expect(s == before)
     }
 
-    @Test func goingDownKeepsYouInTheArea() throws {
+    /// Each step below Year starts at the first column and goes through every goal above, wherever
+    /// the walk stood when it came down (the owner, 2026-11-17); Today stays in the area stood in.
+    @Test func goingDownStartsAtTheFirstColumnAndVisitsEveryGoal() throws {
         var s = offTheGround(.quick, keeping: [m.health, m.work])
         _ = s.apply(.areaTapped(m.work.id), m.env)
         _ = s.plant("ship the app", m.env)
         let ship = try #require(s.items.last)
         _ = s.apply(.areaTapped(m.health.id), m.env)
         _ = s.plant("sleep by ten", m.env)                     // planted last, in Health
+        let sleep = try #require(s.items.last)
         _ = s.apply(.areaTapped(m.work.id), m.env)
         _ = s.act(.next, m.env)
         #expect(s.step == 2)
-        #expect(s.focus[.season] == ship.id)
-        #expect(s.standing == m.work.id)
+        #expect(s.focus[.season] == sleep.id && s.standing == m.health.id)
+        #expect(s.tour == [ship.id])
+        #expect(WalkCopy.nextLine(s, m.env.periods)?.text == "Next: Work")
+        _ = s.act(.next, m.env)
+        #expect(s.step == 2 && s.focus[.season] == ship.id && s.standing == m.work.id && s.tour.isEmpty)
+
+        // A goal from before this walk is not a stop of a quick start; a whole-year walk stops at it.
+        for (depth, stops) in [(WalkDepth.quick, [sleep.id]), (.full, [sleep.id, ship.id])] {
+            var replay = s
+            replay.depth = depth
+            replay.items = replay.items.map { var item = $0; if item.id == ship.id { item.mine = false }; return item }
+            _ = replay.act(.back, m.env)
+            replay.focus[.season] = nil
+            _ = replay.act(.next, m.env)
+            #expect(replay.step == 2 && [replay.focus[.season]].compactMap { $0 } + replay.tour == stops, "\(depth)")
+        }
     }
 
     @Test func walkingToAnAreaOnALowerStepFocusesItsGoal() {

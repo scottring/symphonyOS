@@ -442,14 +442,60 @@ final class WalkFlowTests {
             #expect(row.bucket == "quarter")
         }
 
+        // Month goes goal by goal too, from the first column again.
         m.choose(.next)
         #expect(m.state.step == 3)
-        let lastSeason = try #require(m.state.items(on: .season).first { $0.title == "A weekend away each month" })
-        #expect(m.state.focus[.month] == lastSeason.id)
-        await say(m, "book the plumber")
-        let plumber = try #require(task(ctx, "Book the plumber"))
-        #expect(plumber.sourceId == lastSeason.id)
-        #expect(plumber.goalId == goals.last?.id)
+        let firstSeason = try #require(m.state.items(on: .season).first { $0.title == "Lift twice a week" })
+        #expect(m.state.focus[.month] == firstSeason.id)
+        #expect(WalkCopy.nextLine(m.state, m.periods)?.text == "Next: Home")
+        await say(m, "book the gym induction")
+        let induction = try #require(task(ctx, "Book the gym induction"))
+        #expect(induction.sourceId == firstSeason.id)
+        #expect(induction.goalId == goals.first?.id)
+        m.choose(.next)
+        #expect(m.state.step == 3 && m.state.focusArea == area(m, "Home"))
+        #expect(try childrenAheadOfParents(ctx) == [])
+    }
+
+    /// The owner, 2026-11-17: a quick start with a year goal in Health and one in Work. On Season Next read
+    /// "Next: December" and Health never had its winter. Every step now gives each goal above its turn
+    /// before Next moves down, and Next says where it goes.
+    @Test func aQuickStartTakesEveryGoalDownStepByStep() async throws {
+        let ctx = try walkTestContext()
+        let m = model(ctx)
+        quickStart(m, keeping: ["Health", "Work"])
+        func next() -> String? { WalkCopy.nextLine(m.state, m.periods)?.text }
+        await say(m, "feel strong again")
+        #expect(next() == "Next: Work")
+        m.choose(.next)
+        await say(m, "ship the app")
+        #expect(next() == "Next: this winter")
+
+        m.choose(.next)                                        // Season: Health first, Work waiting
+        #expect(m.state.step == 2 && m.state.standing == area(m, "Health"))
+        #expect(WalkCopy.question(m.state, m.periods) == "What part of “Feel strong again” belongs to this winter?")
+        #expect(next() == "Next: Work")                        // though nothing is added yet
+        await say(m, "lift twice a week")
+        #expect(next() == "Next: Work")
+        m.choose(.next)
+        #expect(m.state.step == 2 && m.state.standing == area(m, "Work"))
+        #expect(WalkCopy.question(m.state, m.periods) == "What part of “Ship the app” belongs to this winter?")
+        await say(m, "launch the beta")
+        #expect(next() == "Next: December")
+
+        m.choose(.next)                                        // Month: the same round
+        #expect(m.state.step == 3 && m.state.standing == area(m, "Health"))
+        #expect(WalkCopy.question(m.state, m.periods) == "What part of “Lift twice a week” belongs to December?")
+        #expect(next() == "Next: Work")
+        m.choose(.next)                                        // Health's month skipped: Work still has its turn
+        #expect(m.state.step == 3 && m.state.standing == area(m, "Work"))
+        await say(m, "invite ten testers")
+        #expect(next() == "Next: this week")
+
+        m.choose(.next)                                        // Week: only what was given a month goal is a stop
+        #expect(m.state.step == 4 && m.state.standing == area(m, "Work") && m.state.tour.isEmpty)
+        let testers = try #require(task(ctx, "Invite ten testers"))
+        #expect(m.state.focus[.week] == testers.id)
         #expect(try childrenAheadOfParents(ctx) == [])
     }
 
@@ -535,9 +581,7 @@ final class WalkFlowTests {
 
         m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
-        #expect(m.state.focus[.season] == bathroom.id)         // the one planted last, in Health
-        m.send(.bannerTapped(bathroom.id))                     // switched: the chain goes under the first goal
-        #expect(m.state.focus[.season] == strong.id)
+        #expect(m.state.focus[.season] == strong.id)           // Season starts at the first goal; the other waits its turn
         let focusBefore = m.state.focus
         let savedBefore = store.load(for: me)
         m.send(.walkAnother)                                   // not at the ending: nothing
@@ -545,7 +589,10 @@ final class WalkFlowTests {
         #expect(m.state.focus == focusBefore)
         #expect(store.load(for: me) == savedBefore)
         await say(m, "lift twice a week")
+        m.choose(.next)                                        // the second goal's turn: given nothing
+        #expect(m.state.step == 2 && m.state.focus[.season] == bathroom.id)
         m.choose(.next)
+        #expect(m.state.step == 3)
         await say(m, "book the gym induction")
         m.choose(.next)
         await say(m, "gym induction, today")
@@ -594,9 +641,10 @@ final class WalkFlowTests {
         let (strong, bathroom) = (m.state.items(on: .year)[0], m.state.items(on: .year)[1])
         m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
-        m.send(.bannerTapped(bathroom.id))                     // switch to the first goal
-        #expect(m.state.focus[.season] == strong.id)
+        #expect(m.state.focus[.season] == strong.id)           // Season starts at the first goal
         await say(m, "lift twice a week")
+        m.choose(.next)                                        // the second goal's turn: given nothing
+        #expect(m.state.focus[.season] == bathroom.id)
         m.choose(.next)
         await say(m, "book the gym induction")
         for _ in 0..<3 { m.choose(.next) }
