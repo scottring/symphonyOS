@@ -2,13 +2,15 @@ import { pdfSourcePages, requestBudget, searchFeeTokens, serviceBudgetControl, s
 /** Provider-call admission with a conservative monetary hold. No local fallback: a
  * missing migration/configuration or failed reservation means no paid call. */
 /** Every interactive paid route (the caller is a signed-in person). Must match
- *  the allowlist in reserve_ai_provider_call (migration 20261015110000). */
+ *  the allowlist in ai_guarded_routes (migration 20261117090000). */
 export const GUARDED_AI_ROUTES = [
   'symphony-agent', 'workspace-voice', 'wall-ask', 'wall-say',
   'analyze-attachment', 'analyze-capture', 'analyze-link', 'extract-capture', 'parse-page', 'plan-from-paper', 'routine-from-doc',
   'goal-planning-chat', 'planning-conversation', 'tend-week', 'sharpen-goal', 'suggest-waiting-for', 'rhythms-parse',
   'kiosk-agent', 'math-story', 'meal-planner-chat', 'meal-slot-suggest', 'semantic-search', 'note-match',
   'question-ideas',
+  // The walk's suggestions: the one route a light household may use (ai_light_routes).
+  'walk-suggest',
 ] as const
 export type GuardedAiRoute = typeof GUARDED_AI_ROUTES[number]
 type UsageDb = Parameters<typeof serviceBudgetControl>[0] & { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }
