@@ -29,7 +29,9 @@ private struct Hill {
         strong = WalkItem(id: UUID(), level: .year, title: "Feel strong again", areaId: health.id)
         bathroom = WalkItem(id: UUID(), level: .year, title: "Finish the bathroom", areaId: home.id)
         lift = WalkItem(id: UUID(), level: .season, title: "Lift twice a week", areaId: health.id, parentId: strong.id)
-        tile = WalkItem(id: UUID(), level: .month, title: "Pick the tile", areaId: home.id)
+        // Home's own general example for the month: under it the general Week examples come first
+        // (`WalkExampleLibrary.pool`), which the tests below tap by name.
+        tile = WalkItem(id: UUID(), level: .month, title: "Pick the tile and pay the deposit", areaId: home.id)
         deposit = WalkItem(id: UUID(), level: .week, title: "Send the deposit", areaId: home.id,
                            parentId: tile.id, day: day(2026, 11, 13))
     }
@@ -440,17 +442,13 @@ struct WalkPlantTests {
         func examplesPoint() -> String? { WalkCopy.points(s, m.env.periods).first { $0.at == .e }?.label }
         #expect(examplesPoint() == "Show examples")
         _ = s.act(.examples, m.env)
-        #expect(examplesPoint() == "Hide examples")
+        #expect(examplesPoint() == "Other examples")                                // the library has more to bring
         _ = s.apply(.exampleTapped(home[0]), m.env)
-        #expect(examplesPoint() == "Hide examples" && s.examplesOn.contains(2))     // one left, on
-        _ = s.act(.examples, m.env)
-        #expect(examplesPoint() == "Show examples" && !s.examplesOn.contains(2))    // one left, off
-        _ = s.act(.examples, m.env)
+        #expect(examplesPoint() == "Other examples" && s.examplesOn.contains(2))    // one left showing, on
         _ = s.apply(.exampleTapped(home[1]), m.env)
-        #expect(examplesPoint() == nil)                                             // both used
-        #expect(!s.examplesOn.contains(2))
-        _ = s.act(.examples, m.env)
-        #expect(!s.examplesOn.contains(2))                                          // the action does nothing either
+        #expect(examplesPoint() == "Show examples" && !s.examplesOn.contains(2))    // both used: they come down
+        let next = s.examplesLeft(today: m.today)                                   // asking again brings the next ones
+        #expect(next.count == 2 && Set(next).isDisjoint(with: home))
         _ = s.apply(.undo, m.env)
         #expect(examplesPoint() == "Show examples" && s.examplesLeft(today: m.today) == [home[1]])
     }

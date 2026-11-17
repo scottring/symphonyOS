@@ -11,6 +11,7 @@ struct WalkHintRow: View {
     let model: WalkModel
     @Environment(\.walkStage) private var stage
     @Environment(\.walkKeyboardLift) private var lift
+    @Environment(\.walkLessonBeat) private var lessonBeat
     @FocusState private var fieldFocused: Bool
     /// The field was closed by Return, Add or its X: the reducer already closed it, so the blur that
     /// follows is not a dismiss.
@@ -29,11 +30,23 @@ struct WalkHintRow: View {
         let s = model.state
         let stage = WalkArt.stageSize
         ZStack(alignment: .topLeading) {
-            // The lesson: two lines above the light, on the veil (any tap puts it away; they take none).
+            // The lesson, above the light on the veil (any tap puts it away; its words take none). While
+            // it moves, the line of the beat being shown, at the top of its room: the flag of sample
+            // words unfurls under it (`WalkOrbView`). Still (Reduce Motion, speech off): both lines.
             if let frame = WalkLayout.teachFrame(s) {
-                teachingLines(WalkCopy.teaching(s))
-                    .frame(width: frame.width, height: frame.height, alignment: .bottom)
-                    .position(x: frame.midX, y: frame.midY)
+                let lines = WalkCopy.teaching(s)
+                if let line = lessonBeat.line, line < lines.count {
+                    lessonLine(lines[line])
+                        .id(line)
+                        .transition(.opacity)
+                        .accessibilityLabel(lines.joined(separator: " "))
+                        .frame(width: frame.width, height: frame.height, alignment: .top)
+                        .position(x: frame.midX, y: frame.midY)
+                } else {
+                    teachingLines(lines)
+                        .frame(width: frame.width, height: frame.height, alignment: .bottom)
+                        .position(x: frame.midX, y: frame.midY)
+                }
             }
             if s.typing != nil {
                 typingRow(s)
@@ -182,13 +195,26 @@ struct WalkHintRow: View {
         .position(x: frame.midX, y: frame.midY)
     }
 
+    /// The lesson's line for the beat being shown: one 22-point serif line, 14 under the top of its room.
+    private func lessonLine(_ line: String) -> some View {
+        Text(line)
+            .font(.custom("CrimsonPro-Regular", size: 22))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .walkGlow()
+            .padding(.top, 14)
+            .allowsHitTesting(false)
+    }
+
     /// The 20-point serif line, then the 15-point line (none with speech off), as the walk's other words.
     private func teachingLines(_ lines: [String]) -> some View {
         VStack(spacing: 8) {
             if let first = lines.first {
                 Text(first)
                     .font(.custom("CrimsonPro-Regular", size: 20))
-                    .frame(maxWidth: 250)               // two even lines: "Press and hold the light," / "and say it out loud."
+                    .frame(maxWidth: 250)
             }
             if lines.count > 1 {
                 Text(lines[1])

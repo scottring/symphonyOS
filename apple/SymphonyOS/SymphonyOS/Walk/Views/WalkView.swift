@@ -102,6 +102,8 @@ struct WalkView: View {
                 .frame(width: model.art.stage.width, height: model.art.stage.height, alignment: .topLeading)
                 .scaleEffect(stage.scale, anchor: .topLeading)
                 .offset(x: stage.origin.x, y: stage.origin.y)
+                // The light's lesson runs its round for the hint row (its line) and the light (the showing).
+                .modifier(WalkLessonDriver(teaching: model.state.teaching && !model.state.speechIsOff))
                 .environment(\.walkStage, stage)
                 .environment(\.walkKeyboardLift, lift(stage, root: geo.frame(in: .global)))
                 // Under the raised paper nothing takes a touch and VoiceOver skips it all (the paper is modal).

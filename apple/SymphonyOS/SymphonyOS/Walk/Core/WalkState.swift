@@ -28,6 +28,8 @@ struct WalkState: Equatable {
     var walkingDown: [UUID] = []
     var firstThing: UUID?; var lastPlanted: [WalkLevel: UUID] = [:]
     var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
+    /// The page of examples the walk is on where it stands (`toggleExamples`). In memory only.
+    var examplePage: ExamplePage?
     var orb: Orb = .idle; var typing: String?
     // Speech, for this walk only (never saved): holds in a row that heard nothing; a
     // refusal, after which a hold opens typing; a session that ended while still held.
@@ -197,8 +199,7 @@ struct WalkState: Equatable {
         // mid-walk (the demo's preview) may not have settled yet, so it settles first, as after any touch.
         case .examples:
             settleStanding()
-            guard !examplesLeft(today: env.periods.today).isEmpty else { return [] }
-            if examplesOn.contains(step) { examplesOn.remove(step) } else { examplesOn.insert(step) }
+            toggleExamples(today: env.periods.today)
             return []
         case .undo: return undoLast(env)
         case .startThere: return startThere(env)

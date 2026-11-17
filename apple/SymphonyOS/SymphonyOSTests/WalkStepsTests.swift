@@ -447,6 +447,12 @@ struct WalkStepsTests {
         #expect(s.examplesOn.isEmpty)                   // a new step is a fresh ask (P24)
         _ = s.act(.examples, m.env)
         #expect(s.examplesOn == [4])
+        // Asking again brings other ones, for up to three pages a showing; then it hides them.
+        let first = s.examplesLeft(today: m.env.periods.today)
+        _ = s.act(.examples, m.env)
+        #expect(s.examplesOn == [4] && s.examplesLeft(today: m.env.periods.today) != first)
+        _ = s.act(.examples, m.env)
+        #expect(s.examplesOn == [4])
         _ = s.act(.examples, m.env)
         #expect(s.examplesOn.isEmpty)
 

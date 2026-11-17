@@ -18,6 +18,8 @@ struct WalkOrbView: View {
     /// True while a press is down; it falls back on its own when the system cancels the gesture.
     @GestureState private var pressing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Where the light's lesson is in its round (`WalkLessonBeat`); `still` when none is moving.
+    @Environment(\.walkLessonBeat) private var lesson
 
     static let dial = CGRect(x: WalkOrb.centre.x - 150, y: WalkOrb.centre.y - 150, width: 300, height: 300)
 
@@ -44,10 +46,29 @@ struct WalkOrbView: View {
                     .allowsHitTesting(false)
             }
 
-            light(active: isActive(s.orb), speaking: isSpeaking(s.orb), symbol: s.lightSymbol)
+            // The lesson's flag of sample words, in the foot of the lesson's room, while its light is held.
+            if lesson.flagOut, let room = layout.lesson {
+                let words = WalkCopy.teachSample(s)
+                let width = min(220, max(100, CGFloat(words.count) * 7 + 34))
+                WalkLiveFlag(text: words, colour: WalkPalette.level(s.level ?? .year))
+                    .frame(width: width, height: 36)
+                    .offset(x: room.midX - width / 2, y: room.maxY - 44)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
+            }
+
+            // In the lesson the light looks as it does under a real finger: pressed, and listening while held.
+            light(active: isActive(s.orb) || lesson.fingerDown, speaking: isSpeaking(s.orb) || lesson.listens,
+                  symbol: s.lightSymbol)
                 .position(WalkOrb.centre)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
+
+            if lesson != .still {
+                WalkLessonFinger(down: lesson.fingerDown)
+                    .position(WalkOrb.centre)
+            }
 
             Circle()
                 .fill(.clear)
@@ -61,6 +82,23 @@ struct WalkOrbView: View {
             // so its label and hint can change during a press without disturbing the press.
             orbForVoiceOver(s, points)
                 .position(WalkOrb.centre)
+
+            // The lesson's tap: the light's own choices, shown but not offered (a touch puts the lesson away).
+            if lesson.choicesOut, !showsPoints {
+                ForEach(points, id: \.at) { point in
+                    WalkPointView(point: point, label: WalkCopy.pointLabel(point, s), hot: false) {}
+                        .position(WalkOrb.position(of: point.at))
+                        .transition(.scale(scale: 0.4).combined(with: .opacity))
+                    ForEach(Array(WalkLayout.pointWords(point, among: points.map(\.at)).enumerated()), id: \.offset) { _, line in
+                        WalkPointLine(line: line)
+                            .frame(width: line.frame.width, height: line.frame.height)
+                            .position(x: line.frame.midX, y: line.frame.midY)
+                            .transition(.opacity)
+                    }
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
 
             if showsPoints {
                 ForEach(points, id: \.at) { point in

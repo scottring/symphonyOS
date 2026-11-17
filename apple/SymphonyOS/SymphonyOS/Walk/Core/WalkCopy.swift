@@ -139,12 +139,22 @@ enum WalkCopy {
     /// The eyebrow's count (`eyebrowCount`) as it follows the eyebrow: " · 1 of 3" (drawn in capitals, in gold).
     static func afterEyebrow(_ count: String) -> String { " · \(count)" }
 
-    /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`).
-    static let teachHold = "Press and hold the light, and say it out loud."
-    static let teachLetGo = "Let go when you’re done. To type, tap More."
+    /// The light taught once per walk, on the first step where holding it answers (`WalkState.teaching`):
+    /// what a hold does, then what a tap does. The lesson shows each in turn on the light itself
+    /// (`WalkLessonBeat`); with Reduce Motion both lines stand, as VoiceOver reads them.
+    static let teachHold = "Hold the light and say it."
+    static let teachTap = "Tap it for other choices."
     static let teachSpeechOff = "Tap More and choose Type it."
-    /// The lines that teach the light: the 20-point line, then the 15-point line if there is one.
-    static func teaching(_ s: WalkState) -> [String] { s.speechIsOff ? [teachSpeechOff] : [teachHold, teachLetGo] }
+    /// The lines that teach the light: the hold, then the tap; one line once speech is off.
+    static func teaching(_ s: WalkState) -> [String] { s.speechIsOff ? [teachSpeechOff] : [teachHold, teachTap] }
+    /// What the lesson's held light hears: the shortest of the step's general examples for the area
+    /// stood in that fits its flag; else, and on Week (whose examples end in a day), a plain one.
+    static func teachSample(_ s: WalkState) -> String {
+        guard let level = s.level, level != .week else { return teachSampleWords }
+        let fitting = examples(level, area: WalkExampleLibrary.area(s.area(s.standing)?.name)).filter { $0.count <= 24 }
+        return fitting.min { $0.count < $1.count } ?? teachSampleWords
+    }
+    static let teachSampleWords = "Run a 5K"
 
     /// Next at the foot, the line that moves the walk on: its words and action,
     /// shown whenever the light is at rest and nothing is being typed. `skip` when nothing has
@@ -252,8 +262,9 @@ enum WalkCopy {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
             } else if !s.examplesLeft(today: p.today).isEmpty {
-                out.append(Point(at: .e, label: s.examplesOn.contains(s.step) ? "Hide examples" : "Show examples",
-                                 action: .examples, symbol: "lightbulb"))
+                let label = !s.examplesOn.contains(s.step) ? showExamples
+                    : s.showsOtherExamples(today: p.today) ? otherExamples : hideExamples
+                out.append(Point(at: .e, label: label, action: .examples, symbol: "lightbulb"))
             }
         }
         if !s.undo.isEmpty {
@@ -261,6 +272,9 @@ enum WalkCopy {
         }
         return out
     }
+
+    /// The examples choice: off; on with other ones to bring (`WalkState.showsOtherExamples`); on with none.
+    static let showExamples = "Show examples", otherExamples = "Other examples", hideExamples = "Hide examples"
 
     private static func order(_ p: CompassPoint) -> Int { CompassPoint.allCases.firstIndex(of: p) ?? 0 }
 

@@ -349,7 +349,7 @@ struct WalkCopyTests {
         var s = inHealth(3)
         #expect(labels(s) == ["Type it", "Show examples"])
         s.items = [item(.month, "x")]; s.examplesOn = [3]
-        #expect(labels(s) == ["Type it", "Hide examples"])
+        #expect(labels(s) == ["Type it", "Other examples"])      // the library has more to bring
         s.undo = [.plant(UUID())]
         #expect(WalkCopy.points(s, nov13).map(\.at) == [.w, .e, .n])
         #expect(WalkCopy.points(s, nov13).last == WalkCopy.Point(at: .n, label: "Undo", action: .undo, symbol: "arrow.uturn.backward"))
@@ -498,7 +498,7 @@ struct WalkCopyTests {
                  WalkCopy.orbLabelWelcome, WalkCopy.orbLabel, WalkCopy.orbLabelTask, WalkCopy.orbLabelSpeechOff, WalkCopy.orbLabelGround, WalkCopy.rowDone, WalkCopy.rowOpen,
                  WalkCopy.typeFieldLabel, WalkCopy.hintChoose, WalkCopy.hintOpen, WalkCopy.hintFirst, WalkCopy.hintAnother, WalkCopy.hintOne,
                  WalkCopy.hintGround, WalkCopy.hintGroundNone, WalkCopy.hintStartHere, WalkCopy.hintFirstThing,
-                 WalkCopy.hintSpeaking, WalkCopy.hintSpeechOff, WalkCopy.teachHold, WalkCopy.teachLetGo,
+                 WalkCopy.hintSpeaking, WalkCopy.hintSpeechOff, WalkCopy.teachHold, WalkCopy.teachTap,
                  WalkCopy.teachSpeechOff, WalkCopy.skipStep, WalkCopy.finish, WalkCopy.startWithThis, WalkCopy.nextGoal,
                  WalkCopy.quickStart, WalkCopy.quickDetail, WalkCopy.wholeYear, WalkCopy.wholeDetail, WalkCopy.notNow,
                  WalkCopy.notNowDetail, WalkCopy.leaveForNow, WalkCopy.leaveDetail, WalkCopy.more, WalkCopy.moreLabel,
@@ -567,8 +567,7 @@ struct WalkCopyTests {
     /// The lesson's lines, and the speech-off one.
     @Test func theLightIsTaughtInItsOwnWords() {
         var s = state(step: 1)
-        #expect(WalkCopy.teaching(s) == ["Press and hold the light, and say it out loud.",
-                                         "Let go when you’re done. To type, tap More."])
+        #expect(WalkCopy.teaching(s) == ["Hold the light and say it.", "Tap it for other choices."])
         s.speechIsOff = true
         #expect(WalkCopy.teaching(s) == ["Tap More and choose Type it."])
     }

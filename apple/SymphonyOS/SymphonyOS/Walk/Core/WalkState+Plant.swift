@@ -20,22 +20,112 @@ extension WalkState {
         return plantFlag(said, on: level, plantSoundMs: 0, env)
     }
 
-    // MARK: Examples (F27)
+    // MARK: Examples (F27, and the library)
 
-    /// The one question about examples (F27, P23): the area stood in's examples for this step's
-    /// level (steps 1 to 4 off the ground) not yet used, that is, not already planted on this level
-    /// (the same title ignoring case; on Week the same day too). None on the nameless post or in an
-    /// area of the person's own. The examples point is offered, the action acts and the layout draws
-    /// examples only from this; while they are on it is exactly what shows.
-    func examplesLeft(today: Date) -> [String] {
+    /// Where a page of examples belongs: the step, the area stood in and the goal above shown.
+    struct ExamplePlace: Equatable { var step: Int; var standing: UUID?; var above: UUID? }
+    /// The page of examples the walk is on at a place, and how many pages this showing has gone through.
+    struct ExamplePage: Equatable { var place: ExamplePlace; var index = 0; var seen = 0 }
+    /// The most pages one showing goes through before the choice reads "Hide examples".
+    static let examplePagesAShowing = 3
+
+    private var examplePlace: ExamplePlace {
+        ExamplePlace(step: step, standing: standing, above: level.flatMap { focus[$0] })
+    }
+
+    /// The goal above shown and the goals above it, nearest first: what the library reads to find a
+    /// theme. Only a goal in the area stood in counts (an example is never planted under another area's).
+    private func titlesAbove() -> [String] {
+        guard let level, level != .year, var at = item(focus[level]), column(of: at) == standing else { return [] }
+        var out = [at.title]
+        while let up = item(at.parentId), out.count < 4 { out.append(up.title); at = up }
+        return out
+    }
+
+    /// Every example for this step in the area stood in, best first (`WalkExampleLibrary.pool`), in
+    /// pages of as many as show at once. None on Today, on the ground, on the nameless post or in an
+    /// area of the person's own.
+    private func examplePages() -> [[String]] {
         guard let level, !ground, (1...4).contains(step) else { return [] }
-        return WalkCopy.examples(level, area: area(standing)?.name).filter { text in
+        let pool = WalkExampleLibrary.pool(level, area: area(standing)?.name, above: titlesAbove())
+        let size = WalkExampleLibrary.pageSize(level)
+        return stride(from: 0, to: pool.count, by: size).map { Array(pool[$0..<min($0 + size, pool.count)]) }
+    }
+
+    /// A page's examples not yet used: not already planted on this level (the same title ignoring
+    /// case; on Week the same day too).
+    private func unused(_ page: [String], today: Date) -> [String] {
+        guard let level else { return [] }
+        return page.filter { text in
             guard let said = Self.exampleSaid(text, level, today) else { return false }
             return !items(on: level).contains {
                 $0.title.caseInsensitiveCompare(said.title) == .orderedSame
                     && (level != .week || $0.day.map(PlanCalendar.day) == said.day.map(PlanCalendar.day))
             }
         }
+    }
+
+    /// The page the walk is on here: the one last shown at this place, else the first.
+    private func examplePageIndex(_ pages: [[String]]) -> Int {
+        guard let page = examplePage, page.place == examplePlace, page.index < pages.count else { return 0 }
+        return page.index
+    }
+
+    /// The first page from `start` on, going round, with an example left; nil when none has.
+    private func pageWithOneLeft(_ pages: [[String]], from start: Int, today: Date) -> Int? {
+        (0..<pages.count).map { (start + $0) % pages.count }.first { !unused(pages[$0], today: today).isEmpty }
+    }
+
+    /// The one question about examples (F27, P23): the examples that show here, or would on asking:
+    /// the page the walk is on, its used ones gone; with none left on it, the next page that has one.
+    /// The examples choice is offered, the action acts and the layout draws examples only from this;
+    /// while they are on it is exactly what shows.
+    func examplesLeft(today: Date) -> [String] {
+        let pages = examplePages()
+        guard let index = pageWithOneLeft(pages, from: examplePageIndex(pages), today: today) else { return [] }
+        return unused(pages[index], today: today)
+    }
+
+    /// While examples are on: asking again brings other ones (another page has one left, and this
+    /// showing has not gone through `examplePagesAShowing` yet). Otherwise asking again hides them.
+    func showsOtherExamples(today: Date) -> Bool {
+        guard examplesOn.contains(step) else { return false }
+        let pages = examplePages()
+        guard let index = pageWithOneLeft(pages, from: examplePageIndex(pages), today: today) else { return false }
+        let seen = examplePage?.place == examplePlace ? examplePage?.seen ?? 0 : 0
+        guard seen < Self.examplePagesAShowing, pages.count > 1 else { return false }
+        return pageWithOneLeft(pages, from: (index + 1) % pages.count, today: today) != index
+    }
+
+    /// The examples choice. Off: the page the walk is on here shows. On: the next page with one left
+    /// shows, for up to `examplePagesAShowing` pages; then they hide. Hiding keeps the page, so asking
+    /// again brings the same ones back, and "Other examples" goes on from there.
+    mutating func toggleExamples(today: Date) {
+        let pages = examplePages()
+        guard let index = pageWithOneLeft(pages, from: examplePageIndex(pages), today: today) else { return }
+        var page = examplePage?.place == examplePlace ? examplePage ?? ExamplePage(place: examplePlace)
+                                                      : ExamplePage(place: examplePlace)
+        let others = showsOtherExamples(today: today)
+        page.index = index
+        if !examplesOn.contains(step) {
+            examplesOn.insert(step)
+            page.seen = 1
+        } else if others, let next = pageWithOneLeft(pages, from: (index + 1) % pages.count, today: today) {
+            page.index = next
+            page.seen = max(page.seen, 1) + 1
+        } else {
+            examplesOn.remove(step)
+            page.seen = 0
+        }
+        examplePage = page
+    }
+
+    /// The page that shows has no example left: they were all used, as examples or in the person's
+    /// own words (P23).
+    private func shownPageIsUsedUp(today: Date) -> Bool {
+        let pages = examplePages()
+        guard !pages.isEmpty else { return true }
+        return unused(pages[examplePageIndex(pages)], today: today).isEmpty
     }
 
     /// An example read as anything said on this step is (Week's day comes off its end).
@@ -85,8 +175,9 @@ extension WalkState {
             undo.append(.plant(item.id))
         }
         lastPlanted[level] = item.id
-        // The last example left here was just used, as an example or in the person's own words (P23).
-        if examplesLeft(today: env.periods.today).isEmpty { examplesOn.remove(step) }
+        // The last example shown here was just used, as an example or in the person's own words (P23):
+        // they come down, and asking again brings the next ones.
+        if examplesOn.contains(step), shownPageIsUsedUp(today: env.periods.today) { examplesOn.remove(step) }
         selected = nil
         expanded = nil                      // the post just planted on is the open one, not one opened before
         undoShowing = true
