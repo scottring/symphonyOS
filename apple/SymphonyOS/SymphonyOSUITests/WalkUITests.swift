@@ -22,9 +22,13 @@ final class WalkUITests: XCTestCase {
         element.tap()
     }
 
+    /// The lesson as VoiceOver and these tests find it: one element that reads both lines, whichever
+    /// beat is showing.
+    private static let lesson = "Hold the light and say it. Tap it for other choices."
+
     /// The first step that listens teaches the light once; a tap anywhere but the light puts it away.
     @MainActor private func dismissTheLesson(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        let lesson = app.staticTexts["Press and hold the light, and say it out loud."]
+        let lesson = app.staticTexts[Self.lesson]
         XCTAssertTrue(lesson.waitForExistence(timeout: 15), "the light was not taught", file: file, line: line)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
         XCTAssertTrue(lesson.waitForNonExistence(timeout: 15), "a tap did not put the lesson away", file: file, line: line)
@@ -318,7 +322,7 @@ final class WalkUITests: XCTestCase {
                       "not back on Year")
         XCTAssertTrue(app.buttons["Year: Run a 5K, tap to move or remove"].waitForExistence(timeout: 15),
                       "the flag planted before leaving is gone")
-        XCTAssertFalse(app.staticTexts["Press and hold the light, and say it out loud."].exists, "taught again on resume")
+        XCTAssertFalse(app.staticTexts[Self.lesson].exists, "taught again on resume")
     }
 }
 #endif
