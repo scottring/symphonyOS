@@ -54,11 +54,17 @@ struct WalkFootingTests {
                                                                          lowest: post.banners.last?.drawn.maxY ?? 110) : 556
                 guard post.lean == 0, post.base == CGPoint(x: 195, y: foot), post.banners.allSatisfy({ $0.turn == 0 && $0.tilt == 0 && $0.shift == 0 })
                 else { Issue.record("\(Generated.describe(s)): the ruled post is not ruled"); return }
-                // Year to Today hang from the lowest cloth's place; Look back up from 6 under its pill at 110 (or from 110), 8 apart.
+                // Year to Today hang from the lowest cloth's place. Look back up: the top cloth 6 under its pill
+                // (or where the pill would be), 8 apart; the whole sign has come down so the bare pole is 24, or,
+                // too tall for that, hangs from 110 as it did.
                 if s.step == 6 {
-                    let first = layout.labels.first.map { $0.frame.maxY + 6 } ?? 110
-                    if let top = post.banners.first, top.frame.minY != first || layout.labels.first.map({ $0.frame.minY != 110 }) == true {
-                        Issue.record("\(Generated.describe(s)): looking back up, the top cloth at \(top.frame.minY)"); return
+                    let pill = layout.labels.first
+                    let top = pill?.frame.minY ?? post.banners.first?.frame.minY ?? 110
+                    let end = post.banners.last?.frame.maxY ?? 110
+                    let cameDown = top > 110 && abs(foot - end - 24) < 0.01
+                    let hangsFromTheTop = top == 110 && foot - end <= 24 + 0.01
+                    if let first = post.banners.first, first.frame.minY != (pill.map { $0.frame.maxY + 6 } ?? top) || !(cameDown || hangsFromTheTop) {
+                        Issue.record("\(Generated.describe(s)): looking back up, the sign from \(top) to \(end) over a foot at \(foot)"); return
                     }
                     // P36: each at least 36 high, 8 apart.
                     for (a, b) in zip(post.banners, post.banners.dropFirst()) where b.frame.minY - a.frame.maxY != 8 || a.frame.height < 36 {

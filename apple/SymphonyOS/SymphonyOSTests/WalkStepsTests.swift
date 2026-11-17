@@ -148,7 +148,7 @@ struct WalkStepsTests {
         #expect(!s.ground)
         #expect(s.step == 1)
         #expect(s.focusArea == m.health.id)
-        #expect(s.tour.isEmpty)
+        #expect(s.tour == [m.home.id])                  // Next visits every area kept, on a quick start too
         #expect(effects == [.save])
     }
 

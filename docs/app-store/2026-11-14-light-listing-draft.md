@@ -202,3 +202,12 @@ The "Settings" path matches `Views/Settings/SettingsView.swift` (Account section
 14. The spec says the free version must have no AI calls; the code still contains `analyze-capture`, `PageIngest` and Google Calendar calls, which are gated by edition on the client and the plan says on the server. I did not verify the server gating. The label "no AI in light" is therefore unverified.
 15. The plan's release checklist is not complete: the edition, membership and deletion migrations and the `delete-account` function are not yet applied or deployed. In-app deletion will not work against the live backend until they are.
 16. Demo account: needs a light household, an account name, and a password you create (placeholders in section 8).
+
+## Changed since this draft (2026-11-17)
+
+The light edition now has ONE AI feature, by Scott's decision of 2026-11-17: in the walk, when the person asks for examples under a goal, the app sends that goal, the goals above it, the area's name and the period to Symphony's server (`walk-suggest`), which asks Anthropic's Claude for three next steps. Nothing is sent unless the person asks. Capped per household on the server.
+
+What this changes here:
+- Item 14 above ("the free version must have no AI calls") no longer holds as written.
+- The privacy answers' categories do not change (user content, collected for app functionality, not used for tracking), but the privacy policy should name the AI provider as a processor for this feature, and no listing text may say that a free account's plan never leaves the phone or that the free version has no AI.
+- The walk still listens on the phone only; what is sent is the text of the goal.

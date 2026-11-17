@@ -44,12 +44,37 @@ struct WalkLayout: Equatable {
             CGPoint(x: frame.width > 0 ? (pivot.x - frame.minX) / frame.width : 0.5,
                     y: frame.height > 0 ? (pivot.y - frame.minY) / frame.height : 0)
         } }
+    /// Under a goal above: a line from its lower edge, `under / 2` in from where the cloths under it
+    /// begin, down to the lowest of them, with a short tick into each at its middle. It says the
+    /// cloths are parts of the goal above. None for "+n more".
+    struct Branch: Equatable {
+        let from: CGPoint
+        /// Where each tick ends: the cloth's left edge, at its middle.
+        let to: [CGPoint]
+
+        init?(under banners: [Banner]) {
+            guard let above = banners.first, above.kind == .parent else { return nil }
+            let hung = banners.dropFirst().filter { $0.kind == .full || $0.kind == .ghost }
+            guard let left = hung.map(\.frame.minX).min() else { return nil }
+            from = CGPoint(x: left - WalkLayout.under / 2, y: above.frame.maxY)
+            to = hung.map { CGPoint(x: $0.frame.minX, y: $0.frame.midY) }
+        }
+
+        /// What the line covers, for placing it.
+        var box: CGRect {
+            let foot = to.map(\.y).max() ?? from.y, right = to.map(\.x).max() ?? from.x
+            return CGRect(x: from.x - 2, y: from.y, width: right - from.x + 4, height: foot - from.y + 2)
+        }
+    }
+
     /// The standing post. `base` is its foot; the pole rises `base.y − top` along a line leaning
     /// `lean` degrees clockwise about `base`; `pole` is the bare pole under its lowest cloth.
     struct Post: Equatable, Identifiable { let id: String; let key: WalkPostKey; let base: CGPoint; let top: CGFloat
         let pale: Bool; let banners: [Banner]
         var lean: Double = 0
         var pole: CGFloat = WalkLayout.pole
+        /// The line that ties the step's cloths to the goal above they hang under; nil with no goal above.
+        var branch: Branch? = nil
 
         /// Where each banner takes a tap, in `banners` order: the cloth as drawn, made at least `touch`
         /// across and, where its neighbours leave room, `touch` high about its middle (room it cannot take

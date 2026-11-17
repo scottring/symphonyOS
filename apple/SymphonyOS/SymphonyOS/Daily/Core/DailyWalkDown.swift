@@ -102,9 +102,11 @@ extension DailyWalkDown {
     /// `.paused`, which, saved nowhere, simply closes it. `now` is the clock every walk reads
     /// (the main view takes a walk down when its day has turned by it).
     @MainActor func model(context: ModelContext, now: Date = .now, scheduler: WalkScheduling? = nil,
-                          listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil) -> WalkModel {
+                          listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil,
+                          suggester: WalkSuggesting? = nil) -> WalkModel {
         WalkModel(context: context, userId: userId, entry: .resume, position: position, edition: .light, now: now,
-                  seasons: seasons, periods: periods, store: nil, scheduler: scheduler, listener: listener, sound: sound)
+                  seasons: seasons, periods: periods, store: nil, scheduler: scheduler, listener: listener, sound: sound,
+                  suggester: suggester)
     }
 }
 #endif

@@ -30,6 +30,13 @@ struct WalkState: Equatable {
     var examplesOn: Set<Int> = []; var selected: UUID?; var expanded: WalkPostKey?
     /// The page of examples the walk is on where it stands (`toggleExamples`). In memory only.
     var examplePage: ExamplePage?
+    /// The server can be asked for suggestions (`walk-suggest`): signed in, not a demo. Set by the model; never saved.
+    var canSuggest = false
+    /// What the server suggested for a place, asked once per place and kept for this walk; an empty
+    /// list when nothing came (the written examples stand in). In memory only.
+    var suggestions: [ExamplePlace: [String]] = [:]
+    /// The place suggestions are being waited for; nil when none are.
+    var suggesting: ExamplePlace?
     var orb: Orb = .idle; var typing: String?
     // Speech, for this walk only (never saved): holds in a row that heard nothing; a
     // refusal, after which a hold opens typing; a session that ended while still held.
@@ -100,6 +107,8 @@ struct WalkState: Equatable {
         case .noteExpired:
             note = nil
             return []
+        case .suggested(let place, let lines): return suggested(place, lines, today: env.periods.today)
+        case .suggestExpired: return suggesting.map { suggested($0, nil, today: env.periods.today) } ?? []
         // The orb, speech and typing (Task 11).
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
              .heard, .listenEnded, .finishExpired, .speechUnavailable, .speechReady,
@@ -199,8 +208,7 @@ struct WalkState: Equatable {
         // mid-walk (the demo's preview) may not have settled yet, so it settles first, as after any touch.
         case .examples:
             settleStanding()
-            toggleExamples(today: env.periods.today)
-            return []
+            return toggleExamples(env)
         case .undo: return undoLast(env)
         case .startThere: return startThere(env)
         case .type:
@@ -302,11 +310,12 @@ struct WalkState: Equatable {
         return []
     }
 
-    /// Leaving the ground: the walk stands in the first kept area; in a whole-year
-    /// walk the Year tour starts there, the rest waiting in `tour`.
+    /// Leaving the ground: the walk stands in the first kept area, and the Year tour starts there, the
+    /// rest waiting in `tour`: Next visits every area the person kept, on a quick start too (the
+    /// owner's observation of 2026-11-17: kept areas were never offered their turn).
     private mutating func startTour() {
         focusArea = kept.first
-        tour = depth == .full ? Array(kept.dropFirst()) : []
+        tour = Array(kept.dropFirst())
     }
 
     /// Season in a whole-year walk: the first time, the tour starts at the first
@@ -322,13 +331,13 @@ struct WalkState: Equatable {
         }
     }
 
-    /// A whole-year tour's full order: kept areas in kept order on Year, year goals
-    /// in column order on Season. Derived, so only the stops still ahead are stored.
+    /// A tour's full order: kept areas in kept order on Year (every walk); year goals in column
+    /// order on Season (a whole-year walk only). Derived, so only the stops still ahead are stored.
     private var tourStops: [UUID] {
-        guard depth == .full, !ground else { return [] }
+        guard !ground else { return [] }
         switch step {
         case 1: return kept
-        case 2: return yearGoalsInColumnOrder().map(\.id)
+        case 2: return depth == .full ? yearGoalsInColumnOrder().map(\.id) : []
         default: return []
         }
     }
@@ -596,6 +605,7 @@ struct WalkState: Equatable {
     private mutating func askAfresh(since place: (step: Int, standing: UUID?)?) {
         guard let place, place.step != step || place.standing != standing else { return }
         examplesOn = []
+        suggesting = nil                    // an answer still on its way is for a place the walk has left
     }
 
     // MARK: Areas and the goal above
@@ -750,13 +760,15 @@ enum WalkEvent: Equatable {
     /// A tap on the Next line at the foot; a tap on the veil behind the open compass; the top row's
     /// More, Back and Leave for now.
     case nextTapped, veilTapped, moreTapped, backTapped, leaveTapped
+    /// The server's suggestions for a place arrived (nil: none came); the wait for them ran out.
+    case suggested(WalkState.ExamplePlace, [String]?), suggestExpired
     /// The paper (F7): raised ("+n more", the nameless post), lowered ("Show the mountain", Escape), a row tapped.
     case paperOpened, paperClosed, paperRow(UUID)
     /// Look back up (F21): a cloth raises the paper for its level (a touch on what the paper covers).
     case lookBackPaper(WalkLevel)
 }
 
-enum WalkTimer: Equatable { case hold, undo, note, finish }
+enum WalkTimer: Equatable { case hold, undo, note, finish, suggest }
 
 enum WalkWrite: Equatable {
     case area(WalkArea), dropArea(UUID), create(WalkItem, parent: WalkItem?), remove(UUID, WalkLevel), restore(UUID)
@@ -768,6 +780,8 @@ enum WalkEffect: Equatable {
     case sound(WalkSoundName, afterMs: Int), listen(Bool), finishListening, write(WalkWrite)
     case timer(WalkTimer, ms: Int?)        // nil cancels
     case askCalendar, save, end(WalkStatus)
+    /// Ask the server for suggestions; the answer comes back as `.suggested`.
+    case suggest(WalkSuggestRequest)
 }
 
 enum WalkUndoEntry: Equatable {

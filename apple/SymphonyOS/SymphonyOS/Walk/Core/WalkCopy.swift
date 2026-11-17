@@ -99,6 +99,7 @@ enum WalkCopy {
         if case .finishing = s.orb { return "" }            // waiting for the last words after letting go
         if let note = s.note { return note }
         if s.typing != nil { return "" }                    // the field carries its own placeholder
+        if s.isSuggesting { return hintSuggesting }         // asked for ideas under this goal: they are on their way
         if case .speaking = s.orb { return hintSpeaking }
         if s.ground { return s.kept.isEmpty ? hintGroundNone : hintGround }
         guard let level = s.level else { return "" }
@@ -128,6 +129,10 @@ enum WalkCopy {
     static let hintStartHere = "Tap “\(startWithThis)”, or hold to speak."
     static let hintFirstThing = "Tap “\(finish)”, or hold to change it."
     static let hintSpeaking = "Let go when you’ve said it"
+    /// Suggestions for the goal above were asked for and are on their way.
+    static let hintSuggesting = "Finding ideas for this goal…"
+    /// Nothing came back, and nothing is written for this place either.
+    static let noSuggestions = "No ideas came through. Say your own."
     /// Speech is off for this walk: a tap types, a hold opens the other choices.
     static let hintSpeechOff = "Tap the light and type."
     /// The longest a hint or note may be: every one fits on one line at 15 pt (48 by estimate).
@@ -187,13 +192,12 @@ enum WalkCopy {
         guard let level = s.level else { return nil }
         if s.ground { return (s.kept.isEmpty ? skipStep : next("your goals"), .next) }
         if level == .today, let focused = s.focus[.today], focused != s.firstThing { return (startWithThis, .startThere) }
+        // Year goes area by area through the areas kept, whether or not this one was given a goal.
+        if level == .year, let stop = s.tour.first, let area = s.area(stop) { return (next(cut(area.name, 14)), .next) }
         let added = level == .today ? s.firstThing != nil : !s.items(on: level).isEmpty
         guard added else { return (skipStep, .next) }
-        // A whole-year walk goes area by area on Year, and goal by goal on Season, before it moves down.
-        if let stop = s.tour.first {
-            if level == .year, let area = s.area(stop) { return (next(cut(area.name, 14)), .next) }
-            if s.item(stop) != nil { return (nextGoal, .next) }
-        }
+        // A whole-year walk goes goal by goal on Season before it moves down.
+        if let stop = s.tour.first, s.item(stop) != nil { return (nextGoal, .next) }
         switch level {
         case .year: return (next("this \(p.seasonWord)"), .next)
         case .season: return (next(p.monthName), .next)
@@ -261,7 +265,7 @@ enum WalkCopy {
                 if s.calendarOffer {
                     out.append(Point(at: .e, label: "Show my calendar on Today", action: .calendar, symbol: "calendar"))
                 }
-            } else if !s.examplesLeft(today: p.today).isEmpty {
+            } else if !s.examplesLeft(today: p.today).isEmpty || s.couldSuggest || s.isSuggesting {
                 let label = !s.examplesOn.contains(s.step) ? showExamples
                     : s.showsOtherExamples(today: p.today) ? otherExamples : hideExamples
                 out.append(Point(at: .e, label: label, action: .examples, symbol: "lightbulb"))

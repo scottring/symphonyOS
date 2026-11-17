@@ -309,6 +309,29 @@ struct WalkDropIn: ViewModifier, Animatable {
 }
 
 /// A post: the pole from its top banner to the ground, and a small shadow at its foot.
+/// The branch under a goal above (`WalkLayout.Branch`): one pale line down from it and a tick into
+/// each cloth that hangs under it. Drawn in its own box (`Branch.box`).
+struct WalkBranchView: View {
+    let branch: WalkLayout.Branch
+
+    var body: some View {
+        let box = branch.box
+        Path { p in
+            let x = branch.from.x - box.minX
+            let foot = (branch.to.map(\.y).max() ?? branch.from.y) - box.minY
+            p.move(to: CGPoint(x: x, y: 0))
+            p.addLine(to: CGPoint(x: x, y: foot))
+            for tick in branch.to {
+                p.move(to: CGPoint(x: x, y: tick.y - box.minY))
+                p.addLine(to: CGPoint(x: tick.x - box.minX + 1, y: tick.y - box.minY))
+            }
+        }
+        .stroke(.white.opacity(0.9), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        .shadow(color: WalkPalette.ink.opacity(0.45), radius: 1.5, y: 0.5)
+        .frame(width: box.width, height: box.height, alignment: .topLeading)
+    }
+}
+
 struct WalkPoleView: View {
     let height: CGFloat
     let pale: Bool

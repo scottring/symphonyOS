@@ -174,19 +174,19 @@ struct WalkExampleLibraryTests {
         var s = walk(step: 1)
         let general = WalkCopy.examples(.year, area: "Health")
         #expect(label(s) == "Show examples" && s.examplesLeft(today: today) == general)
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         #expect(s.examplesOn.contains(1) && s.examplesLeft(today: today) == general)
         #expect(label(s) == "Other examples")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         let second = s.examplesLeft(today: today)
         #expect(second.count == 3 && Set(second).isDisjoint(with: general) && label(s) == "Other examples")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         let third = s.examplesLeft(today: today)
         #expect(third.count == 3 && Set(third).isDisjoint(with: second + general))
         #expect(label(s) == "Hide examples")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         #expect(!s.examplesOn.contains(1) && label(s) == "Show examples")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         #expect(s.examplesOn.contains(1) && s.examplesLeft(today: today) == third && label(s) == "Other examples")
     }
 
@@ -195,11 +195,11 @@ struct WalkExampleLibraryTests {
         let running = try #require(WalkExampleLibrary.themes(area: "Health").first { $0.name == "running" }?.lines[.season])
         var s = walk(step: 2, goal: "Run a marathon")
         #expect(s.examplesLeft(today: today) == Array(running.prefix(2)))
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         #expect(label(s) == "Other examples")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         #expect(s.examplesLeft(today: today) == Array(running.suffix(2)))
-        s.toggleExamples(today: today)                      // round again: this showing has seen both pages
+        _ = s.toggleExamples(env())                      // round again: this showing has seen both pages
         #expect(s.examplesLeft(today: today) == Array(running.prefix(2)))
     }
 
@@ -207,7 +207,7 @@ struct WalkExampleLibraryTests {
     @Test func aUsedUpPageComesDown() throws {
         let running = try #require(WalkExampleLibrary.themes(area: "Health").first { $0.name == "running" }?.lines[.season])
         var s = walk(step: 2, goal: "Run a marathon")
-        s.toggleExamples(today: today)
+        _ = s.toggleExamples(env())
         _ = s.apply(.exampleTapped(running[0]), env())
         #expect(s.examplesOn.contains(2) && s.examplesLeft(today: today) == [running[1]])
         _ = s.apply(.exampleTapped(running[1]), env())

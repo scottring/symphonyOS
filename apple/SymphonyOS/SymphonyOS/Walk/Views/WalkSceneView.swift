@@ -306,6 +306,14 @@ struct WalkWorldView: View {
                     .accessibilityHidden(true)
                     .walkPlaced(CGRect(x: post.base.x - 9, y: post.top, width: 18, height: max(0, post.base.y - post.top)),
                                 camera)
+                // Under a goal above, the line that ties the step's cloths to it.
+                if let branch = post.branch {
+                    WalkBranchView(branch: branch)
+                        .opacity(veilsWords ? 0.3 : 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                        .walkPlaced(branch.box, camera)
+                }
                 // Each cloth takes its tap in its own touch frame (`Post.touchFrames`): the cloth as drawn,
                 // grown to a touch where its neighbours leave room, never over another cloth, a side post or a control.
                 let touches = layout.touchFrames(post, touch: stage.touch)

@@ -306,7 +306,7 @@ extension WalkEvent {
     var isUnderThePaper: Bool {
         switch self {
         case .paperOpened, .paperClosed, .paperRow, .heard, .listenEnded, .finishExpired, .noteExpired, .undoExpired,
-             .speechReady, .calendarAnswered:
+             .speechReady, .calendarAnswered, .suggested, .suggestExpired:
             return false
         case .orbDown, .orbHeld, .orbMoved, .orbUp, .orbCancelled, .speechUnavailable, .typeChanged, .typeSubmitted,
              .typeDismissed, .point, .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,
@@ -324,7 +324,7 @@ extension WalkEvent {
     var leavesAWaitingFlag: Bool {
         switch self {
         case .heard, .listenEnded, .finishExpired, .orbHeld, .orbMoved, .orbUp, .orbCancelled,
-             .noteExpired, .undoExpired, .speechReady, .calendarAnswered, .veilTapped:
+             .noteExpired, .undoExpired, .speechReady, .calendarAnswered, .veilTapped, .suggested, .suggestExpired:
             return true
         case .orbDown, .speechUnavailable, .typeChanged, .typeSubmitted, .typeDismissed, .point,
              .areaTapped, .bannerTapped, .stubTapped, .exampleTapped, .moveTo, .pullUp, .undo,

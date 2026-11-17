@@ -328,8 +328,8 @@ struct WalkLayoutTests {
         }
         #expect(present > 5000 && absent > 500, "\(present) with a caret, \(absent) without")
         print("The caret: \(present) posts with one, \(absent) without")
-        // Present: Health's Month on the full plan (the pill's top at 307). Absent: a stack that reaches 283.
-        #expect(ruled(plan(DemoStress.full, step: 3, standing: "Health")).standingLabel?.caret == CGRect(x: 190, y: 298, width: 10, height: 7))
+        // Present: Health's Season on the full plan (the pill's top at 329). Absent: a stack that reaches 283.
+        #expect(ruled(plan(DemoStress.full, step: 2, standing: "Health")).standingLabel?.caret == CGRect(x: 190, y: 320, width: 10, height: 7))
         let above = flag(.season, "Slow Sundays", in: "People")
         let goals = ["Plan a pancake Sunday", "Book train tickets to Gran", "Sleep seven hours most nights", "Call Mum about Sunday lunch"]
             .map { flag(.month, $0, in: "People", parent: above.id) }
@@ -774,7 +774,7 @@ struct WalkLayoutTests {
     /// Review Focus 7: ruled, a phone has the board's numbers exactly.
     @Test func underLevelFootingTheNumbersAreTheBoards() {
         #expect(WalkLayout.standingFoot == 556 && WalkLayout.lowestCloth == 532 && WalkLayout.question == 282)
-        #expect(WalkLayout.stretch(wing: 0) == 1 && WalkLayout.standingWidth(wing: 0) == 150 && WalkLayout.parentWidth(wing: 0) == 126)
+        #expect(WalkLayout.stretch(wing: 0) == 1 && WalkLayout.standingWidth(wing: 0) == 150 && WalkLayout.parentWidth(wing: 0) == 150 && WalkLayout.under == 12)
         #expect(WalkLayout.sidePoles(wing: 0) == [90, 33, 300, 357] && WalkLayout.sidePill(wing: 0) == 58)
         #expect(WalkLayout.edges(wing: 0) == 4...386 && WalkLayout.column(wing: 0) == 0...390)
 
@@ -783,20 +783,27 @@ struct WalkLayoutTests {
         let post = layout.posts[0]
         #expect(post.base == CGPoint(x: 195, y: 556) && post.lean == 0 && post.pole == 24)
         #expect(layout.banners.last?.frame.maxY == 532)
-        // The goal above "Lift twice a week" (one line at 11 pt in its 126, and "1 of 3" on a line of its own,
-        // F40: 12 + 14 + 14), then Health's four month goals, each on its one line (18 + 17 = 35), 4 between cloths.
+        // The goal above "Lift twice a week", as wide as a flag (one line at 11 pt, and "1 of 3" on a line of
+        // its own, F40: 12 + 14 + 14), then Health's four month goals hanging 12 in under it, 138 wide, their
+        // right edges with its own: three on one line (18 + 17 = 35), "No screens after ten" on two at that
+        // width (52); 4 between cloths.
         let frames = layout.banners.map(\.frame)
         #expect(layout.banners.map(\.kind) == [.parent, .full, .full, .full, .full])
         #expect(layout.banners.first?.text == "Lift twice a week" && layout.banners.first?.tag == "1 of 3")
-        #expect(frames == [CGRect(x: 132, y: 336, width: 126, height: 40), CGRect(x: 120, y: 380, width: 150, height: 35),
-                           CGRect(x: 120, y: 419, width: 150, height: 35), CGRect(x: 120, y: 458, width: 150, height: 35),
-                           CGRect(x: 120, y: 497, width: 150, height: 35)], "\(frames)")
+        #expect(frames == [CGRect(x: 120, y: 319, width: 150, height: 40), CGRect(x: 132, y: 363, width: 138, height: 35),
+                           CGRect(x: 132, y: 402, width: 138, height: 35), CGRect(x: 132, y: 441, width: 138, height: 52),
+                           CGRect(x: 132, y: 497, width: 138, height: 35)], "\(frames)")
+        // The branch: down from the goal above's lower edge, 6 in, with a tick into each cloth at its middle.
+        #expect(post.branch?.from == CGPoint(x: 126, y: 359))
+        #expect(post.branch?.to == [CGPoint(x: 132, y: 380.5), CGPoint(x: 132, y: 419.5), CGPoint(x: 132, y: 467), CGPoint(x: 132, y: 514.5)])
+        #expect(ruled(plan(DemoStress.full, step: 1, standing: "Health")).posts[0].branch == nil)        // Year: no goal above
         #expect(layout.banners.allSatisfy { $0.turn == 0 && $0.shift == 0 && $0.drawn == $0.frame })
         // The pill: "HEALTH" at DM Sans SemiBold's own capitals (11 pt, tracked 1.1: 48.6) and 24, rounded up
-        // (Task 10, P30; 75 by the old 8.4 a capital), 23 high, 6 above the goal above; its caret 2 above it.
-        #expect(layout.standingLabel?.frame == CGRect(x: 195 - 36.5, y: 307, width: 73, height: 23))
-        #expect(layout.standingLabel?.caret == CGRect(x: 190, y: 298, width: 10, height: 7))
-        #expect(post.top == 336)
+        // (Task 10, P30; 75 by the old 8.4 a capital), 23 high, 6 above the goal above. Its caret would stand at
+        // 281, into the question's floor (282), so it is not drawn (F34).
+        #expect(layout.standingLabel?.frame == CGRect(x: 195 - 36.5, y: 290, width: 73, height: 23))
+        #expect(layout.standingLabel?.caret == nil)
+        #expect(post.top == 319)
 
         // The side posts: Home, People, Work and Money all to the right of Health, inner low first.
         #expect(layout.sides.map(\.name) == ["Home", "People", "Work", "Money"])
@@ -811,13 +818,13 @@ struct WalkLayoutTests {
 
         // On the half window (wing 110.3) the posts stand half as far apart again, and the flags are wider.
         #expect(WalkLayout.sidePoles(wing: 110.3) == [37.5, -48, 352.5, 438])
-        #expect(WalkLayout.standingWidth(wing: 110.3) == 226.5 && WalkLayout.parentWidth(wing: 110.3) == 202.5)
+        #expect(WalkLayout.standingWidth(wing: 110.3) == 226.5 && WalkLayout.parentWidth(wing: 110.3) == 226.5)
         #expect(WalkLayout.sidePill(wing: 110.3) == 86.5)
         #expect(near(WalkLayout.edges(wing: 110.3).lowerBound, -106.3, 0.001) && near(WalkLayout.edges(wing: 110.3).upperBound, 496.3, 0.001))
         #expect(WalkLayout.column(wing: 110.3) == -85...475 && WalkLayout.column(wing: 40) == -40...430)
         let wide = ruled(s, wing: 110.3)
-        #expect(wide.banners(.full).allSatisfy { $0.frame.width == 226.5 && near($0.frame.midX, 195, 0.001) })
-        #expect(wide.banners(.parent).first?.frame.width == 202.5 && wide.banners(.full).count == 4 && wide.mores.isEmpty)
+        #expect(wide.banners(.full).allSatisfy { $0.frame.width == 214.5 && near($0.frame.midX, 201, 0.001) })
+        #expect(wide.banners(.parent).first?.frame.width == 226.5 && wide.banners(.full).count == 4 && wide.mores.isEmpty)
         let crowd = state(1, kept: ["Home"], items: (1...8).map { flag(.year, "Goal \($0)", in: "Home") }, standing: "Home")
         #expect(ruled(crowd, wing: 110.3).mores.first?.frame == CGRect(x: 156, y: 510, width: 78, height: 22))    // "+n more" stays 78
         #expect(wide.sides.allSatisfy { $0.pill!.width <= 86.5 })
@@ -862,21 +869,22 @@ struct WalkLayoutTests {
 
     // MARK: Long words, long names (F20)
 
-    /// A goal above of 44 characters stands whole on three lines, in its own narrower cloth.
+    /// A goal above of 44 characters stands whole, in its cloth as wide as a flag.
     @Test func aParentOfFortyFourLettersStandsWhole() {
-        // The long plan's Week in Home: a 44-character month goal above two week tasks. Its three lines
-        // cost no flag (240 of 250): both tasks stand in full under it.
+        // The long plan's Week in Home: a 44-character month goal above two week tasks. Its lines cost no
+        // flag: both tasks stand in full under it.
         let s = plan(DemoStress.long, step: 4, standing: "Home")
         let layout = ruled(s)
         let above = layout.banners(.parent).first!
         #expect(above.text == "Pick the tile and pay the contractor deposit" && above.text.count == 44)
-        #expect(above.lines == WalkLayout.lines(for: above.text, width: 126, face: .parent) && above.lines == 3)
-        #expect(near(above.frame.width, 126, 0.01) && near(above.frame.height, 12 + 14 * 3, 0.01))
+        #expect(above.lines == WalkLayout.lines(for: above.text, width: 150, face: .parent) && (2...3).contains(above.lines))
+        #expect(above.words.joined(separator: " ") == above.text)                                  // whole: nothing cut
+        #expect(near(above.frame.width, 150, 0.01) && near(above.frame.height, 12 + 14 * CGFloat(above.lines), 0.01))
         #expect(above.frame.minX >= 4 && above.frame.maxX <= 386 && above.frame.minY >= 282 && above.frame.maxY <= 532)
         #expect(above.level == .month && above.label.hasPrefix("Month: Pick the tile and pay the contractor deposit"))
         let tasks = s.items(on: .week).filter { $0.areaId == s.standing }
         #expect(tasks.count == 2 && layout.banners(.full).compactMap(\.itemId) == tasks.map(\.id) && layout.mores.isEmpty)
-        #expect(near(layout.standingLabel!.frame.minY, 532 - 240, 0.01))
+        #expect(near(layout.standingLabel!.frame.maxY, above.frame.minY - 6, 0.01) && layout.banners.last?.frame.maxY == 532)
     }
 
     /// Standing in "Side projects and making": the pill takes two lines at the same size, the name
@@ -1453,9 +1461,8 @@ struct WalkLayoutTests {
     static let breaksOtherwise: Set<String> = [
         "flag at 183: Book the first camping trip",
         "flag at 150: Invite friends over for dinner", "flag at 150: Borrow the next book on Saturday",
-        "parent at 126: Tour the gym on Main Street", "parent at 159: Protect two focus mornings a week",
-        "flag at 226: Photograph the first five pieces in daylight", "parent at 202: Finish the upstairs bathroom before spring",
-        "parent at 202: Put the free Sunday on the calendar today",
+        "parent at 183: Send the contractor the deposit", "parent at 183: Walk every morning before work",
+        "flag at 226: Photograph the first five pieces in daylight",
     ]
 
     /// F39 (c): ordinary titles look as the system sets them: the layout's lines are the lines TextKit
@@ -1463,7 +1470,8 @@ struct WalkLayoutTests {
     @Test @MainActor func ordinaryTitlesBreakAsTheSystemDoes() throws {
         var cloths: [(face: WalkLayout.Face, width: CGFloat)] = [(.lookBack, 150)]
         for wing: CGFloat in [0, 42.3, 110.3] {
-            cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.parent, WalkLayout.parentWidth(wing: wing))]
+            cloths += [(.flag, WalkLayout.standingWidth(wing: wing)), (.flag, WalkLayout.standingWidth(wing: wing) - WalkLayout.under),
+                       (.parent, WalkLayout.parentWidth(wing: wing))]
         }
         var otherwise = Set<String>(), seen: [String] = []
         var checked = 0
@@ -1806,17 +1814,21 @@ struct WalkLayoutTests {
 
     // MARK: Look back up (Task 8)
 
-    /// F6: the full plan, standing in Health: the area's name in its pill at 110, then one cloth for
+    /// F6: the full plan, standing in Health: the area's name in its pill, then one cloth for
     /// each level, year above season above month above week above today, each centred on the
     /// midline and a standing flag's width (120…270 on a phone), 6 under the pill and 8 apart (P36); every
-    /// other kept area a side post, nearest first.
+    /// other kept area a side post, nearest first. The sign stands at a signpost's height: it has come
+    /// down from 110 so that the bare pole under its lowest cloth is 24 (2026-11-17).
     @Test func lookingBackUpReadsOneAreaTopToBottom() throws {
         let s = plan(DemoStress.full, step: 6, standing: "Health")
         #expect(s.standing == area("Health").id)
         for wing in wings {
             let layout = ruled(s, wing: wing)
             let pill = try #require(layout.standingLabel)
-            #expect(pill.frame.minY == 110 && pill.name == "Health" && pill.caret == CGRect(x: 190, y: 101, width: 10, height: 7))
+            #expect(pill.name == "Health" && pill.caret == CGRect(x: 190, y: pill.frame.minY - 9, width: 10, height: 7))
+            #expect(pill.frame.minY == (wing == 0 ? 241.5 : 286), "wing \(wing): \(pill.frame)")       // 537.5 is land on the phone, 556 on the wider windows
+            let foot = try #require(layout.posts.first?.base.y), lowest = try #require(layout.banners.last?.frame.maxY)
+            #expect(near(foot - lowest, 24, 0.001) && near(layout.posts[0].pole, 24, 0.001), "wing \(wing)")
             let cloths = layout.banners
             #expect(layout.posts.count == 1 && cloths.allSatisfy { $0.kind == .compact }, "wing \(wing)")
             #expect(cloths.map(\.level) == [.year, .season, .month, .week, .today], "wing \(wing)")
@@ -3139,6 +3151,9 @@ enum Generated {
 /// The layout's guarantees, measured on what is drawn: a cloth by its turned outline's bounding
 /// box (`drawn`), a side post by its pill, its leaning pole and its pennants, a label by its frame.
 enum Invariants {
+    /// The cloths hang as ruled (no tilt, no shift): where a rule is about exact places, it is checked only then.
+    static func footingIsLevel(_ banners: [WalkLayout.Banner]) -> Bool { banners.allSatisfy { $0.tilt == 0 && $0.shift == 0 && $0.turn == 0 } }
+
     static func overlap(_ a: CGRect, _ b: CGRect) -> Bool {
         let e: CGFloat = 0.01
         return a.minX < b.maxX - e && b.minX < a.maxX - e && a.minY < b.maxY - e && b.minY < a.maxY - e
@@ -3213,12 +3228,19 @@ enum Invariants {
             problems.append("off the ground the one label is the standing area's, and takes no tap")
         }
         let width = WalkLayout.standingWidth(wing: wing)
+        // Under a goal above the step's cloths hang 12 in from its left edge, 12 narrower, their right edges with its own.
+        let goalAbove = banners.first { $0.kind == .parent }
         for b in banners {
             let size: CGSize
             switch b.kind {
-            case .full, .ghost: size = CGSize(width: width, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
-            // F40: the goal above's place in the round ("1 of 3") is a line of its own, 14 more.
-            case .parent: size = CGSize(width: width - 24, height: 12 + 14 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
+            case .full, .ghost:
+                size = CGSize(width: goalAbove == nil ? width : width - 12, height: 18 + 17 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
+                if let goalAbove, footingIsLevel(banners),
+                   abs(b.frame.maxX - goalAbove.frame.maxX) > 0.01 || abs(b.frame.minX - goalAbove.frame.minX - 12) > 0.01 {
+                    problems.append("\(b.id) does not hang 12 in under the goal above: \(b.frame) under \(goalAbove.frame)")
+                }
+            // F40: the goal above's place in the round ("1 of 3") is a line of its own, 14 more. As wide as a flag.
+            case .parent: size = CGSize(width: width, height: 12 + 14 * CGFloat(b.lines) + (b.tag == nil ? 0 : 14))
             case .more: size = CGSize(width: 78, height: 22)
             case .compact: size = CGSize(width: width, height: max(36, 23 + 13 * CGFloat(b.lines - 1) + (b.more == nil ? 0 : 14)))
             }

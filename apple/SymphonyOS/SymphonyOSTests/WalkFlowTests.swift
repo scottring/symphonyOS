@@ -105,6 +105,7 @@ final class WalkFlowTests {
             #expect(self.fetch(ctx, Goal.self).isEmpty)
             #expect(m.state.items.isEmpty)
         }
+        m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
         await say(m, "lift twice a week")
         m.choose(.next)
@@ -350,6 +351,7 @@ final class WalkFlowTests {
         m.send(.orbUp(heldMs: 900))
         m.send(.typeChanged("feel strong again"))
         m.send(.typeSubmitted("feel strong again"))
+        m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
         await typeIt(m, "lift twice a week")
         m.choose(.next)
@@ -471,6 +473,7 @@ final class WalkFlowTests {
         let first = model(ctx)
         quickStart(first, keeping: ["Health", "Home"])
         await say(first, "feel strong again")
+        first.choose(.next)                 // on to Home, kept with nothing given to it
         first.choose(.next)
         await say(first, "lift twice a week")
         first.choose(.next)
@@ -530,6 +533,7 @@ final class WalkFlowTests {
         #expect(goals.count == 2)
         let (strong, bathroom) = (goals[0], goals[1])
 
+        m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
         #expect(m.state.focus[.season] == bathroom.id)         // the one planted last, in Health
         m.send(.bannerTapped(bathroom.id))                     // switched: the chain goes under the first goal
@@ -588,6 +592,7 @@ final class WalkFlowTests {
         await say(m, "feel strong again")
         await say(m, "finish the bathroom")
         let (strong, bathroom) = (m.state.items(on: .year)[0], m.state.items(on: .year)[1])
+        m.choose(.next)                     // on to Home, kept with nothing given to it
         m.choose(.next)
         m.send(.bannerTapped(bathroom.id))                     // switch to the first goal
         #expect(m.state.focus[.season] == strong.id)

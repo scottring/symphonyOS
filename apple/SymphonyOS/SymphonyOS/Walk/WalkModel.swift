@@ -10,6 +10,12 @@ import Observation
 /// through `onWords`, then `onEnd`. `stop()` is a cancel: nothing more arrives.
 /// `onEnd` is called once per session that ends without `stop()`: after
 /// `finish()`, or by itself (an error, an interruption).
+/// Asks the server for three next steps under a goal (`walk-suggest`). Nil for any failure: signed
+/// out, no network, the allowance spent, nothing usable back.
+@MainActor protocol WalkSuggesting {
+    func suggest(_ request: WalkSuggestRequest) async -> [String]?
+}
+
 @MainActor protocol WalkListening: AnyObject {
     var problem: String? { get }
     var onWords: ((String) -> Void)? { get set }
@@ -53,6 +59,8 @@ extension Dictation: WalkListening {}
     @ObservationIgnored private var planted: Set<UUID>
     @ObservationIgnored private let listener: WalkListening
     @ObservationIgnored private let sound: WalkSoundPlaying
+    /// Asks the server for suggestions under a goal; nil where it cannot be asked (a demo, a test).
+    @ObservationIgnored private let suggester: WalkSuggesting?
     /// Counts the holds that asked to listen; each session's callbacks carry their hold's number.
     @ObservationIgnored private var holdCount = 0
     @ObservationIgnored private var session: Session = .none
@@ -87,6 +95,7 @@ extension Dictation: WalkListening {}
          now: Date = .now, seasons: [SeasonBoundary]? = nil, periods chosen: WalkPeriods? = nil,
          store: WalkPositionStore? = WalkPositionStore(),
          scheduler: WalkScheduling? = nil, listener: WalkListening? = nil, sound: WalkSoundPlaying? = nil,
+         suggester: WalkSuggesting? = nil,
          calendarAccess: @escaping @MainActor () -> AppleCalendarAccess = { AppleCalendarService.shared.access },
          requestCalendar: @escaping @MainActor () async -> Void = { await AppleCalendarService.shared.requestAccess() },
          calendarEvents: @escaping @MainActor (Date) -> [TimelineItem]? = { CalendarFeed.shared.items(for: $0) },
@@ -127,6 +136,7 @@ extension Dictation: WalkListening {}
             return dictation
         }()
         self.sound = sound ?? WalkSound.shared
+        self.suggester = suggester
         self.context = context
         self.calendarAccess = calendarAccess
         self.requestCalendar = requestCalendar
@@ -134,6 +144,7 @@ extension Dictation: WalkListening {}
         self.clock = clock
         // A walk with no store (a walk-down) keeps no place: Leave for now does not say it does.
         self.state.placeKept = store != nil
+        self.state.canSuggest = suggester != nil
         readEnding()
         // Picked back up after Leave for now: no longer paused, so from here on it resumes as any walk in progress.
         if resuming?.status == .paused { save(.inProgress) }
@@ -161,7 +172,7 @@ extension Dictation: WalkListening {}
     /// it (every plant has already saved), so the walk can be resumed from there.
     func close() {
         cancelListening()
-        for timer in [WalkTimer.hold, .undo, .note, .finish] { scheduler.cancel(key: Self.key(timer)) }
+        for timer in [WalkTimer.hold, .undo, .note, .finish, .suggest] { scheduler.cancel(key: Self.key(timer)) }
         for name in WalkSoundName.allCases {
             scheduler.cancel(key: Self.soundKey(name))
             scheduler.cancel(key: Self.hapticKey(name))
@@ -185,6 +196,7 @@ extension Dictation: WalkListening {}
             case .finishListening: finishListening()
             case .sound(let name, let ms): play(name, after: ms)
             case .askCalendar: askCalendar()
+            case .suggest(let request): suggest(request)
             }
         }
     }
@@ -273,6 +285,20 @@ extension Dictation: WalkListening {}
             session = .none
         case .none, .cancelledWhileStarting:
             break
+        }
+    }
+
+    /// The server is asked through the scheduler; whatever comes back (nil for a failure) goes to the
+    /// state, which takes it only while it is still waiting for that place.
+    private func suggest(_ request: WalkSuggestRequest) {
+        guard let suggester else {
+            send(.suggested(request.place, nil))
+            return
+        }
+        scheduler.run { [weak self] in
+            let lines = await suggester.suggest(request)
+            guard let self, !self.closed else { return }
+            self.send(.suggested(request.place, lines))
         }
     }
 
@@ -410,6 +436,7 @@ extension Dictation: WalkListening {}
         case .undo: "undo"
         case .note: "note"
         case .finish: "finish"
+        case .suggest: "suggest"
         }
     }
 
@@ -424,6 +451,7 @@ extension Dictation: WalkListening {}
         case .undo: event = .undoExpired
         case .note: event = .noteExpired
         case .finish: event = .finishExpired
+        case .suggest: event = .suggestExpired
         }
         guard let ms else {
             scheduler.cancel(key: key)

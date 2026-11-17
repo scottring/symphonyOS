@@ -64,9 +64,13 @@ extension WalkLayout {
     static func stretch(wing: CGFloat) -> CGFloat {
         min((WalkArt.stageSize.width + 2 * max(0, wing)) / WalkArt.stageSize.width, 1.5)
     }
-    /// A standing flag's width (150 on a phone, up to 226.5), and the goal above's (24 less).
+    /// A standing flag's width (150 on a phone, up to 226.5). The goal above is as wide: it is the
+    /// post's sign, and what hangs under it hangs `under` in from its left edge, on a branch, so it
+    /// reads as part of it (the owner's observation of 2026-11-17: the goal above and the goals
+    /// added under it read as one list of equals).
     static func standingWidth(wing: CGFloat) -> CGFloat { 150 + 153 * (stretch(wing: wing) - 1) }
-    static func parentWidth(wing: CGFloat) -> CGFloat { standingWidth(wing: wing) - 24 }
+    static func parentWidth(wing: CGFloat) -> CGFloat { standingWidth(wing: wing) }
+    static let under: CGFloat = 12
     /// The side poles: left inner, left outer, right inner, right outer (90, 33, 300, 357 on a phone).
     static func sidePoles(wing: CGFloat) -> [CGFloat] {
         let m = stretch(wing: wing)
@@ -206,15 +210,25 @@ struct WalkStanding {
         if level == nil, pieces.isEmpty { return (nil, nil, sides) }
 
         var frames: [CGRect] = []
-        let pillTop: CGFloat?
+        var pillTop: CGFloat?
         let ceiling: CGFloat
         if level != nil {
             // Ruled: the cloths hang from the lowest cloth's place, the pill 6 above the top one; a
             // post with nothing on it is a short pole with the pill on its top.
+            // Under a goal above, the step's own cloths hang `under` in from its left edge, their right
+            // edges with its right edge ("+n more" in the middle of their room).
+            let hangsUnder = pieces.first?.kind == .parent
             var y = L.lowestCloth
             for piece in pieces.reversed() {
-                frames.insert(CGRect(x: L.centreX - piece.size.width / 2, y: y - piece.size.height,
-                                     width: piece.size.width, height: piece.size.height), at: 0)
+                let x: CGFloat
+                if !hangsUnder || piece.kind == .parent {
+                    x = L.centreX - piece.size.width / 2
+                } else if case .more = piece.kind {
+                    x = L.centreX + L.under / 2 - piece.size.width / 2
+                } else {
+                    x = L.centreX + width / 2 - piece.size.width
+                }
+                frames.insert(CGRect(x: x, y: y - piece.size.height, width: piece.size.width, height: piece.size.height), at: 0)
                 y -= piece.size.height + L.clothGap
             }
             let clothsTop = frames.first?.minY ?? L.standingFoot - L.barePole
@@ -229,6 +243,17 @@ struct WalkStanding {
             for piece in pieces {
                 frames.append(CGRect(x: L.centreX - piece.size.width / 2, y: y, width: piece.size.width, height: piece.size.height))
                 y += piece.size.height + L.lookBackGap
+            }
+            // The sign stands at a signpost's height (the owner's observation of 2026-11-17: the cloths
+            // in the sky over half a screen of bare pole): where its foot stands lower than `pole` under
+            // the stack, the stack and its pill come down to it, so the bare pole is 24 as on every step.
+            // A stack too tall for that stays where it hangs.
+            if let end = frames.last?.maxY {
+                let drop = lookBackFoot(end) - L.pole - end
+                if drop > 0 {
+                    frames = frames.map { $0.offsetBy(dx: 0, dy: drop) }
+                    pillTop = pillTop.map { $0 + drop }
+                }
             }
             ceiling = sides.contains { $0.area != nil } ? L.lookBackWordsFoot : L.lookBackHeader
         }
@@ -264,6 +289,7 @@ struct WalkStanding {
         var post = L.Post(id: postId, key: WalkPostKey(level: level ?? .year, column: s.standing), base: base, top: top,
                           pale: !pieces.isEmpty && pieces.allSatisfy { $0.kind == .ghost }, banners: banners)
         post.lean = hand.lean
+        post.branch = L.Branch(under: banners)
         // The bare pole under the lowest cloth: 24 on Year to Today (and the lift); looking back up, down to the foot.
         post.pole = level == nil ? foot - (frames.last.map { $0.maxY } ?? clothsTop) + hand.lift
             : (frames.isEmpty ? L.barePole : L.pole) + hand.lift
@@ -346,7 +372,9 @@ struct WalkStanding {
         let goalLines = goal.map { L.lines(for: $0.title, width: L.parentWidth(wing: wing), face: .parent) }
             ?? (loose ? L.lines(for: WalkCopy.noGoalAbove, width: L.parentWidth(wing: wing), face: .parent) : 0)
         let flags = self.flags(level)
-        let ghosts = s.examplesOn.contains(s.step) ? s.examplesLeft(today: today).map { ghostPiece($0, level) } : []
+        // Under a goal above (or the stop for the flags under none) the step's cloths are `under` narrower.
+        let across = goal != nil || loose ? width - L.under : width
+        let ghosts = s.examplesOn.contains(s.step) ? s.examplesLeft(today: today).map { ghostPiece($0, level, across: across) } : []
         let pill = s.area(s.standing).map(pillSize)?.height
         let room = L.lowestCloth - L.question
 
@@ -375,14 +403,14 @@ struct WalkStanding {
             if let chosen, !out.isEmpty, !out.contains(chosen) { out[0] = chosen }
             return out
         }
-        func own(_ n: Int) -> [Piece] { shown(n).map { flagPiece($0, level, lines: nil) } }
+        func own(_ n: Int) -> [Piece] { shown(n).map { flagPiece($0, level, lines: nil, across: across) } }
         /// One flag, cut to the most lines that fit beside these examples.
         func cut(_ examples: [Piece]) -> [Piece]? {
             guard let one = shown(1).first else { return nil }
-            for lines in stride(from: flagPiece(one, level, lines: nil).lines - 1, to: 0, by: -1) {
-                if let cloths = fitted([flagPiece(one, level, lines: lines)], examples) { return cloths }
+            for lines in stride(from: flagPiece(one, level, lines: nil, across: across).lines - 1, to: 0, by: -1) {
+                if let cloths = fitted([flagPiece(one, level, lines: lines, across: across)], examples) { return cloths }
             }
-            return stack(min(1, goalLines), [flagPiece(one, level, lines: 1)], examples)
+            return stack(min(1, goalLines), [flagPiece(one, level, lines: 1, across: across)], examples)
         }
 
         if !ghosts.isEmpty {
@@ -435,30 +463,30 @@ struct WalkStanding {
         CGSize(width: L.parentWidth(wing: wing), height: L.parentPad + L.parentLine * CGFloat(lines) + (counted ? L.tagLine : 0))
     }
 
-    /// A flag of the step's level (on Today the first thing, tagged). `lines`: cut to these; nil, in full.
-    func flagPiece(_ item: WalkItem, _ level: WalkLevel, lines: Int?) -> Piece {
+    /// A flag of the step's level (on Today the first thing, tagged), `across` wide. `lines`: cut to these; nil, in full.
+    func flagPiece(_ item: WalkItem, _ level: WalkLevel, lines: Int?, across: CGFloat) -> Piece {
         let first = level == .today
         let tag: String? = first ? WalkCopy.firstThingTag
             : (level == .week ? item.day.map { WalkWords.tag(for: $0, today: today) } : nil)
         let role = L.role(item, in: s, firstThing: first)
-        let words = L.setLines(item.title, face: .flag, width: width - L.Face.flag.inset, limit: lines ?? 3)
+        let words = L.setLines(item.title, face: .flag, width: across - L.Face.flag.inset, limit: lines ?? 3)
         let lines = lines ?? max(1, words.count)
         // A chosen flag glows, and so does a first thing that is the goal above.
         let glows = s.selected == item.id || (first && s.focus[.today] == item.id)
         return Piece(id: "\(postId)-\(item.id.uuidString)", who: item.id.uuidString, kind: .full, item: item, level: level,
                      text: L.normalised(item.title), tag: tag, glows: glows,
                      label: WalkCopy.bannerLabel(item.title, level: level, tag: tag, role: role), taps: role.taps,
-                     words: words, lines: lines, size: flagSize(lines: lines, tagged: tag != nil))
+                     words: words, lines: lines, size: flagSize(lines: lines, tagged: tag != nil, across: across))
     }
 
-    func ghostPiece(_ text: String, _ level: WalkLevel) -> Piece {
-        let words = L.setLines(text, face: .flag, width: width - L.Face.flag.inset, limit: 3)
+    func ghostPiece(_ text: String, _ level: WalkLevel, across: CGFloat) -> Piece {
+        let words = L.setLines(text, face: .flag, width: across - L.Face.flag.inset, limit: 3)
         let lines = max(1, words.count)
         // `text` is the example as written: a tap plants exactly it.
         return Piece(id: "\(postId)-example-\(text)", who: "example:\(text)", kind: .ghost, item: nil, level: level,
-                     text: text, tag: L.exampleTag(forWidth: width), glows: false,
+                     text: text, tag: L.exampleTag(forWidth: across), glows: false,
                      label: WalkCopy.bannerLabel(text, level: level, tag: nil, role: .example), taps: true,
-                     words: words, lines: lines, size: flagSize(lines: lines, tagged: true))
+                     words: words, lines: lines, size: flagSize(lines: lines, tagged: true, across: across))
     }
 
     /// Look back up (F6, F20): the area stood in, top to bottom, one cloth for each level holding a flag
@@ -503,8 +531,8 @@ struct WalkStanding {
               lines: 1, size: L.moreSize)
     }
 
-    func flagSize(lines: Int, tagged: Bool) -> CGSize {
-        CGSize(width: width, height: L.flagPad + L.flagLine * CGFloat(lines) + (tagged ? L.tagLine : 0))
+    func flagSize(lines: Int, tagged: Bool, across: CGFloat) -> CGSize {
+        CGSize(width: across, height: L.flagPad + L.flagLine * CGFloat(lines) + (tagged ? L.tagLine : 0))
     }
 
     // MARK: The side posts

@@ -287,6 +287,14 @@ extension iOSMainView {
     /// opens it once, over an empty in-memory store or over the mockup's preview at step N,
     /// then drives it into a state for a screenshot. A demo saves its position only in
     /// `DemoMode.walkStore`, emptied at launch, so Leave for now can be picked back up within one run.
+    /// The walk's suggestions from the server; none in a demo, which is never signed in.
+    private var walkSuggester: WalkSuggesting? {
+        #if DEBUG
+        if DemoMode.isOn { return nil }
+        #endif
+        return WalkSuggestService()
+    }
+
     private func considerWalk(animated: Bool = true) {
         let userId = auth.currentUser?.id
         // A walk down from a light page or sign, ahead of any other: never stored, and over,
@@ -294,7 +302,7 @@ extension iOSMainView {
         switch DailyWalkDown.decide(appState.walkDown, walkUp: walk != nil, userId: userId, edition: appState.edition) {
         case .open(let down):
             appState.walkDown = nil
-            let model = down.model(context: modelContext)
+            let model = down.model(context: modelContext, suggester: walkSuggester)
             model.onEnd = { status in
                 closeWalk()
                 if !down.keepsTell { appState.tellRequested = false }   // back on a page that takes no Tell
@@ -369,7 +377,8 @@ extension iOSMainView {
                               householdsPulled: appState.householdsPulled)
         let model = WalkModel(context: modelContext, userId: userId, entry: opening.entry, position: opening.position,
                               edition: edition, seasons: householdRows.first?.seasons,
-                              store: store, listener: opening.listener)
+                              store: store, listener: opening.listener,
+                              suggester: walkSuggester)
         model.onEnd = { status in
             closeWalk()
             // Leave for now: Today, with the walk waiting to be picked up.

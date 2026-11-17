@@ -23,13 +23,13 @@ extension WalkState {
     // MARK: Examples (F27, and the library)
 
     /// Where a page of examples belongs: the step, the area stood in and the goal above shown.
-    struct ExamplePlace: Equatable { var step: Int; var standing: UUID?; var above: UUID? }
+    struct ExamplePlace: Hashable { var step: Int; var standing: UUID?; var above: UUID? }
     /// The page of examples the walk is on at a place, and how many pages this showing has gone through.
     struct ExamplePage: Equatable { var place: ExamplePlace; var index = 0; var seen = 0 }
     /// The most pages one showing goes through before the choice reads "Hide examples".
     static let examplePagesAShowing = 3
 
-    private var examplePlace: ExamplePlace {
+    var examplePlace: ExamplePlace {
         ExamplePlace(step: step, standing: standing, above: level.flatMap { focus[$0] })
     }
 
@@ -45,11 +45,17 @@ extension WalkState {
     /// Every example for this step in the area stood in, best first (`WalkExampleLibrary.pool`), in
     /// pages of as many as show at once. None on Today, on the ground, on the nameless post or in an
     /// area of the person's own.
+    /// While suggestions are waited for here, nothing shows. What the server suggested for this
+    /// place is the first page, and the library's follow (less any line the server also wrote).
     private func examplePages() -> [[String]] {
-        guard let level, !ground, (1...4).contains(step) else { return [] }
+        guard let level, !ground, (1...4).contains(step), !isSuggesting else { return [] }
+        let written = suggestions[examplePlace] ?? []
+        let taken = Set(written.map { $0.lowercased() })
         let pool = WalkExampleLibrary.pool(level, area: area(standing)?.name, above: titlesAbove())
+            .filter { !taken.contains($0.lowercased()) }
         let size = WalkExampleLibrary.pageSize(level)
-        return stride(from: 0, to: pool.count, by: size).map { Array(pool[$0..<min($0 + size, pool.count)]) }
+        let pages = stride(from: 0, to: pool.count, by: size).map { Array(pool[$0..<min($0 + size, pool.count)]) }
+        return written.isEmpty ? pages : [written] + pages
     }
 
     /// A page's examples not yet used: not already planted on this level (the same title ignoring
@@ -100,9 +106,25 @@ extension WalkState {
     /// The examples choice. Off: the page the walk is on here shows. On: the next page with one left
     /// shows, for up to `examplePagesAShowing` pages; then they hide. Hiding keeps the page, so asking
     /// again brings the same ones back, and "Other examples" goes on from there.
-    mutating func toggleExamples(today: Date) {
+    ///
+    /// Under a goal, the first ask at a place goes to the server when it can be asked (`couldSuggest`):
+    /// the examples are on, nothing shows while the answer is waited for (`isSuggesting`, at most
+    /// `suggestMs`), and what comes back is the first page. Asking again while waiting calls it off.
+    mutating func toggleExamples(_ env: WalkEnv) -> [WalkEffect] {
+        let today = env.periods.today
+        if isSuggesting {
+            suggesting = nil
+            examplesOn.remove(step)
+            return [.timer(.suggest, ms: nil)]
+        }
+        if !examplesOn.contains(step), couldSuggest, let request = suggestRequest(env.periods) {
+            suggesting = request.place
+            examplesOn.insert(step)
+            examplePage = ExamplePage(place: request.place, index: 0, seen: 1)
+            return [.suggest(request), .timer(.suggest, ms: WalkState.suggestMs)]
+        }
         let pages = examplePages()
-        guard let index = pageWithOneLeft(pages, from: examplePageIndex(pages), today: today) else { return }
+        guard let index = pageWithOneLeft(pages, from: examplePageIndex(pages), today: today) else { return [] }
         var page = examplePage?.place == examplePlace ? examplePage ?? ExamplePage(place: examplePlace)
                                                       : ExamplePage(place: examplePlace)
         let others = showsOtherExamples(today: today)
@@ -118,11 +140,13 @@ extension WalkState {
             page.seen = 0
         }
         examplePage = page
+        return []
     }
 
     /// The page that shows has no example left: they were all used, as examples or in the person's
     /// own words (P23).
     private func shownPageIsUsedUp(today: Date) -> Bool {
+        if isSuggesting { return false }            // nothing shows yet: the answer is still on its way
         let pages = examplePages()
         guard !pages.isEmpty else { return true }
         return unused(pages[examplePageIndex(pages)], today: today).isEmpty
