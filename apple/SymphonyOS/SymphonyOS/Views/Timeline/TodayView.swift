@@ -130,8 +130,9 @@ struct TodayView: View {
         .task(id: calendar.readKey(for: date)) { await calendar.refresh(date, maxAge: 60) }
         .task { if appState.edition.allows(.dinner) { await dinners.refresh(date) } }
         #if os(iOS)
-        // The widgets carry tomorrow and the day after as well.
-        .task {
+        // The widgets carry tomorrow and the day after as well. Read again when the calendar's source
+        // changes: the feed reads nothing until the edition is known.
+        .task(id: calendar.refreshKey) {
             for offset in 1..<WidgetFeed.dayCount {
                 await calendar.refresh(PlanCalendar.addDays(.now, offset), maxAge: 600)
             }
