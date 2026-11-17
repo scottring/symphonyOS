@@ -9,6 +9,7 @@ import { historyAppDef } from '@/apps/history';
 import { listsAppDef } from '@/apps/lists';
 import { contactsAppDef } from '@/apps/contacts';
 import { documentsAppDef } from '@/apps/documents';
+import { loginsAppDef } from '@/apps/logins';
 import { notesAppDef } from '@/apps/notes';
 import { discussionsAppDef } from '@/apps/discussions';
 import { routinesAppDef } from '@/apps/routines';
@@ -78,6 +79,7 @@ export const appRegistry: AppRegistry = createRegistry([
   listsAppDef,
   contactsAppDef,
   documentsAppDef,
+  loginsAppDef,
   notesAppDef,
   discussionsAppDef,
   routinesAppDef,

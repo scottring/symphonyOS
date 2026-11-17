@@ -22,6 +22,7 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
     { label: 'School digest', route: '/school-digest' },
     { label: 'Contacts', route: '/contacts' },
     { label: 'Documents', route: '/documents' },
+    { label: 'Logins', route: '/logins' },
     { label: 'Notes', route: '/notes' },
     { label: 'History', route: '/history' },
     // The printable sheets. Reachable by URL since they shipped, but nothing

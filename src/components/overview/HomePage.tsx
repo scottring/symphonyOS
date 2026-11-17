@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { Link, useLocation } from 'react-router-dom'
 import {
   ArrowRight, BookOpen, Check, Clock, FileText, Home as HouseIcon, Inbox, List, MessageCircle, NotebookText, Repeat, RotateCcw, Sparkles, Users, UtensilsCrossed,
+  KeyRound,
 } from 'lucide-react'
 import { GoalsProvider } from '@/contexts/GoalsContext'
 import { useHomeBearings, type Rung, type TodayRow } from '@/hooks/useHomeBearings'
@@ -54,6 +55,7 @@ const LIBRARY = [
   { label: 'Notes', hint: 'Everything you’ve written down', to: '/notes', Icon: NotebookText },
   { label: 'Contacts', hint: 'People and places you call', to: '/contacts', Icon: Users },
   { label: 'Documents', hint: 'Forms, scans and files', to: '/documents', Icon: FileText },
+  { label: 'Logins', hint: 'Sites, usernames and password hints', to: '/logins', Icon: KeyRound },
   { label: 'House', hint: 'Rooms, appliances, upkeep', to: '/home', Icon: HouseIcon },
   { label: 'Planning guide', hint: 'Plan from paper, or be walked through it', to: '/guide', Icon: BookOpen },
 ]

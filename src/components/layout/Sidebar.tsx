@@ -27,6 +27,7 @@ import {
   History,
   Settings,
   LogOut,
+  KeyRound,
 } from 'lucide-react'
 
 // Feature flags for in-progress features
@@ -97,6 +98,7 @@ export function Sidebar({
     location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
     location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
     location.pathname.startsWith('/routines') || location.pathname.startsWith('/documents') ||
+    location.pathname.startsWith('/logins') ||
     location.pathname.startsWith('/notes')
 
   useEffect(() => {
@@ -407,6 +409,15 @@ export function Sidebar({
           >
             {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Documents</span>}
+          </button>
+
+          {/* Logins — site, username and a password hint; private to you */}
+          <button
+            onClick={() => navigate('/logins')}
+            className={navItemClass(location.pathname.startsWith('/logins'))}
+          >
+            {createElement(KeyRound, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Logins</span>}
           </button>
 
           {/* Notes — the stream. Every other notes editor in the app is reached
