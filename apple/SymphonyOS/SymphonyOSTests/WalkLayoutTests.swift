@@ -1910,11 +1910,12 @@ struct WalkLayoutTests {
     @Test func theRaisedSheetCoversTheMountain() {
         let env = WalkEnv(periods: WalkPeriods.pick(now: today, weekStartsOn: 0), now: today)
         var s = plan(DemoStress.full, step: 6, standing: "Health")
-        s.sheetOpen = true
-        #expect(s.sheetRaised)
-        let raised = ruled(s)
+        var bare = s
+        bare.items = []                                         // raised only with no plan to look back at
+        #expect(bare.sheetRaised)
+        let raised = ruled(bare)
         #expect(raised.posts.isEmpty && raised.labels.isEmpty && raised.sides.isEmpty && raised.lookBackHint == nil)
-        s.sheetOpen = false
+        #expect(!s.sheetRaised)
         #expect(ruled(s).posts.count == 1 && ruled(s).lookBackHint != nil)
         _ = s.apply(.lookBackPaper(.month), env)
         #expect(s.paperOpen && ruled(s).posts.isEmpty && ruled(s).labels.isEmpty && ruled(s).sides.isEmpty)
@@ -2368,7 +2369,7 @@ struct WalkLayoutTests {
         let lines = Dictionary(uniqueKeysWithValues: welcome.map { p in
             (p.at, WalkLayout.pointWords(p, among: welcome.map(\.at)).filter(\.detail).map(\.text)) })
         #expect(lines[.nw] == ["Every part of life.", "About 25 minutes."])
-        #expect(lines[.ne] == ["Go straight to Today."])
+        #expect(lines[.ne] == ["One goal, down to today.", "About 3 minutes."])
     }
 
     // MARK: The controls: the top row, the foot, above the light
@@ -2711,7 +2712,7 @@ struct WalkLayoutTests {
             #expect(WalkLayout.hintFrame(s) == CGRect(x: 10, y: 572, width: 370, height: 19.5), "step \(s.step)")
             #expect(WalkLayout.nextFrame(s).map { !Invariants.overlap($0, WalkLayout.hintFrame(s)!) } == true)
         }
-        #expect(WalkLayout.hintFrame(WalkState()) == CGRect(x: 10, y: 790.5, width: 370, height: 19.5))
+        #expect(WalkLayout.hintFrame(WalkState()) == nil)        // Welcome has no hint: every choice says what it is
     }
 
     /// While the light is open or speaking Next is not drawn and the hint stands at the foot (top 766);

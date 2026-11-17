@@ -1419,7 +1419,6 @@ struct WalkPlantTests {
         s.emptyHolds = 1
         s.sessionOver = true
         s.speechIsOff = true
-        s.sheetOpen = true
         s.calendarOffer = true
 
         #expect(s.apply(.walkAnother, m.env) == [.save])
@@ -1431,7 +1430,6 @@ struct WalkPlantTests {
         #expect(s.examplesOn.isEmpty && s.note == nil)
         #expect(s.selected == nil && s.expanded == nil && s.typing == nil)
         #expect(s.orb == .idle && !s.orbWasOpen && s.emptyHolds == 0 && !s.sessionOver)
-        #expect(!s.sheetOpen)
         // What belongs to the day, the ridge or the phone stays.
         #expect(s.items == [m.strong, m.bathroom, m.lift, tile, gym])
         #expect(s.kept == [m.health.id, m.home.id, m.people.id])

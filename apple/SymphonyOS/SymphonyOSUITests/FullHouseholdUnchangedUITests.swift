@@ -61,7 +61,7 @@ final class FullHouseholdUnchangedUITests: XCTestCase {
 
     /// A full household's walk ends as it always did: on the old Today, with no bar.
     @MainActor func testTheWalkEndsOnTheOldToday() throws {
-        let (app, any) = launch(["-SymphonyWalk", "-SymphonyWalkStep", "6", "-SymphonyWalkSheet", "up"])
+        let (app, any) = launch(["-SymphonyWalk", "-SymphonyWalkStep", "6"])
         let goToToday = any["walk.goToToday"]
         XCTAssertTrue(goToToday.waitForExistence(timeout: 60), "the walk's ending never showed")
         goToToday.tap()

@@ -21,8 +21,7 @@ final class LightDailyUITests: XCTestCase {
     /// A light household's walk ends on light Today, with the signpost and the bar and no dock;
     /// the row of words then opens Week, and Month with the walk's own month goal on it, and Today again.
     @MainActor func testFromTheWalksEndToTodayWeekAndMonth() throws {
-        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk", "-SymphonyWalkStep", "6",
-                                 "-SymphonyWalkSheet", "up"])
+        let (app, any) = launch(["-SymphonyDemo", "-SymphonyLight", "-SymphonyWalk", "-SymphonyWalkStep", "6"])
         let goToToday = any["walk.goToToday"]
         XCTAssertTrue(goToToday.waitForExistence(timeout: 60), "the walk's ending never showed")
         goToToday.tap()
@@ -76,7 +75,7 @@ final class LightDailyUITests: XCTestCase {
         let year = any["walk.lookback.year"]
         XCTAssertTrue(year.waitForExistence(timeout: 60), "no year cloth on Look back up")
         // The ending sheet has risen in (its handle is there) before the cloth is tapped.
-        XCTAssertTrue(any["walk.sheetHandle"].waitForExistence(timeout: 15), "the ending sheet never rose")
+        XCTAssertTrue(any["walk.goToToday"].waitForExistence(timeout: 15), "the ending sheet never rose")
         let standing = any["walk.standing"]
         XCTAssertEqual(standing.label, "Health")
         XCTAssertTrue(year.label.contains("tap to read the list"), year.label)

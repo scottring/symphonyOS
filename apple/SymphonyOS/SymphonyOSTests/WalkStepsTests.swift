@@ -512,7 +512,7 @@ struct WalkStepsTests {
         let effects = s.act(.next, m.env)
         #expect(s.step == 6)
         #expect(s.level == nil)
-        #expect(s.sheetOpen == false)
+        #expect(!s.sheetRaised)
         #expect(s.selected == nil)
         #expect(s.typing == nil)
         #expect(s.orb == .idle)
@@ -522,11 +522,9 @@ struct WalkStepsTests {
 
     @Test func stepsNeverPassSix() {
         var s = m.at(6)
-        s.sheetOpen = true
         #expect(s.act(.next, m.env) == [])
         #expect(s.act(.next, m.env) == [])
-        #expect(s.step == 6)
-        #expect(s.sheetOpen)                    // walking on at the bottom changes nothing
+        #expect(s.step == 6 && !s.ended)        // walking on at the bottom changes nothing
     }
 
     @Test func enteringTodayOffersTheCalendarOnlyWhenAsked() {
@@ -580,31 +578,28 @@ struct WalkStepsTests {
         #expect(today.act(.calendar, env) == [])
     }
 
-    @Test func theHandleRaisesAndLowersTheSheetOnlyAtTheEnding() {
+    /// With a plan the sheet peeks and its handle, "Take me to Today", ends the walk onto Today
+    /// (2026-11-17, the owner: no separate "Show my day" and "Open Today").
+    @Test func theHandleGoesToTodayOnlyAtTheEnding() {
         var s = m.at(6)
-        #expect(!s.sheetOpen && !s.sheetRaised)
-        #expect(s.endingTitle == WalkCopy.lookBack && s.sheetHandleLabel == WalkCopy.showMyDay)
-        #expect(s.apply(.sheetHandle, m.env) == [])
-        #expect(s.sheetOpen && s.sheetRaised)
-        #expect(s.endingTitle == WalkCopy.heresToday && s.sheetHandleLabel == WalkCopy.lookBackHandle)
-        _ = s.apply(.sheetHandle, m.env)
-        #expect(!s.sheetOpen)
+        #expect(!s.sheetRaised)
+        #expect(s.endingTitle == WalkCopy.lookBack && s.sheetHandleLabel == WalkCopy.goToToday)
+        #expect(s.apply(.sheetHandle, m.env) == [.timer(.finish, ms: nil), .end(.finished)])
 
-        // Nothing planted to look back at: the sheet stands up, with no handle to lower it.
+        // Nothing planted to look back at: the sheet stands up, with no handle, only its own button.
         var bare = m.welcome()
         bare.step = 6
         #expect(bare.sheetRaised && bare.endingTitle == WalkCopy.heresToday && bare.sheetHandleLabel == nil)
-        _ = bare.apply(.sheetHandle, m.env)
-        #expect(!bare.sheetOpen)
+        #expect(bare.apply(.sheetHandle, m.env) == [])
+        #expect(bare.apply(.goToToday, m.env) == [.timer(.finish, ms: nil), .end(.finished)])
 
         var today = m.at(5)
-        _ = today.apply(.sheetHandle, m.env)
-        #expect(!today.sheetOpen)
+        #expect(today.apply(.sheetHandle, m.env) == [])
+        #expect(today.step == 5)
     }
 
     @Test func goToTodayEndsTheWalkFinishedFromTheEndingOnly() {
         var s = m.at(6)
-        s.sheetOpen = true
         #expect(s.apply(.goToToday, m.env) == [.timer(.finish, ms: nil), .end(.finished)])
         var today = m.at(5)
         #expect(today.apply(.goToToday, m.env) == [])

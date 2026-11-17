@@ -32,7 +32,7 @@ extension WalkState {
 
     /// Next at the foot shows on steps 1 to 5 while the light is at rest and nothing is being typed,
     /// the lesson included (S19: it shows the way on), and not while the paper is up. On Welcome it is
-    /// the quick start, under the light while it is not pressed.
+    /// Not now, under the light while it is not pressed.
     var showsNextLine: Bool {
         if step == 0 { return orb == .idle || orb == .open }
         return (1...5).contains(step) && orb == .idle && typing == nil && !paperOpen

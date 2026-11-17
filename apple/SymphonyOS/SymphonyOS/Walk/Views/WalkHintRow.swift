@@ -83,22 +83,24 @@ struct WalkHintRow: View {
 
     // MARK: Next, the hint and Undo
 
-    /// Welcome's quick start under the light (F8, unchanged): glowing words with the light's gold arrow
-    /// after them, and a second line under them saying what it is.
+    /// Welcome's line under the light (F8): glowing words and a second line under them saying what
+    /// it does. Since 2026-11-17 it is Not now, drawn as a skip: quieter words and no gold arrow.
     private func welcomeLine(_ line: WalkCopy.NextLine) -> some View {
         Button { model.send(.nextTapped) } label: {
             VStack(spacing: 1) {
                 HStack(spacing: 6) {
                     Text(line.text)
                         .font(.custom("DMSans-SemiBold", size: 16))
-                        .foregroundStyle(.white.opacity(line.skip ? 0.7 : 1))
+                        .foregroundStyle(.white.opacity(line.skip ? 0.85 : 1))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .walkGlow()
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 17, weight: .regular))
-                        .foregroundStyle(WalkPalette.gold)
-                        .shadow(color: WalkPalette.glowShadow.opacity(0.6), radius: 2)
+                    if !line.skip {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundStyle(WalkPalette.gold)
+                            .shadow(color: WalkPalette.glowShadow.opacity(0.6), radius: 2)
+                    }
                 }
                 if let detail = line.detail {
                     Text(detail)
@@ -114,9 +116,8 @@ struct WalkHintRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(line.text)
+        .walkAccessibilityHint(line.detail)
         .accessibilityIdentifier("walk.next")
-        // On Welcome the light itself reads the quick start (`WalkCopy.orbLabelWelcome`): the line is not read twice.
-        .accessibilityHidden(true)
     }
 
     /// Next on steps 1 to 5: a gold button 50 high, its words plus 56 wide (160 to 280), with the light's

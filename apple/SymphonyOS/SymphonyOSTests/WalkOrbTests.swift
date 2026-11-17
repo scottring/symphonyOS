@@ -294,10 +294,10 @@ struct WalkOrbTests {
     @Test func welcomeStartsWithItsPointsShowing() {
         let welcome = WalkState()
         #expect(welcome.showsPoints && welcome.showsVeil)
-        #expect(WalkCopy.hint(welcome) == WalkCopy.hintChoose)
+        #expect(WalkCopy.hint(welcome) == "")
         #expect(welcome.lightSymbol == "figure.walk")
         #expect(WalkCopy.nextLine(welcome, env.periods)
-                == WalkCopy.NextLine(text: WalkCopy.quickStart, action: .quick, skip: false, detail: WalkCopy.quickDetail))
+                == WalkCopy.NextLine(text: WalkCopy.notNow, action: .notNow, skip: true, detail: WalkCopy.notNowDetail))
         #expect(!welcome.showsMore)
         var s = welcome
         _ = s.apply(.point(.nw), env)
@@ -306,12 +306,15 @@ struct WalkOrbTests {
         _ = t.apply(.veilTapped, env)
         #expect(t.showsPoints && t.step == 0)
         _ = t.apply(.point(.ne), env)
-        #expect(t.ended)
+        #expect(t.step == 1 && t.ground && t.depth == .quick)       // upper-right: the quick start
+        var u = welcome
+        _ = u.apply(.nextTapped, env)                               // the line under the light: Not now
+        #expect(u.ended)
     }
 
-    /// On Welcome a tap on the light, a hold on it, and a tap on the line under it each do exactly
-    /// what choosing the quick start does (the old bottom point): the same state and effects (the
-    /// light's press also lets go of its hold timer, as every press does).
+    /// On Welcome a tap on the light, a hold on it, and a tap on the Quick start point each do exactly
+    /// what choosing the quick start does: the same state and effects (the light's press also lets go
+    /// of its hold timer, as every press does).
     @Test func onWelcomeTheLightIsTheQuickStart() {
         var chosen = WalkState()
         chosen.orb = .open
@@ -325,9 +328,9 @@ struct WalkOrbTests {
             #expect(light == chosen, "held \(heldMs)")
             #expect(up.filter { $0 != .timer(.hold, ms: nil) } == point)
         }
-        var line = WalkState()
-        #expect(line.apply(.nextTapped, env) == point)
-        #expect(line == chosen)
+        var upper = WalkState()
+        #expect(upper.apply(.point(.ne), env) == point)
+        #expect(upper == chosen)
     }
 
     /// "More" opens the compass exactly as a tap on the light does (the light's press also

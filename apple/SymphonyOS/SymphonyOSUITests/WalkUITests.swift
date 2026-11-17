@@ -248,9 +248,10 @@ final class WalkUITests: XCTestCase {
         app.launchDemo()
         XCTAssertTrue(app.staticTexts[welcome].waitForExistence(timeout: 60), "the walk never opened")
 
-        // Welcome: the light itself is the quick start.
+        // Welcome: the two ways in above the light, Not now under it; the light itself is the quick start too.
         let orb = app.buttons["walk.orb"]
-        XCTAssertTrue(app.buttons["Plan my whole year"].exists && app.buttons["Not now"].exists, "Welcome's other choices")
+        XCTAssertTrue(app.buttons["Plan my whole year"].exists && app.buttons["Quick start"].exists, "Welcome's two ways in")
+        XCTAssertTrue(app.buttons["Not now"].exists, "Welcome's Not now")
         tap(orb, "the light (Quick start)")
         tap(app.buttons["Health"], "the Health area")
         tap(app.buttons["Next: your goals"], "the Next line")

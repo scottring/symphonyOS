@@ -69,8 +69,10 @@ struct WalkEndingView: View {
     }
 }
 
-/// The paper itself: handle, today's date and ring, the next event, the rows,
-/// "Walk another one down", the closing line and "Open Today". It is laid out in the reading
+/// The paper itself. With a plan to look back at it only peeks: its handle ("Take me to Today") and,
+/// under it, "Plan another goal down to today" when a year goal has nothing under it, else today's
+/// date and ring. With none it stands raised: the date and ring, the next event, the rows, the
+/// closing line and "Take me to Today". It is laid out in the reading
 /// column; `bleed` is how far its paper runs past the column to the window's edges.
 struct WalkEndingSheet: View {
     let model: WalkModel
@@ -88,20 +90,25 @@ struct WalkEndingSheet: View {
             ScrollViewReader { scroller in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
-                        head.id(Self.top)
-                            .dynamicTypeSize(raised ? ...DynamicTypeSize.xLarge : ...DynamicTypeSize.large)
-                        if let next = model.nextUp { nextCard(next) }
-                        if !model.endingRows.isEmpty { rows }
-                        if let name = model.nextToWalk { walkAnother(name) }
-                        if let line = model.dayLine {
-                            Text(line)
-                                .font(.custom("CrimsonPro-Regular", size: 22))
-                                .foregroundStyle(EndingPaper.deepGreen)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 4)
+                        if !raised, let name = model.nextToWalk {
+                            walkAnother(name).id(Self.top)
+                        } else {
+                            head.id(Self.top)
+                                .dynamicTypeSize(raised ? ...DynamicTypeSize.xLarge : ...DynamicTypeSize.large)
                         }
-                        goToToday
+                        if raised {
+                            if let next = model.nextUp { nextCard(next) }
+                            if !model.endingRows.isEmpty { rows }
+                            if let line = model.dayLine {
+                                Text(line)
+                                    .font(.custom("CrimsonPro-Regular", size: 22))
+                                    .foregroundStyle(EndingPaper.deepGreen)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 4)
+                            }
+                            goToToday
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 28)
@@ -135,9 +142,9 @@ struct WalkEndingSheet: View {
 
     // MARK: Handle
 
-    /// A labelled button (S37): a capsule 36 high, its words and a chevron (up to raise the sheet, down
-    /// to lower it) 20 in from either end, inside the 56-point tap height. With nothing to look back at,
-    /// only the grabber.
+    /// A labelled button (S37): a capsule 36 high, "Take me to Today" and a chevron up, 20 in from either
+    /// end, inside the 56-point tap height; a tap ends the walk onto Today. With nothing to look back at
+    /// (the sheet stands raised, with its own button), only the grabber.
     @ViewBuilder private var handle: some View {
         if let label = model.state.sheetHandleLabel {
             Button { model.send(.sheetHandle) } label: {
@@ -147,7 +154,7 @@ struct WalkEndingSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
-            .accessibilityIdentifier("walk.sheetHandle")
+            .accessibilityIdentifier("walk.goToToday")      // it goes to Today, as the raised sheet's button does
         } else {
             Capsule().fill(EndingPaper.grabber).frame(width: 40, height: 5)
                 .frame(maxWidth: .infinity, minHeight: 20)

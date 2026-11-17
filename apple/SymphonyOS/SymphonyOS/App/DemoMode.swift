@@ -46,12 +46,6 @@ enum DemoMode {
     /// `-SymphonyWalkExamples`: the demo walk opens with the example flags on for its step.
     static var walkExamples: Bool { ProcessInfo.processInfo.arguments.contains("-SymphonyWalkExamples") }
 
-    /// `-SymphonyWalkSheet up`: on Look back up, the ending sheet raised (by its handle's own event).
-    static var walkSheetUp: Bool {
-        let args = ProcessInfo.processInfo.arguments
-        guard let i = args.firstIndex(of: "-SymphonyWalkSheet"), i + 1 < args.count else { return false }
-        return args[i + 1].lowercased() == "up"
-    }
 
     static let userId = UUID(uuidString: "00000000-0000-4000-8000-00000000D3E0")!
 
@@ -226,7 +220,6 @@ enum DemoMode {
     /// - `lookback:<level>`: on Look back up, a tap on that level's cloth (year, season, month, week,
     ///   today), so its paper is raised.
     /// With `-SymphonyWalkExamples` the Examples point is chosen first, so the step's example flags show.
-    /// With `-SymphonyWalkSheet up` the ending's handle is tapped last, so the sheet stands raised.
     @MainActor static func showWalk(_ model: WalkModel, _ steps: [String]) {
         if walkExamples { model.choose(.examples) }
         for step in steps {
@@ -287,7 +280,6 @@ enum DemoMode {
                 }
             }
         }
-        if walkSheetUp { model.send(.sheetHandle) }
     }
 
     /// With `speak` among the `-SymphonyWalkOrb` steps, the demo walk listens through

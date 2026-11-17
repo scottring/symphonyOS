@@ -489,12 +489,12 @@ final class LightEditionUITests: XCTestCase {
 
     // MARK: The handover
 
-    /// The walk on its last step with Today's sheet raised; `remembers` keeps the demo's memory of
+    /// The walk on its last step, left by its "Take me to Today"; `remembers` keeps the demo's memory of
     /// the handover's line from the launch before (`-SymphonyHandoverRemembers`).
     private func finishTheWalk(light: Bool, remembers: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-SymphonyDemo"] + (light ? ["-SymphonyLight"] : [])
-            + ["-SymphonyWalk", "-SymphonyWalkStep", "6", "-SymphonyWalkSheet", "up"]
+            + ["-SymphonyWalk", "-SymphonyWalkStep", "6"]
             + (remembers ? ["-SymphonyHandoverRemembers"] : [])
         app.launchDemo()
         // The ending's last control (`WalkCopy.goToToday`).

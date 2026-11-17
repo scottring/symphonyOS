@@ -92,7 +92,7 @@ enum WalkCopy {
     /// it stands above the light, while the light is busy at the foot, while typing just above the
     /// field, and on Welcome under its line (`WalkLayout.hintFrame`).
     static func hint(_ s: WalkState) -> String {
-        if s.step == 0 { return hintChoose }                // Welcome: the choices are always open
+        if s.step == 0 { return "" }                        // Welcome: every choice says what it is
         if s.teaching { return "" }                         // the light is being taught, in its own two lines
         if s.orb == .open { return hintOpen }
         if case .holding = s.orb { return "" }              // a press on its way to speaking, or a slide
@@ -115,8 +115,6 @@ enum WalkCopy {
         return s.speechIsOff ? hintSpeechOff : hintFirst
     }
 
-    /// Welcome: the light itself is the quick start.
-    static let hintChoose = "Tap the light for a quick start"
     static let hintOpen = "Tap one, or tap the light to close"
     static let hintFirst = "Hold the light and speak."
     static let hintAnother = "Hold the light to add another."
@@ -171,10 +169,11 @@ enum WalkCopy {
         }
     }
 
-    /// On Welcome the line under the light is the quick start, with what it is under it.
+    /// On Welcome the line under the light is Not now, drawn quieter, with what it does under it
+    /// (2026-11-17, the owner: Quick start went up beside Plan my whole year, Not now came down here).
     static func nextLine(_ s: WalkState, _ p: WalkPeriods) -> NextLine? {
         guard s.showsNextLine else { return nil }
-        if s.step == 0 { return NextLine(text: quickStart, action: .quick, skip: false, detail: quickDetail) }
+        if s.step == 0 { return NextLine(text: notNow, action: .notNow, skip: true, detail: notNowDetail) }
         guard let ahead = forward(s, p) else { return nil }
         return NextLine(text: ahead.label, action: ahead.action, skip: ahead.label == skipStep)
     }
@@ -247,8 +246,8 @@ enum WalkCopy {
     /// is never stored, `placeKept`).
     static func leaveHint(_ s: WalkState) -> String? { s.placeKept ? leaveDetail : nil }
 
-    /// The choices on the light. Welcome's two sit upper-left and upper-right, with room under each
-    /// for its second line (the light itself is the quick start). On steps 1 to 5 at most three, in
+    /// The choices on the light. Welcome's two ways in sit upper-left and upper-right, each with its
+    /// second line (a tap on the light is the quick start too; Not now is the line under it). On steps 1 to 5 at most three, in
     /// this order: Type it on the left ("Type your own" on the ground), the examples (steps 1 to 4 off
     /// the ground, while the area stood in has one left unused for the step, F27, P23) or, on Today while it is
     /// offered, the calendar on the right, and Undo at the top
@@ -257,7 +256,7 @@ enum WalkCopy {
         if s.step == 0 {
             return [
                 Point(at: .nw, label: wholeYear, action: .full, symbol: "mountain.2", detail: wholeDetail),
-                Point(at: .ne, label: notNow, action: .notNow, symbol: "xmark", detail: notNowDetail),
+                Point(at: .ne, label: quickStart, action: .quick, symbol: "figure.walk", detail: quickDetail),
             ].sorted { order($0.at) < order($1.at) }
         }
         guard let level = s.level else { return [] }
@@ -507,7 +506,7 @@ enum WalkCopy {
     /// Under Look back up's header while other areas stand at the side (F6).
     static let lookBackHint = "Tap a post to see that area"
     static let showMyDay = "Show my day"; static let lookBackHandle = "See my whole plan"
-    static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Open Today"
+    static let todayEyebrow = "Today"; static let walkAnother = "Plan another goal down to today"; static let goToToday = "Take me to Today"
     static let thatsTheDay = "That’s the day."; static let nothingToday = "Nothing for today yet."
     static func nextFlag(_ name: String) -> String { "Next: \(name)" }
     static func forGoal(_ name: String) -> String { "for \(name)" }

@@ -79,19 +79,15 @@ extension WalkLayout {
 
     /// The hint's top at rest (above the light), at the foot while the light is busy, and while typing.
     static let restHintTop: CGFloat = 572, footHintTop: CGFloat = 766, typingHintTop: CGFloat = 724
-    /// Welcome's hint, under its line.
-    static let welcomeHintTop: CGFloat = 790.5
 
     /// One line. At rest above the light; while the light is open, held, speaking or finishing at the
-    /// foot, where Next is not drawn; while typing (a note) just above the field; on Welcome under its
-    /// line. Not drawn while the Undo pill or the Move row stands in its place.
+    /// foot, where Next is not drawn; while typing (a note) just above the field. None on Welcome, where
+    /// every choice says what it is. Not drawn while the Undo pill or the Move row stands in its place.
     static func hintFrame(_ s: WalkState) -> CGRect? {
         let text = WalkCopy.hint(s)
         guard !text.isEmpty else { return nil }
         let top: CGFloat
-        if s.step == 0 {
-            top = welcomeHintTop
-        } else if s.typing != nil {
+        if s.typing != nil {
             top = typingHintTop
         } else if s.orb != .idle {
             top = footHintTop
@@ -173,7 +169,13 @@ extension WalkLayout {
     static let labelChar: CGFloat = 6.4, detailChar: CGFloat = 6.4
     static let labelLine: CGFloat = 16, detailLine: CGFloat = 17
     static let wordsGap: CGFloat = 4, detailGap: CGFloat = 2
-    static let labelWidth: CGFloat = 132, detailWidth: CGFloat = 152, wordsMargin: CGFloat = 12
+    static let labelWidth: CGFloat = 132, detailWidth: CGFloat = 160, wordsMargin: CGFloat = 12
+
+    /// A text's sentences, each keeping its full stop.
+    static func sentences(_ text: String) -> [String] {
+        let parts = text.components(separatedBy: ". ")
+        return parts.indices.map { i in i < parts.count - 1 ? parts[i] + "." : parts[i] }
+    }
 
     /// Greedy wrapping by words at `width`, by the character estimate.
     static func wrap(_ text: String, width: CGFloat, char: CGFloat) -> [String] {
@@ -201,7 +203,8 @@ extension WalkLayout {
         let disc = WalkOrb.position(of: p.at)
         // The right point's words sit beside the ring's widest part: they wrap narrower.
         let labels = wrap(p.label, width: p.at == .e ? 120 : labelWidth, char: labelChar)
-        let details = p.detail.map { wrap($0, width: detailWidth, char: detailChar) } ?? []
+        // A second line breaks between its sentences first ("One goal, down to today." / "About 3 minutes.").
+        let details = p.detail.map { sentences($0).flatMap { wrap($0, width: detailWidth, char: detailChar) } } ?? []
         let rows: [(text: String, detail: Bool, width: CGFloat)] =
             labels.map { ($0, false, CGFloat($0.count) * labelChar + 4) }
             + details.map { ($0, true, CGFloat($0.count) * detailChar + 4) }

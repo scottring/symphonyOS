@@ -54,7 +54,7 @@ struct WalkState: Equatable {
     var undo: [WalkUndoEntry] = []         // in memory only, by design: never saved, so a relaunch starts with nothing to undo
     var pulledChildren: [UUID: [UUID]] = [:]   // a pulled-up flag → the flags that named it as parent; in memory, for Undo
     var dayBeforeFirst: [UUID: Date?] = [:]    // a task the first-thing mark dated today → its day before; in memory
-    var sheetOpen = false; var calendarOffer = false
+    var calendarOffer = false
     /// The paper is raised over the mountain (F7): the whole level as a plain list by area. Belongs to
     /// the step it was opened on (`settle` closes it); never saved.
     var paperOpen = false
@@ -129,7 +129,8 @@ struct WalkState: Equatable {
         case .calendarAnswered:
             calendarOffer = false
             return []
-        case .sheetHandle: return moveSheet()
+        // The ending's handle goes to Today, as the raised sheet's button does (only with a plan to look back at).
+        case .sheetHandle: return step == 6 && !items.isEmpty ? end(.finished) : []
         case .goToToday: return step == 6 ? end(.finished) : []
         // Next at the foot: exactly what its own action does.
         case .nextTapped:
@@ -391,7 +392,6 @@ struct WalkState: Equatable {
         pulledChildren = [:]
         typing = nil
         orb = .idle
-        sheetOpen = false
         teaching = false
         paperOpen = false
         paperLevel = nil

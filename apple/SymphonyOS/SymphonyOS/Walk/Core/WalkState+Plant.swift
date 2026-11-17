@@ -466,31 +466,22 @@ extension WalkState {
         orbWasOpen = false
         emptyHolds = 0
         sessionOver = false
-        sheetOpen = false
         teachOnce()                         // a walk-down's first step teaches the light, if this walk never has
         return [.save]
     }
 
     // MARK: The sheet
 
-    /// The sheet stands raised when the person opened it, or when there is no plan to look back at.
-    var sheetRaised: Bool { sheetOpen || items.isEmpty }
+    /// The sheet stands raised only when there is no plan to look back at; with one it peeks, and its
+    /// handle goes to Today (2026-11-17, the owner: "Show my day" and "Open Today" were one too many).
+    var sheetRaised: Bool { items.isEmpty }
 
     /// Look back up's one line: the plan while the sheet is down, today once it is up.
     var endingTitle: String { sheetRaised ? WalkCopy.heresToday : WalkCopy.lookBack }
 
-    /// What the handle says; nil when there is nothing to look back at, so nothing to lower it to.
-    var sheetHandleLabel: String? {
-        guard !items.isEmpty else { return nil }
-        return sheetOpen ? WalkCopy.lookBackHandle : WalkCopy.showMyDay
-    }
-
-    /// The handle raises the sheet and lowers it again; it never ends the walk.
-    mutating func moveSheet() -> [WalkEffect] {
-        guard step == 6, !items.isEmpty else { return [] }
-        sheetOpen.toggle()
-        return []
-    }
+    /// What the handle says: "Take me to Today"; nil when there is no plan, where the sheet stands raised
+    /// with its own button.
+    var sheetHandleLabel: String? { items.isEmpty ? nil : WalkCopy.goToToday }
 
     // MARK: The ending's rows
 

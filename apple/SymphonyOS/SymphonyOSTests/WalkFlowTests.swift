@@ -600,14 +600,12 @@ final class WalkFlowTests {
         m.choose(.startThere)
         m.choose(.next)
         #expect(m.state.step == 6)
-        m.send(.sheetHandle)                                   // walked from inside the raised sheet
-        #expect(m.state.sheetOpen)
+        #expect(!m.state.sheetRaised)                          // offered in the peek, under the handle
 
         m.send(.walkAnother)
         #expect(m.state.step == 2)
         #expect(m.state.depth == .quick)
         #expect(m.state.focus[.season] == bathroom.id)
-        #expect(!m.state.sheetOpen)                            // the sheet is put away for the walk down
         #expect(store.load(for: me)?.step == 2)
 
         // The second goal's chain links to its own lines, not the first's.
@@ -844,12 +842,8 @@ final class WalkFlowTests {
         await say(m, "feel strong again")
         for _ in 0..<5 { m.choose(.next) }
         #expect(m.state.step == 6)
-        #expect(!m.state.sheetOpen)
+        #expect(!m.state.sheetRaised)
         #expect(m.nextToWalk == m.state.items(on: .year).first?.title)   // its season piece not walked yet
-        m.send(.sheetHandle)
-        #expect(m.state.sheetOpen)
-        m.send(.sheetHandle)
-        #expect(!m.state.sheetOpen)
     }
 
     @Test func tickingARowCompletesTheTaskWhoeverPlantedIt() async throws {
@@ -901,12 +895,8 @@ final class WalkFlowTests {
         for _ in 0..<5 { m.choose(.next) }
         #expect(m.state.step == 6)
         #expect(m.endingRows.isEmpty && m.dayLine == WalkCopy.nothingToday)
-        m.send(.sheetHandle)
-        #expect(m.state.sheetOpen)
-        m.send(.sheetHandle)
-        #expect(!m.state.sheetOpen)
-        #expect(ended.isEmpty)                                 // the handle only raises and lowers
-        m.send(.goToToday)
+        #expect(ended.isEmpty)
+        m.send(.sheetHandle)                                   // "Take me to Today"
         #expect(ended == [.finished])
         #expect(store.load(for: me)?.status == .finished)
     }
@@ -1128,7 +1118,7 @@ final class WalkFlowTests {
         _ = month.apply(.lookBackPaper(.season), paperEnv)
         #expect(!month.paperOpen && month.paperLevel == nil)
         var raised = s
-        _ = raised.apply(.sheetHandle, paperEnv)
+        raised.items = []                                      // the sheet stands raised only with no plan
         #expect(raised.sheetRaised)
         _ = raised.apply(.lookBackPaper(.year), paperEnv)
         #expect(!raised.paperOpen)
