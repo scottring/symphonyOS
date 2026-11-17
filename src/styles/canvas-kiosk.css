@@ -511,6 +511,15 @@ li:last-child > .kc-ev { border-bottom: 0; }
 .kc-call-empty svg { width: calc(var(--kc-u) * 3); height: calc(var(--kc-u) * 3); color: var(--kc-muted); }
 .kc-call-actions { margin-top: auto; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: calc(var(--kc-u) * .8); }
 .kc-call-actions.is-one { grid-template-columns: minmax(0, 1fr); }
+/* kidsPhone ringtone picker (inside the call panel) */
+.kc-ring-entry { align-self: center; }
+.kc-ring { display: flex; flex-direction: column; gap: calc(var(--kc-u) * .8); }
+.kc-ring-group h3 { margin: calc(var(--kc-u) * .4) 0 calc(var(--kc-u) * .5); font-size: calc(var(--kc-u) * 1); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--kc-muted); }
+.kc-ring-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--kc-u) * .6); }
+.kc-ring-opt { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: calc(var(--kc-u) * .6) calc(var(--kc-u) * 1); text-align: left; border-width: 1px; border-color: var(--kc-line); }
+.kc-ring-opt.is-on { border-width: 3px; border-color: var(--kc-accent); }
+.kc-ring-name { display: inline-flex; align-items: center; gap: 8px; }
+.kc-ring-opt small { font-size: calc(var(--kc-u) * .85); font-weight: 500; color: var(--kc-muted); }
 .kiosk-canvas.is-standalone { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; padding: calc(var(--kc-u) * 1.6) var(--kc-pad-x); gap: 12px; }
 .kc-standalone-head { display: flex; justify-content: flex-end; }
 

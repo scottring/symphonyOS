@@ -4,14 +4,40 @@
 // Renders nothing when there is no live call. Inbound shows "{name} is calling";
 // outbound shows "Calling {name}…". Blocked calls are never published upstream,
 // so they never reach here. lucide-react icons only — no emoji (wall-v2 rule).
+//
+// An inbound call also RINGS here, through the EMEET, in the ringtone picked
+// on the wall's phone screen — so the handset's own ringer can be switched
+// off. It stops when the kid picks up (the bridge sends `connected`), when the
+// call ends, or when someone closes this screen.
 
+import { useEffect } from 'react';
 import { PhoneIncoming, PhoneOutgoing, X } from 'lucide-react';
 import { useCurrentCall, type CurrentCall } from '@/hooks/useCurrentCall';
+import { loadRingtone, startRinging } from '@/lib/wall/ringtones';
 
 /** Direction-aware headline. Exported for unit testing. */
-export function callHeadline(call: Pick<CurrentCall, 'direction' | 'name'>): string {
+export function callHeadline(call: Pick<CurrentCall, 'direction' | 'name'> & { state?: CurrentCall['state'] }): string {
   const who = call.name?.trim() || (call.direction === 'outbound' ? 'someone' : 'Someone');
-  return call.direction === 'outbound' ? `Calling ${who}…` : `${who} is calling`;
+  if (call.direction === 'outbound') return `Calling ${who}…`;
+  if (call.state === 'connected') return call.name?.trim() ? `On the phone with ${who}` : 'On the phone';
+  return `${who} is calling`;
+}
+
+/** Only an incoming call that nobody has picked up yet rings the wall. */
+export function shouldRing(call: Pick<CurrentCall, 'direction' | 'state'> | null): boolean {
+  return !!call && call.direction === 'inbound' && call.state === 'ringing';
+}
+
+function storage(): Storage | null {
+  try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
+}
+
+/** Rings while `ring` is true; a new call (new sid) restarts the ring. */
+function useCallRingtone(ring: boolean, callSid: string | null | undefined) {
+  useEffect(() => {
+    if (!ring) return;
+    return startRinging(loadRingtone(storage()));
+  }, [ring, callSid]);
 }
 
 function initialOf(name: string | null): string {
@@ -20,6 +46,7 @@ function initialOf(name: string | null): string {
 
 export function CallerIdTakeover() {
   const { call, dismiss } = useCurrentCall();
+  useCallRingtone(shouldRing(call), call?.call_sid);
   if (!call) return null;
 
   const outbound = call.direction === 'outbound';
@@ -59,7 +86,11 @@ export function CallerIdTakeover() {
 
         {/* The wall cannot hang up (place-call has no hang-up), so the button
             says what it does: it clears this screen, on this wall, only. */}
-        <p className="font-body text-xl text-white/75">The call continues on the handset — put the phone down to end it.</p>
+        <p className="font-body text-xl text-white/75">
+          {shouldRing(call)
+            ? 'Pick up the phone to answer.'
+            : 'The call continues on the handset — put the phone down to end it.'}
+        </p>
         <button
           type="button"
           onClick={dismiss}

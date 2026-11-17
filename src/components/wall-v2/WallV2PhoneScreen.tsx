@@ -23,7 +23,9 @@
 // `fixture` shows fixed contacts for design previews and never dials.
 
 import { useRef, useState } from 'react'
-import { Phone, X, PhoneCall } from 'lucide-react'
+import { Phone, X, PhoneCall, BellRing } from 'lucide-react'
+import { loadRingtone, ringtoneLabel, saveRingtone, type RingtoneId } from '@/lib/wall/ringtones'
+import { WallV2RingtonePicker } from './WallV2RingtonePicker'
 import { useKidPhoneContacts, callableContacts, partitionContacts } from '@/hooks/useKidPhoneContacts'
 import { useHandsetState } from '@/hooks/useHandsetState'
 import { placeCall } from '@/lib/telephony/placeCall'
@@ -39,6 +41,10 @@ export interface PhoneFixture {
   contacts: KidPhoneContact[]
   /** Open the confirm panel on this contact. */
   selectedId?: string
+}
+
+function storage(): Storage | null {
+  try { return typeof localStorage !== 'undefined' ? localStorage : null } catch { return null }
 }
 
 function initials(name: string): string {
@@ -68,6 +74,9 @@ export function WallV2PhoneScreen({ onClose, embedded = false, fixture }: { onCl
     const c = fixture?.selectedId ? callableContacts(fixture.contacts).find((x) => x.contactId === fixture.selectedId) : null
     return c ? { state: 'confirm', contact: c } : null
   })
+  const [ringtone, setRingtone] = useState<RingtoneId>(() => loadRingtone(storage()))
+  const [picking, setPicking] = useState(false)
+  const chooseRingtone = (id: RingtoneId) => { setRingtone(id); saveRingtone(storage(), id) }
   // Bumped when the screen moves on so a placeCall() that resolves late can't
   // repaint a panel nobody is looking at.
   const requestId = useRef(0)
@@ -98,7 +107,7 @@ export function WallV2PhoneScreen({ onClose, embedded = false, fixture }: { onCl
   }
 
   const dialed = pending?.state === 'dialing' || pending?.state === 'dialed'
-  const pick = (x: KidPhoneContact) => { if (!dialed) setPending({ state: 'confirm', contact: x }) }
+  const pick = (x: KidPhoneContact) => { if (!dialed) { setPicking(false); setPending({ state: 'confirm', contact: x }) } }
   // Inside the kiosk frame the frame's place ("Calling") is the page heading.
   const Heading = embedded ? 'h2' : 'h1'
 
@@ -125,12 +134,20 @@ export function WallV2PhoneScreen({ onClose, embedded = false, fixture }: { onCl
       </section>
 
       <section className="kc-call-confirm" aria-label="Confirm call">
-        {!pending && (
-          <div className="kc-call-empty">
-            <PhoneCall aria-hidden="true" />
-            <p>Pick someone to call.</p>
-            <p className="kc-muted">Rings {KIOSK_LINE}. Nothing dials until you tap Call.</p>
-          </div>
+        {!pending && picking && (
+          <WallV2RingtonePicker value={ringtone} onChange={chooseRingtone} onDone={() => setPicking(false)} />
+        )}
+        {!pending && !picking && (
+          <>
+            <div className="kc-call-empty">
+              <PhoneCall aria-hidden="true" />
+              <p>Pick someone to call.</p>
+              <p className="kc-muted">Rings {KIOSK_LINE}. Nothing dials until you tap Call.</p>
+            </div>
+            <button type="button" className="kc-btn kc-ring-entry" onClick={() => setPicking(true)}>
+              <BellRing aria-hidden="true" /> Ringtone: {ringtoneLabel(ringtone)}
+            </button>
+          </>
         )}
         {pending && (
           <>

@@ -31,6 +31,12 @@ vi.mock('@/hooks/useHandsetState', () => ({
 const placeCall = vi.fn().mockResolvedValue({ ok: true });
 vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }));
 
+const playRingtone = vi.hoisted(() => vi.fn(() => ({ seconds: 2, stop: vi.fn() })));
+vi.mock('@/lib/wall/ringtones', async (orig) => ({
+  ...(await orig<typeof import('@/lib/wall/ringtones')>()),
+  playRingtone: (id: string) => playRingtone(id),
+}));
+
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 
 describe('WallV2PhoneScreen', () => {
@@ -164,5 +170,26 @@ describe('WallV2PhoneScreen handset awareness', () => {
   it('shows no off-hook hint when the receiver is down', () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
     expect(screen.queryByText(/holding the phone/i)).toBeNull();
+  });
+
+  it('lets you hear and pick the ringtone, then go back to calling', () => {
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Ringtone: Music box/ }));
+    const frogs = screen.getByRole('button', { name: /Frog chorus/ });
+    expect(frogs.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(frogs);
+    expect(playRingtone).toHaveBeenCalledWith('frog-chorus');
+    expect(screen.getByRole('button', { name: /Frog chorus/ }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByRole('button', { name: /Ringtone: Frog chorus/ })).toBeTruthy();
+    expect(screen.getByText(/pick someone to call/i)).toBeTruthy();
+  });
+
+  it('closes the ringtone picker when a contact is picked', () => {
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Ringtone:/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Grandma' }));
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Call Grandma?' })).toBeTruthy();
   });
 });
