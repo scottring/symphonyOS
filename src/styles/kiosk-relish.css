@@ -30,7 +30,21 @@
 .kiosk-canvas .kr-q.is-long { font-size: calc(54 * var(--p)); }
 
 /* ---- Dinnertime activities: eight cards ---------------------------------- */
-.kiosk-canvas .kr-games > .kw-eyebrow { flex: none; margin-bottom: calc(18 * var(--p)); }
+/* The heading row: Open Relish, the real app full screen, where games are
+   kept, sits beside it so the eight cards keep their room. */
+.kiosk-canvas .kr-games-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: calc(24 * var(--p)); margin-bottom: calc(18 * var(--p)); }
+.kiosk-canvas .kr-games-head .kw-eyebrow { margin: 0; }
+.kiosk-canvas .kr-open {
+  flex: none; display: flex; align-items: center; gap: calc(16 * var(--p)); min-height: calc(88 * var(--p));
+  padding: 0 calc(22 * var(--p)) 0 calc(26 * var(--p)); border-radius: 999px;
+  border: calc(2 * var(--p)) solid var(--kw-sym); background: var(--kw-sym-tint); color: var(--kw-ink);
+  font: inherit; text-align: left; white-space: nowrap;
+}
+.kiosk-canvas .kr-open:active { transform: scale(.97); }
+.kiosk-canvas .kr-open svg { flex: none; width: calc(34 * var(--p)); height: calc(34 * var(--p)); color: var(--kw-sym); }
+.kiosk-canvas .kr-open span { display: flex; align-items: baseline; gap: calc(12 * var(--p)); }
+.kiosk-canvas .kr-open strong { font: 600 calc(28 * var(--p)) var(--kw-sans); }
+.kiosk-canvas .kr-open small { font-size: calc(22 * var(--p)); color: var(--kw-muted); }
 .kiosk-canvas .kr-grid {
   flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: calc(18 * var(--p));

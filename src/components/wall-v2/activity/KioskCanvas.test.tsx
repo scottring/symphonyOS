@@ -285,6 +285,18 @@ describe('Kitchen wall v2: the frame', () => {
     expect(screen.getByRole('region', { name: 'Dinnertime activities' })).toBeInTheDocument()
   })
 
+  // Scott, 2026-11-19: run real Relish on the wall, signed in, so games save.
+  it('Open Relish runs the real app full screen, with the microphone for Listen', () => {
+    render(<Harness v1={v1Rest} />)
+    fireEvent.click(within(dock().getByRole('navigation', { name: 'Wall' })).getByRole('button', { name: 'Relish' }))
+    fireEvent.click(screen.getByRole('button', { name: /Open Relish/ }))
+    const frame = screen.getByTitle('Relish')
+    expect(frame.tagName).toBe('IFRAME')
+    expect(frame).toHaveAttribute('src', 'https://app.relish.my/relish/')
+    expect(frame.getAttribute('allow')).toContain('microphone')
+    expect(screen.queryByRole('region', { name: 'Tonight’s question' })).toBeNull()
+  })
+
   it('More has a Relish tile: Dinner games and questions', () => {
     render(<Harness v1={v1Rest} />)
     fireEvent.click(dock().getByRole('button', { name: 'More' }))

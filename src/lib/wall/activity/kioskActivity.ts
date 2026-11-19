@@ -43,7 +43,7 @@ export type KioskStage =
   | { kind: 'agenda'; view: 'today' | 'weekend' }
   /** A web app from a kid's routine (wallApps), full screen. `routineId` is
    *  checked off when the app says it's done. */
-  | { kind: 'webapp'; url: string; title: string; origin: string; routineId?: string }
+  | { kind: 'webapp'; url: string; title: string; origin: string; routineId?: string; allow?: string }
 
 export type KioskStageKind = KioskStage['kind']
 

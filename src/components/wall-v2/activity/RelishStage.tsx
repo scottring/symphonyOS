@@ -12,11 +12,12 @@
 // open (stageHoldsOpen) and goes back on its own after RELISH_STAGE_MAX_MS
 // untouched, so it never sits there overnight.
 //
-// Presentation only: the prompts and games are bundled (lib/wall/relish);
-// nothing here reads or writes.
+// The prompts and games here are bundled (lib/wall/relish) and nothing here
+// is saved. Open Relish runs the real app full screen (a WebAppStage), signed
+// in, so games played there are kept in the family's books.
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ChevronRight, Shuffle } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronRight, Shuffle } from 'lucide-react'
 import type { RelishAudience } from '@/lib/wall/relish/dinnerPrompts'
 import { RELISH_GAMES, type RelishGame } from '@/lib/wall/relish/games'
 import { localDayNumber, tonightsPrompt } from '@/lib/wall/relish/tonight'
@@ -63,7 +64,7 @@ function GameView({ game, day, onBack }: { game: RelishGame; day: number; onBack
   )
 }
 
-export function RelishStage({ now, onClose }: { now: Date; onClose?: () => void }) {
+export function RelishStage({ now, onClose, onOpenRelish }: { now: Date; onClose?: () => void; onOpenRelish?: () => void }) {
   const [audience, setAudience] = useState<RelishAudience>('kid')
   // Another's taps, kept with the day they were made on: a new day starts
   // again from its own pick.
@@ -101,7 +102,16 @@ export function RelishStage({ now, onClose }: { now: Date; onClose?: () => void 
       <section className="kr-games" aria-label="Dinnertime activities">
         {game ? <GameView key={game.id} game={game} day={day} onBack={() => setOpenId(null)} /> : (
           <>
-            <p className="kw-eyebrow">Dinnertime activities</p>
+            <div className="kr-games-head">
+              <p className="kw-eyebrow">Dinnertime activities</p>
+              {onOpenRelish && (
+                <button type="button" className="kr-open" onClick={onOpenRelish}>
+                  <BookOpen aria-hidden="true" />
+                  <span><strong>Open Relish</strong><small>games there are saved</small></span>
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              )}
+            </div>
             <ul className="kr-grid">
               {RELISH_GAMES.map((g) => (
                 <li key={g.id}>
