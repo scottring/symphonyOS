@@ -93,6 +93,8 @@ await import('./styles/kiosk-energy.css')
 await import('./styles/kiosk-agenda.css')
 // The kept school digest on the wall (More → School digest).
 await import('./styles/kiosk-digest.css')
+// Relish at the table: tonight's question and dinnertime games.
+await import('./styles/kiosk-relish.css')
 // A kid's tablet (/kid).
 await import('./styles/kid-kiosk.css')
 await import('./styles/canvas-routines.css')

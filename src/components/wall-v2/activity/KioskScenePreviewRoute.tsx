@@ -2,6 +2,8 @@
 // approved kiosk board with fixed data (no reads, writes or calls);
 // &v1=night shows a wall v1 Home screen instead; &dock=listening|quiet|muted
 // holds the conversation dock in that state.
+// An activity scene with &v1=<screen> draws it in the live wall's frame
+// (Kitchen wall v2), e.g. /kiosk-preview?scene=relish&v1=dinner&theme=dark.
 import { useSearchParams } from 'react-router-dom'
 import { KioskCanvasPreview } from './KioskCanvasPreview'
 
