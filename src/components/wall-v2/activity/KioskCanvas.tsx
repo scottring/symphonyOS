@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap, GraduationCap, Utensils, StickyNote, Plus } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator, Zap, GraduationCap, Utensils, StickyNote, Plus, MessageCircleHeart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -68,6 +68,7 @@ import { MathStage } from './MathStage'
 import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
 import { DigestStage } from './DigestStage'
+import { RelishStage } from './RelishStage'
 import { dayLabel, toDoLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
@@ -193,6 +194,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const hold = useMemo(() => ({ bedtimeInProgress: p.bedtime.inProgress }), [p.bedtime.inProgress])
   const { setHold } = p.activity
   const goBack = useCallback(() => dispatch({ type: 'BACK' }), [dispatch])
+  const goHome = useCallback(() => dispatch({ type: 'HOME' }), [dispatch])
   useEffect(() => { setHold(hold) }, [hold, setHold])
   const memberById = useCallback((id: string) => p.members.find((m) => m.id === id) ?? null, [p.members])
 
@@ -390,6 +392,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onSelect: () => { setMoreOpen(false); p.onRefreshDigests?.(); dispatch({ type: 'OPEN', stage: { kind: 'digest' } }) },
         }
       : null,
+    { id: 'relish', label: 'Relish', sub: 'Dinner games and questions', icon: MessageCircleHeart, onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'relish' } }) } },
     p.onAddSticky ? { id: 'sticky', label: 'Add a sticky', sub: 'A note for the house', icon: Plus, onSelect: () => { setMoreOpen(false); setStickyOpen(true) } } : null,
     shellTile('list'),
     { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
@@ -509,6 +512,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
     case 'digest':
       content = <DigestStage digests={p.schoolDigests ?? []} todayYmd={localYmd(p.now)} />
       break
+    case 'relish':
+      content = <RelishStage now={p.now} onClose={goHome} />
+      break
     case 'agenda':
       content = p.agenda && p.onSetDone
         ? <AgendaStage view={stage.view} days={p.agenda} sometime={p.agenda.sometime} members={p.members} onSetDone={p.onSetDone} onTapRow={p.onTapRow} />
@@ -560,7 +566,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
   if (v1) {
     // The calm wall's places (Scott, 2026-11-10: "allows you to navigate to
     // where you need to navigate"): one tap each, from any screen.
-    const go = (kind: 'dinner' | 'digest') => () => {
+    const go = (kind: 'dinner' | 'digest' | 'relish') => () => {
       setMoreOpen(false)
       if (kind === 'digest') p.onRefreshDigests?.()
       dispatch({ type: 'OPEN', stage: { kind } })
@@ -573,6 +579,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'agenda', view: p.now.getDay() === 0 || p.now.getDay() === 6 ? 'weekend' : 'today' } }) },
       }] : []),
       { id: 'dinner', label: 'Dinner', icon: Utensils, onSelect: go('dinner'), current: stage.kind === 'dinner' && !moreOpen },
+      { id: 'relish', label: 'Relish', icon: MessageCircleHeart, onSelect: go('relish'), current: stage.kind === 'relish' && !moreOpen },
       ...(lists ? [{ id: 'lists', label: 'Lists', icon: ShoppingCart, onSelect: lists.onSelect }] : []),
       ...(p.schoolDigests ? [{ id: 'school', label: 'School', icon: GraduationCap, onSelect: go('digest'), current: stage.kind === 'digest' && !moreOpen }] : []),
       ...(notes ? [{ id: 'notes', label: 'Notes', icon: StickyNote, onSelect: notes.onSelect }] : []),

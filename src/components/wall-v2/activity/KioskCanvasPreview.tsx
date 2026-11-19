@@ -6,7 +6,8 @@
 //   <KioskCanvasPreview scene="cooking" theme="dark" />
 //
 // scene: home-morning · home-afternoon · home-evening · quiet · dinner ·
-//        groceries · cooking · held · departure · bedtime · call
+//        groceries · cooking · held · departure · bedtime · call · math ·
+//        energy · agenda · agenda-weekend · digest · relish
 // theme: 'light' (the wall's default) | 'dark' (the wall's dark view)
 // v1Screen: a wall v1 Home screen instead (night · rest · weekend · …);
 //        night is dark, the others follow theme.
@@ -99,6 +100,7 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   agenda: { moment: 'after', h: 14, min: 5 },
   'agenda-weekend': { moment: 'after', h: 14, min: 5 },
   digest: { moment: 'dinner', h: 17, min: 30 },
+  relish: { moment: 'dinner', h: 18, min: 35 },
 }
 
 // Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
@@ -181,6 +183,7 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
     agenda: [{ type: 'OPEN', stage: { kind: 'agenda', view: 'today' } }],
     'agenda-weekend': [{ type: 'OPEN', stage: { kind: 'agenda', view: 'weekend' } }],
     digest: [{ type: 'OPEN', stage: { kind: 'digest' } }],
+    relish: [{ type: 'OPEN', stage: { kind: 'relish' } }],
   }
   let s = events[scene].reduce(kioskReducer, initialKioskState(dateKey))
   // "Cumin — probably in the pantry": the board shows one line left off.

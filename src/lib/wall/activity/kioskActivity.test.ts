@@ -180,6 +180,13 @@ describe('kiosk activity: never time out an activity in progress', () => {
     expect(currentStage(kioskReducer(g, idle)).kind).toBe('groceries')
   })
 
+  it('Relish holds: the family talks rather than taps, so idle leaves the question up', () => {
+    const s = run([{ type: 'OPEN', stage: { kind: 'relish' } }])
+    expect(stageHoldsOpen(s, quiet)).toBe(true)
+    expect(currentStage(kioskReducer(s, idle)).kind).toBe('relish')
+    expect(kioskPlace(s, ctx)).toBe('Relish')
+  })
+
   it('"Everyone\'s out" finishes the departure and leaves its stage', () => {
     const s = run([{ type: 'OPEN', stage: { kind: 'departure' } }, { type: 'DEPARTURE_TOGGLE', key: 'k' }, { type: 'DEPARTURE_DONE' }])
     expect(s.departure).toEqual({ checked: ['k'], done: true })

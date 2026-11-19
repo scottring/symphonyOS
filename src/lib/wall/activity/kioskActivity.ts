@@ -37,6 +37,8 @@ export type KioskStage =
   | { kind: 'energy' }
   /** The kept 5pm school digests, newest day first (More → School digest). */
   | { kind: 'digest' }
+  /** Relish at the table: tonight's question and dinnertime games (the dock's Relish). */
+  | { kind: 'relish' }
   /** Everything on today, or the weekend, each task and routine with its check. */
   | { kind: 'agenda'; view: 'today' | 'weekend' }
   /** A web app from a kid's routine (wallApps), full screen. `routineId` is
@@ -188,6 +190,10 @@ export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
     case 'person':
     case 'recipe':
     case 'webapp':
+      return true
+    // Relish: the family talks rather than taps, so the question stays up;
+    // the stage closes itself after a long while instead (RelishStage).
+    case 'relish':
       return true
     case 'groceries':
       return !!s.groceries?.lines.some((l) => l.state === 'saving')
@@ -356,6 +362,8 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
       return 'Energy'
     case 'digest':
       return 'School digest'
+    case 'relish':
+      return 'Relish'
     case 'agenda':
       return stage.view === 'today' ? 'All of today' : ctx.weekendDates ? `This weekend · ${ctx.weekendDates}` : 'This weekend'
     case 'webapp':

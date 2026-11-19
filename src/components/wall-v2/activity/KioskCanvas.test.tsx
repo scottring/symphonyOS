@@ -265,12 +265,32 @@ describe('Kitchen wall v2: the frame', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     const more = screen.getByRole('region', { name: 'More' })
     expect(within(more).getAllByRole('button').map((b) => b.querySelector('b')?.textContent ?? b.textContent))
-      .toEqual(['Done', 'Recipes', 'Call', 'Dark view', 'Voice is off'])
+      .toEqual(['Done', 'Relish', 'Recipes', 'Call', 'Dark view', 'Voice is off'])
     // The lead stays, dimmed beside More.
     expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
     fireEvent.click(within(more).getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
     expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
+  })
+
+  // Scott, 2026-11-19: "a Relish section of the kiosk, with dinnertime
+  // activities and conversation starters".
+  it('Relish rides the bar after Dinner and opens tonight’s question and the table games', () => {
+    render(<Harness v1={v1Rest} />)
+    const nav = () => within(dock().getByRole('navigation', { name: 'Wall' }))
+    fireEvent.click(nav().getByRole('button', { name: 'Relish' }))
+    expect(topBand().getByRole('heading', { level: 1 })).toHaveTextContent('Relish')
+    expect(nav().getByRole('button', { name: 'Relish' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('region', { name: 'Tonight’s question' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Dinnertime activities' })).toBeInTheDocument()
+  })
+
+  it('More has a Relish tile: Dinner games and questions', () => {
+    render(<Harness v1={v1Rest} />)
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /Relish.*Dinner games and questions/ }))
+    expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
+    expect(topBand().getByRole('heading', { level: 1 })).toHaveTextContent('Relish')
   })
 
   it('More has a Recipes tile (the places moved off the moments); Type instead is gone', () => {
@@ -288,14 +308,14 @@ describe('Kitchen wall v2: the frame', () => {
     render(<Harness v1={v1Rest} />)
     const navNames = () => within(dock().getByRole('navigation', { name: 'Wall' })).getAllByRole('button').map((b) => b.textContent)
     // The calm wall's places (2026-11-10) ride the bar on every screen.
-    expect(navNames()).toEqual(['Dinner', 'More'])
+    expect(navNames()).toEqual(['Dinner', 'Relish', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
-    expect(navNames()).toEqual(['Home', 'Dinner', 'More'])
+    expect(navNames()).toEqual(['Home', 'Dinner', 'Relish', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'Home' }))
-    expect(navNames()).toEqual(['Dinner', 'More'])
+    expect(navNames()).toEqual(['Dinner', 'Relish', 'More'])
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
     fireEvent.click(screen.getByRole('button', { name: /^Call/ }))
-    expect(navNames()).toEqual(['Home', 'Back', 'Dinner', 'More'])
+    expect(navNames()).toEqual(['Home', 'Back', 'Dinner', 'Relish', 'More'])
   })
 
   it('without a listener, a tap on the mic opens the strip with the field focused; what is typed runs like speech', () => {

@@ -25,6 +25,7 @@ const PLACE: Record<string, RegExp> = {
   call: /^Calling$/,
   agenda: /^All of today$/,
   'agenda-weekend': /^This weekend · [A-Z][a-z]{2} \d/,
+  relish: /^Relish$/,
 }
 
 describe('KioskCanvasPreview (dev fixture)', () => {
