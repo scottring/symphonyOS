@@ -15,6 +15,16 @@ const WALL_APPS: Record<string, string> = {
   'kaleb-puzzle-trail.vercel.app': 'Puzzle Trail',
 }
 
+/** Relish, opened from the wall's Relish place (Scott, 2026-11-19: run real
+ *  Relish on the wall, signed in, so what's said in dinner games is saved).
+ *  It may use the microphone, for its Listen button. */
+export const RELISH_APP: WallApp & { allow: string } = {
+  url: 'https://app.relish.my/relish/',
+  title: 'Relish',
+  origin: 'https://app.relish.my',
+  allow: 'autoplay; microphone',
+}
+
 /** The first allowed app link in a routine's description, or null. */
 export function wallAppFor(text: string | null | undefined): WallApp | null {
   if (!text) return null

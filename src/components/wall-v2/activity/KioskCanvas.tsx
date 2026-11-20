@@ -69,6 +69,7 @@ import type { KidMath } from '@/hooks/useKidMath'
 import { EnergyStage } from './EnergyStage'
 import { DigestStage } from './DigestStage'
 import { RelishStage } from './RelishStage'
+import { RELISH_APP } from '@/lib/wall/activity/wallApps'
 import { dayLabel, toDoLabel, type SchoolDigest } from '@/lib/schoolDigest/schoolDigests'
 import { WebAppStage } from './WebAppStage'
 import { AgendaStage, AgendaViews } from './AgendaStage'
@@ -504,7 +505,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
       break
     case 'webapp':
-      content = <WebAppStage url={stage.url} title={stage.title} origin={stage.origin} routineId={stage.routineId} onClose={goBack} />
+      content = <WebAppStage url={stage.url} title={stage.title} origin={stage.origin} routineId={stage.routineId} allow={stage.allow} onClose={goBack} />
       break
     case 'energy':
       content = <EnergyStage live={energy} now={p.now} loadPeriod={p.loadEnergyPeriod} />
@@ -513,7 +514,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
       content = <DigestStage digests={p.schoolDigests ?? []} todayYmd={localYmd(p.now)} />
       break
     case 'relish':
-      content = <RelishStage now={p.now} onClose={goHome} />
+      content = <RelishStage now={p.now} onClose={goHome} onOpenRelish={() => dispatch({ type: 'OPEN', stage: { kind: 'webapp', ...RELISH_APP } })} />
       break
     case 'agenda':
       content = p.agenda && p.onSetDone

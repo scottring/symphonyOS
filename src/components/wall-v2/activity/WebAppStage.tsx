@@ -12,11 +12,13 @@ import { isAppDone } from '@/lib/wall/activity/wallApps'
 
 export const APP_STAGE_MAX_MS = 45 * 60_000
 
-export function WebAppStage({ url, title, origin, routineId, onClose }: {
+export function WebAppStage({ url, title, origin, routineId, allow = 'autoplay', onClose }: {
   url: string
   title: string
   origin: string
   routineId?: string
+  /** The frame's permissions; Relish adds the microphone. */
+  allow?: string
   onClose: () => void
 }) {
   const { markDone } = useActionableInstances()
@@ -45,7 +47,7 @@ export function WebAppStage({ url, title, origin, routineId, onClose }: {
         src={url}
         title={title}
         style={{ border: 0, width: '100%', height: '100%', display: 'block' }}
-        allow="autoplay"
+        allow={allow}
         referrerPolicy="no-referrer"
       />
       {checked && routineId && (

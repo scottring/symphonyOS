@@ -34,6 +34,15 @@ describe('Relish on the wall: tonight’s question', () => {
 })
 
 describe('Relish on the wall: dinnertime activities', () => {
+  it('Open Relish shows only when the wall can open it, and opens it', () => {
+    const { rerender } = render(<RelishStage now={NOW} />)
+    expect(screen.queryByRole('button', { name: /Open Relish/ })).toBeNull()
+    const open = vi.fn()
+    rerender(<RelishStage now={NOW} onOpenRelish={open} />)
+    fireEvent.click(screen.getByRole('button', { name: /Open Relish/ }))
+    expect(open).toHaveBeenCalledOnce()
+  })
+
   it('eight games as cards; one opens its steps in place, and All games goes back', () => {
     render(<RelishStage now={NOW} />)
     const games = within(screen.getByRole('region', { name: 'Dinnertime activities' }))
